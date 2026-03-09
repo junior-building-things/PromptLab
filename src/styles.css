@@ -847,13 +847,6 @@ p {
   padding: 0 1.35rem 1.35rem;
 }
 
-.batch-meta-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-}
-
 .batch-table-shell {
   display: grid;
   gap: 1rem;
@@ -921,9 +914,11 @@ p {
 
 .batch-table-output-image {
   width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
+  max-width: 220px;
+  max-height: 220px;
+  object-fit: contain;
   display: block;
+  margin: 0 auto;
   border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: #f8faff;
@@ -934,6 +929,17 @@ p {
   border-radius: 16px;
   background: #f8faff;
   color: var(--surface-ink);
+}
+
+.batch-table-output-placeholder {
+  width: 100%;
+  max-width: 220px;
+  height: 220px;
+  margin: 0 auto;
+  border-radius: 18px;
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.9), rgba(241, 245, 249, 0.95), rgba(226, 232, 240, 0.9));
+  background-size: 200% 100%;
+  animation: placeholder-shimmer 1.4s linear infinite;
 }
 
 .batch-table-empty {
@@ -1030,6 +1036,15 @@ textarea:disabled {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes placeholder-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
   }
 }
 

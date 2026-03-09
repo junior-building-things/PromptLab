@@ -93,11 +93,30 @@ function TextIcon({ Icon }: { Icon: LucideIcon }) {
 function BatchResultCell({
   results,
   getAssetName,
+  isRunning,
+  placeholderCount,
 }: {
   results: TestResult[];
   getAssetName: (id?: string) => string | undefined;
+  isRunning: boolean;
+  placeholderCount: number;
 }) {
   if (results.length === 0) {
+    if (isRunning) {
+      return (
+        <div className="batch-table-cell-stack">
+          {Array.from({ length: placeholderCount }).map((_, index) => (
+            <div key={index} className="batch-table-result">
+              {placeholderCount > 1 ? (
+                <div className="batch-table-result-meta">Image Reference {index + 1}</div>
+              ) : null}
+              <div className="batch-table-output-placeholder" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     return <div className="batch-table-empty">No Result</div>;
   }
 
@@ -363,8 +382,14 @@ export function BatchTestPage() {
   }
 
   function buildRunTables(run: BatchRun): BatchTable[] {
-    const promptIds = [...new Set(run.results.map((result) => result.promptId))];
-    const modelIds = [...new Set(run.results.map((result) => result.modelId))];
+    const promptIds =
+      run.scenario.promptIds && run.scenario.promptIds.length > 0
+        ? run.scenario.promptIds
+        : [...new Set(run.results.map((result) => result.promptId))];
+    const modelIds =
+      run.scenario.modelIds && run.scenario.modelIds.length > 0
+        ? run.scenario.modelIds
+        : [...new Set(run.results.map((result) => result.modelId))];
     const rows = getRowLabels(run);
 
     const promptColumns = promptIds.map((id) => ({ id, label: getPromptLabel(id) }));
@@ -638,34 +663,6 @@ export function BatchTestPage() {
 
                   {expandedTests.has(run.id) ? (
                     <div className="batch-results-stack">
-                      <div className="surface-card batch-meta-card">
-                        <div className="meta-pair">
-                          <HistoryIcon size={15} />
-                          <div>
-                            <span>Created Time</span>
-                            <strong>{format(new Date(run.createdAt), 'MMM d, yyyy HH:mm')}</strong>
-                          </div>
-                        </div>
-                        <div className="meta-pair">
-                          {run.status === 'running' ? (
-                            <LoaderCircle size={15} className="spin" />
-                          ) : run.status === 'failed' ? (
-                            <CircleAlert size={15} />
-                          ) : (
-                            <CheckCircle size={15} />
-                          )}
-                          <div>
-                            <span>Status</span>
-                            <strong>
-                              {run.status === 'running'
-                                ? 'In Progress'
-                                : run.status === 'failed'
-                                  ? 'Failed'
-                                  : 'Completed'}
-                            </strong>
-                          </div>
-                        </div>
-                      </div>
                       {run.status === 'running' ? (
                         <div className="surface-card stat-card">
                           <LoaderCircle size={18} className="spin" />
@@ -706,6 +703,12 @@ export function BatchTestPage() {
                                           <BatchResultCell
                                             results={cell?.results ?? []}
                                             getAssetName={getAssetName}
+                                            isRunning={run.status === 'running'}
+                                            placeholderCount={
+                                              run.scenario.assetIds && run.scenario.assetIds.length > 0
+                                                ? run.scenario.assetIds.length
+                                                : 1
+                                            }
                                           />
                                         </td>
                                       );
