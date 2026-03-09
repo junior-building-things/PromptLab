@@ -889,6 +889,12 @@ p {
   padding-bottom: 0.5rem;
 }
 
+.batch-results-table thead th:not(:first-child) {
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
+}
+
 .batch-results-table tbody th {
   width: 220px;
   min-width: 220px;
@@ -899,7 +905,9 @@ p {
 }
 
 .batch-results-table td {
+  width: 220px;
   min-width: 220px;
+  max-width: 220px;
   padding-top: 0.5rem;
 }
 
@@ -926,8 +934,7 @@ p {
 }
 
 .batch-table-output-image {
-  width: 100%;
-  max-width: 220px;
+  width: 220px;
   max-height: 220px;
   object-fit: contain;
   display: block;
@@ -945,8 +952,7 @@ p {
 }
 
 .batch-table-output-placeholder {
-  width: 100%;
-  max-width: 220px;
+  width: 220px;
   height: 220px;
   margin: 0;
   border-radius: 18px;
