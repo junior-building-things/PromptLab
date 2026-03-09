@@ -66,6 +66,7 @@ type AppContextValue = AppState & {
   removePromptVersion: (versionId: string) => void;
   removePromptProject: (projectId: string) => void;
   createAsset: (draft: AssetDraft) => void;
+  removeAsset: (id: string) => void;
   updateAsset: (id: string, draft: AssetDraft) => void;
   updateModel: (id: string, draft: Partial<ModelDraft>) => void;
   createRun: (run: Omit<BatchRun, 'id' | 'createdAt'>) => BatchRun;
@@ -321,6 +322,13 @@ export function AppProvider({ children }: PropsWithChildren) {
     }));
   }, []);
 
+  const removeAsset = useCallback((id: string) => {
+    setState((current) => ({
+      ...current,
+      assets: current.assets.filter((asset) => asset.id !== id),
+    }));
+  }, []);
+
   const updateAsset = useCallback((id: string, draft: AssetDraft) => {
     setState((current) => ({
       ...current,
@@ -377,6 +385,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       removePromptVersion,
       removePromptProject,
       createAsset,
+      removeAsset,
       updateAsset,
       updateModel,
       createRun,
@@ -388,6 +397,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       createRun,
       removePromptVersion,
       removePromptProject,
+      removeAsset,
       state,
       updateAsset,
       updateModel,

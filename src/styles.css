@@ -344,7 +344,6 @@ p {
 }
 
 .asset-card,
-.asset-card-header,
 .asset-preview-text {
   display: grid;
   gap: 0.85rem;
@@ -357,13 +356,31 @@ p {
 }
 
 .asset-card {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1 / 1.25;
   grid-template-rows: auto 1fr auto;
   overflow: hidden;
 }
 
 .asset-card-header {
-  align-content: start;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.asset-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.asset-title-row svg {
+  color: var(--accent-strong);
+  flex-shrink: 0;
+}
+
+.asset-title-row h3 {
+  margin: 0;
 }
 
 .asset-preview {

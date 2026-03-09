@@ -1,8 +1,7 @@
 import { formatDistanceToNow } from 'date-fns';
-import { FileImage, FileText, Plus, Upload } from 'lucide-react';
+import { FileImage, FileText, MoreHorizontal, Plus, Trash2, Upload } from 'lucide-react';
 import {
   type ChangeEvent,
-  type ClipboardEvent,
   useMemo,
   useRef,
   useState,
@@ -29,9 +28,11 @@ function parseTextInputs(source: string) {
 }
 
 export function AssetsPage() {
-  const { assets, createAsset } = useAppContext();
+  const { assets, createAsset, removeAsset } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const [menuAssetId, setMenuAssetId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AssetComposerState>({
     name: '',
     kind: 'text-inputs',
@@ -53,6 +54,7 @@ export function AssetsPage() {
 
   function closeComposer() {
     setComposerOpen(false);
+    setSelectedFileName('');
     setDraft({
       name: '',
       kind: 'text-inputs',
@@ -89,21 +91,18 @@ export function AssetsPage() {
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    setSelectedFileName(file.name);
     readFile(file);
     event.target.value = '';
   }
 
-  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
-    if (draft.kind !== 'image-reference') return;
+  function handleRemoveAsset(assetId: string, assetName: string) {
+    if (!window.confirm(`Remove ${assetName}?`)) {
+      return;
+    }
 
-    const imageItem = Array.from(event.clipboardData.items).find((item) =>
-      item.type.startsWith('image/'),
-    );
-    const file = imageItem?.getAsFile();
-    if (!file) return;
-
-    event.preventDefault();
-    readFile(file);
+    removeAsset(assetId);
+    setMenuAssetId(null);
   }
 
   return (
@@ -129,14 +128,32 @@ export function AssetsPage() {
               return (
                 <article key={asset.id} className="surface-card asset-card">
                   <div className="asset-card-header">
-                    <div>
+                    <div className="asset-title-row">
+                      {asset.kind === 'text-inputs' ? <FileText size={18} /> : <FileImage size={18} />}
                       <h3>{asset.name}</h3>
-                      <p>{asset.kind === 'text-inputs' ? 'Text Inputs' : 'Image Reference'}</p>
                     </div>
-                    <span className="pill pill-subtle">
-                      {asset.kind === 'text-inputs' ? <FileText size={14} /> : <FileImage size={14} />}
-                      {asset.kind === 'text-inputs' ? 'Text Inputs' : 'Image Reference'}
-                    </span>
+                    <div className="card-menu-wrap">
+                      <button
+                        className="icon-action-button"
+                        onClick={() =>
+                          setMenuAssetId((current) => (current === asset.id ? null : asset.id))
+                        }
+                        aria-label="Asset actions"
+                      >
+                        <MoreHorizontal size={18} />
+                      </button>
+                      {menuAssetId === asset.id ? (
+                        <div className="card-menu-sheet">
+                          <button
+                            className="menu-sheet-action menu-sheet-danger"
+                            onClick={() => handleRemoveAsset(asset.id, asset.name)}
+                          >
+                            <Trash2 size={15} />
+                            Remove
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="asset-preview">
@@ -181,16 +198,14 @@ export function AssetsPage() {
           <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
             <header className="composer-sheet-header">
               <div>
-                <p className="eyebrow">Upload Asset</p>
-                <h3>Create Asset</h3>
-                <p>Add reusable text inputs or image references for future test runs.</p>
+                <h3>Upload Asset</h3>
               </div>
               <div className="button-row-inline">
                 <button className="button button-secondary" onClick={closeComposer}>
                   Cancel
                 </button>
                 <button className="button button-primary" onClick={handleCreateAsset}>
-                  Create Asset
+                  Upload Asset
                 </button>
               </div>
             </header>
@@ -212,11 +227,14 @@ export function AssetsPage() {
                 <select
                   value={draft.kind}
                   onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      kind: event.target.value as AssetKind,
-                      source: '',
-                    }))
+                    {
+                      setSelectedFileName('');
+                      setDraft((current) => ({
+                        ...current,
+                        kind: event.target.value as AssetKind,
+                        source: '',
+                      }));
+                    }
                   }
                 >
                   <option value="text-inputs">Text Inputs</option>
@@ -240,6 +258,7 @@ export function AssetsPage() {
                     {draft.kind === 'image-reference' ? 'PNG or JPG' : 'TXT'}
                   </span>
                 </div>
+                {selectedFileName ? <p className="meta-text">{selectedFileName}</p> : null}
                 <input
                   ref={fileInputRef}
                   className="sr-only"
@@ -249,22 +268,19 @@ export function AssetsPage() {
                 />
               </div>
 
-              <label className="field-block">
-                <span>{draft.kind === 'image-reference' ? 'Paste Image' : 'Paste Text Inputs'}</span>
-                <textarea
-                  rows={draft.kind === 'image-reference' ? 8 : 6}
-                  value={draft.source}
-                  onPaste={handlePaste}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, source: event.target.value }))
-                  }
-                  placeholder={
-                    draft.kind === 'image-reference'
-                      ? 'Paste an image URL, data URL, or paste an image from your clipboard.'
-                      : 'Paste comma-separated text inputs.'
-                  }
-                />
-              </label>
+              {draft.kind === 'text-inputs' ? (
+                <label className="field-block">
+                  <span>Paste Text Inputs</span>
+                  <textarea
+                    rows={6}
+                    value={draft.source}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, source: event.target.value }))
+                    }
+                    placeholder="Paste comma-separated text inputs."
+                  />
+                </label>
+              ) : null}
             </div>
           </section>
         </div>
