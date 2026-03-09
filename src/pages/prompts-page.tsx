@@ -83,19 +83,15 @@ export function PromptsPage() {
     if (!composer.projectName.trim() || !composer.systemPrompt.trim()) return;
 
     if (composer.mode === 'project') {
-      const created = createPromptProject({
+      createPromptProject({
         name: composer.projectName.trim(),
         systemPrompt: composer.systemPrompt.trim(),
       });
-      navigate(`/prompts/${created.project.id}?version=${created.version.id}`);
       closeComposer();
       return;
     }
 
-    const created = createPromptVersion(composer.projectId, composer.systemPrompt.trim());
-    if (created) {
-      navigate(`/prompts/${composer.projectId}?version=${created.id}`);
-    }
+    createPromptVersion(composer.projectId, composer.systemPrompt.trim());
     closeComposer();
   }
 
