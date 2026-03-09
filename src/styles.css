@@ -345,10 +345,18 @@ p {
 .prompt-card,
 .list-card,
 .model-card,
+.project-prompt-card,
 .history-result-card,
 .stat-card,
 .form-card {
   display: grid;
+  gap: 1rem;
+}
+
+.project-prompt-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 1rem;
 }
 

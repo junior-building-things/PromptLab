@@ -63,6 +63,7 @@ type AppContextValue = AppState & {
   createPromptVersion: (projectId: string, systemPrompt?: string) => PromptVersion | null;
   updatePromptProject: (projectId: string, updates: Partial<Pick<PromptProject, 'name'>>) => void;
   updatePromptVersion: (versionId: string, draft: PromptVersionDraft) => void;
+  removePromptVersion: (versionId: string) => void;
   removePromptProject: (projectId: string) => void;
   createAsset: (draft: AssetDraft) => void;
   updateAsset: (id: string, draft: AssetDraft) => void;
@@ -260,6 +261,27 @@ export function AppProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
+  const removePromptVersion = useCallback((versionId: string) => {
+    setState((current) => {
+      const target = current.promptVersions.find((version) => version.id === versionId);
+      if (!target) {
+        return current;
+      }
+
+      const remainingVersions = current.promptVersions.filter((version) => version.id !== versionId);
+      const projectHasVersions = remainingVersions.some((version) => version.projectId === target.projectId);
+
+      return {
+        ...current,
+        promptProjects: projectHasVersions
+          ? current.promptProjects
+          : current.promptProjects.filter((project) => project.id !== target.projectId),
+        promptVersions: remainingVersions,
+        history: current.history.filter((run) => run.scenario.promptId !== versionId),
+      };
+    });
+  }, []);
+
   const createAsset = useCallback((draft: AssetDraft) => {
     setState((current) => ({
       ...current,
@@ -327,6 +349,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       createPromptVersion,
       updatePromptProject,
       updatePromptVersion,
+      removePromptVersion,
       removePromptProject,
       createAsset,
       updateAsset,
@@ -338,6 +361,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       createPromptProject,
       createPromptVersion,
       createRun,
+      removePromptVersion,
       removePromptProject,
       state,
       updateAsset,
