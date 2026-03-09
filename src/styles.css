@@ -5,8 +5,8 @@
   font-weight: 400;
   --bg: #03060c;
   --bg-soft: #08111f;
-  --surface: rgba(9, 14, 24, 0.88);
-  --surface-strong: #0f1727;
+  --surface: #0f0f2a;
+  --surface-strong: #0f0f2a;
   --surface-ink: #eef4ff;
   --muted: #8ea1bf;
   --muted-soft: #64748b;
@@ -96,7 +96,7 @@ textarea {
   gap: 1.25rem;
   padding: 1.25rem;
   border-radius: 28px;
-  background: rgba(7, 12, 22, 0.78);
+  background: #0f0f2a;
   backdrop-filter: blur(18px);
   border: 1px solid rgba(83, 116, 167, 0.22);
   box-shadow: var(--shadow);
