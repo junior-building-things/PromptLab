@@ -375,7 +375,7 @@ p {
 
 .multi-dropdown-trigger {
   display: grid;
-  grid-template-columns: 1rem minmax(0, 1fr) 1rem;
+  grid-template-columns: minmax(0, 1fr) 1rem;
   align-items: center;
   gap: 0.9rem;
   width: 100%;
@@ -388,17 +388,11 @@ p {
   text-align: left;
 }
 
-.multi-dropdown-trigger-spacer {
-  display: block;
-  width: 1rem;
-  height: 1rem;
-}
-
 .multi-dropdown-trigger-copy {
   display: grid;
-  place-items: center;
+  place-items: start;
   min-width: 0;
-  text-align: center;
+  text-align: left;
 }
 
 .multi-dropdown-trigger-copy strong,
@@ -836,6 +830,20 @@ p {
   text-align: left;
 }
 
+.history-shell-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.history-shell-header .history-toggle {
+  flex: 1;
+}
+
+.history-card-menu {
+  padding: 1.35rem 1.35rem 0 0;
+}
+
 .history-results-grid {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   padding: 0 1.35rem 1.35rem;
@@ -866,7 +874,7 @@ p {
 
 .batch-results-table th,
 .batch-results-table td {
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   vertical-align: top;
   border-bottom: 1px solid rgba(148, 163, 184, 0.16);
 }
@@ -876,6 +884,7 @@ p {
   color: var(--muted);
   font-size: 0.88rem;
   font-weight: 700;
+  padding-bottom: 0.5rem;
 }
 
 .batch-results-table tbody th {
@@ -889,6 +898,7 @@ p {
 
 .batch-results-table td {
   min-width: 260px;
+  padding-top: 0.5rem;
 }
 
 .batch-results-table tbody tr:last-child th,
@@ -1093,5 +1103,15 @@ textarea:disabled {
 
   .main-panel-inner {
     min-height: auto;
+  }
+
+  .history-shell-header {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .history-card-menu {
+    padding: 0 1.35rem 1.35rem;
+    align-self: flex-end;
   }
 }

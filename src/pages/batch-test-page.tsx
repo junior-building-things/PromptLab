@@ -10,7 +10,9 @@ import {
   History as HistoryIcon,
   ImageIcon,
   LoaderCircle,
+  MoreHorizontal,
   Play,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -198,7 +200,6 @@ function MultiSelectDropdown({
           className="multi-dropdown-trigger"
           onClick={() => setOpen((current) => !current)}
         >
-          <span className="multi-dropdown-trigger-spacer" aria-hidden="true" />
           <div className="multi-dropdown-trigger-copy">
             <strong>{buildSummary(selectedIds, options, emptyLabel)}</strong>
           </div>
@@ -235,10 +236,11 @@ function MultiSelectDropdown({
 }
 
 export function BatchTestPage() {
-  const { history, promptProjects, promptVersions, assets, models, createRun, updateRun } =
+  const { history, promptProjects, promptVersions, assets, models, removeRun, createRun, updateRun } =
     useAppContext();
   const [composerOpen, setComposerOpen] = useState(false);
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
+  const [openRunMenuId, setOpenRunMenuId] = useState<string | null>(null);
   const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>(
     promptVersions[0] ? [promptVersions[0].id] : [],
   );
@@ -253,6 +255,17 @@ export function BatchTestPage() {
   );
   const [running, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (!openRunMenuId) return;
+
+    function handlePointerDown() {
+      setOpenRunMenuId(null);
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [openRunMenuId]);
 
   const counters = useMemo(() => history.reduce((sum, run) => sum + run.results.length, 0), [history]);
   const readyModels = useMemo(() => models.filter((model) => model.status === 'ready'), [models]);
@@ -338,6 +351,16 @@ export function BatchTestPage() {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  function handleRemoveRun(id: string) {
+    removeRun(id);
+    setOpenRunMenuId(null);
+    setExpandedTests((current) => {
+      const next = new Set(current);
+      next.delete(id);
       return next;
     });
   }
@@ -546,42 +569,68 @@ export function BatchTestPage() {
 
     try {
       const imageReferenceScenarios = selectedImageReferences.length > 0 ? selectedImageReferences : [undefined];
+      const scenarioQueue = selectedPrompts.flatMap((prompt) =>
+        imageReferenceScenarios.flatMap((imageReference) =>
+          selectedUserInputs.map((userInput) => ({
+            prompt,
+            imageReference,
+            userInput,
+          })),
+        ),
+      );
       const results: TestResult[] = [];
       const errors: string[] = [];
 
-      for (const prompt of selectedPrompts) {
-        for (const imageReference of imageReferenceScenarios) {
-          for (const userInput of selectedUserInputs) {
+      await Promise.all(
+        scenarioQueue.map(async ({ prompt, imageReference, userInput }) => {
+          try {
             const apiPayload = await executeScenario(prompt, selectedModels, imageReference, userInput);
 
-            apiPayload.results.forEach((result, index) => {
-              results.push({
-                id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
-                promptId: prompt.id,
-                modelId: result.modelId,
-                assetId: imageReference?.id,
-                userInput,
-                output: result.output,
-                outputImage: result.outputImage,
-                latencyMs: result.latencyMs,
-                score: result.score,
-              });
-            });
+            const nextResults = apiPayload.results.map((result, index) => ({
+              id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
+              promptId: prompt.id,
+              modelId: result.modelId,
+              assetId: imageReference?.id,
+              userInput,
+              output: result.output,
+              outputImage: result.outputImage,
+              latencyMs: result.latencyMs,
+              score: result.score,
+            }));
+
+            results.push(...nextResults);
 
             apiPayload.errors?.forEach((error) => {
               const model = getModel(error.modelId);
               errors.push(`${model?.name ?? 'Unknown Model'}: ${error.message}`);
             });
+
+            const uniqueErrors = [...new Set(errors)];
+            updateRun(draftRun.id, {
+              status: 'running',
+              errorMessage: uniqueErrors.length > 0 ? uniqueErrors.join(' | ') : undefined,
+              results: [...results],
+            });
+          } catch (error) {
+            errors.push(
+              error instanceof Error ? error.message : 'Batch run failed for an unknown reason.',
+            );
+            const uniqueErrors = [...new Set(errors)];
+            updateRun(draftRun.id, {
+              status: 'running',
+              errorMessage: uniqueErrors.join(' | '),
+              results: [...results],
+            });
           }
-        }
-      }
+        }),
+      );
 
       const uniqueErrors = [...new Set(errors)];
 
       updateRun(draftRun.id, {
         status: uniqueErrors.length > 0 ? 'failed' : 'completed',
         errorMessage: uniqueErrors.length > 0 ? uniqueErrors.join(' | ') : undefined,
-        results,
+        results: [...results],
       });
     } catch (error) {
       updateRun(draftRun.id, {
@@ -623,53 +672,81 @@ export function BatchTestPage() {
 
               {history.map((run) => (
                 <article key={run.id} className="surface-card history-shell">
-                  <button className="history-toggle" onClick={() => toggleExpand(run.id)}>
-                    <div className="list-card-topline">
-                      <div className="icon-pill icon-pill-muted">
-                        {expandedTests.has(run.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                      </div>
-                      <div>
-                        <h3>{run.name}</h3>
-                        <div className="history-meta">
-                          <span>{format(new Date(run.createdAt), 'MMM d, yyyy HH:mm')}</span>
-                          <span
-                            className={`pill ${
-                              run.status === 'failed'
-                                ? 'pill-danger'
-                                : run.status === 'running'
-                                  ? 'pill-progress'
-                                  : ''
-                            }`}
-                          >
-                            {run.status === 'running' ? (
-                              <>
-                                <LoaderCircle size={14} className="spin" />
-                                In Progress
-                              </>
-                            ) : run.status === 'failed' ? (
-                              <>
-                                <CircleAlert size={14} />
-                                Failed
-                              </>
-                            ) : (
-                              'Completed'
-                            )}
-                          </span>
-                          <span className="pill pill-subtle">{run.results.length} Results</span>
+                  <div className="history-shell-header">
+                    <button className="history-toggle" onClick={() => toggleExpand(run.id)}>
+                      <div className="list-card-topline">
+                        <div className="icon-pill icon-pill-muted">
+                          {expandedTests.has(run.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        </div>
+                        <div>
+                          <h3>{run.name}</h3>
+                          <div className="history-meta">
+                            <span>{format(new Date(run.createdAt), 'MMM d, yyyy HH:mm')}</span>
+                            <span
+                              className={`pill ${
+                                run.status === 'failed'
+                                  ? 'pill-danger'
+                                  : run.status === 'running'
+                                    ? 'pill-progress'
+                                    : 'pill-success'
+                              }`}
+                            >
+                              {run.status === 'running' ? (
+                                <>
+                                  <LoaderCircle size={14} className="spin" />
+                                  In Progress
+                                </>
+                              ) : run.status === 'failed' ? (
+                                <>
+                                  <CircleAlert size={14} />
+                                  Failed
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle size={14} />
+                                  Completed
+                                </>
+                              )}
+                            </span>
+                            <span className="pill pill-subtle">{run.results.length} Results</span>
+                          </div>
                         </div>
                       </div>
+                    </button>
+
+                    <div className="card-menu-wrap history-card-menu">
+                      <button
+                        type="button"
+                        className="icon-action-button"
+                        aria-label="Open Batch Job Menu"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setOpenRunMenuId((current) => (current === run.id ? null : run.id));
+                        }}
+                      >
+                        <MoreHorizontal size={16} />
+                      </button>
+
+                      {openRunMenuId === run.id ? (
+                        <div
+                          className="card-menu-sheet"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="menu-sheet-action menu-sheet-danger"
+                            onClick={() => handleRemoveRun(run.id)}
+                          >
+                            <Trash2 size={15} />
+                            Remove
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
-                  </button>
+                  </div>
 
                   {expandedTests.has(run.id) ? (
                     <div className="batch-results-stack">
-                      {run.status === 'failed' ? (
-                        <div className="surface-card stat-card error-card">
-                          <AlertCircle size={18} />
-                          <h3>Job Failed</h3>
-                          <p>{run.errorMessage ?? 'Batch run failed for an unknown reason.'}</p>
-                        </div>
-                      ) : null}
                       {buildRunTables(run).map((table) => (
                         <div className="surface-card batch-table-shell" key={table.key}>
                           <div className="section-header-inline">
