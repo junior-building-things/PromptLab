@@ -12,7 +12,7 @@ import {
   Play,
   type LucideIcon,
 } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../context/app-context';
 import type { AssetRecord, PromptVersion, TestResult } from '../lib/types';
 
@@ -76,18 +76,50 @@ function MultiSelectDropdown({
   onToggle: (id: string) => void;
   emptyLabel: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
   return (
-    <label className="field-block">
+    <div className="field-block" ref={rootRef}>
       <span>{label}</span>
-      <details className="multi-dropdown">
-        <summary className="multi-dropdown-trigger">
+      <div className={`multi-dropdown${open ? ' is-open' : ''}`}>
+        <button
+          type="button"
+          className="multi-dropdown-trigger"
+          onClick={() => setOpen((current) => !current)}
+        >
           <div className="multi-dropdown-trigger-copy">
             <strong>{buildSummary(selectedIds, options, emptyLabel)}</strong>
             <p>{selectedIds.length} selected</p>
           </div>
           <ChevronDown size={16} />
-        </summary>
-        <div className="multi-dropdown-menu">
+        </button>
+        {open ? (
+          <div className="multi-dropdown-menu">
           {options.map((option) => {
             const checked = selectedIds.includes(option.id);
 
@@ -109,9 +141,10 @@ function MultiSelectDropdown({
               </label>
             );
           })}
-        </div>
-      </details>
-    </label>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -201,10 +234,28 @@ export function BatchTestPage() {
       readyModels.map((model) => ({
         id: model.id,
         label: model.name,
+        description:
+          model.provider === 'openai'
+            ? 'OpenAI'
+            : model.provider === 'gemini'
+              ? 'Google DeepMind'
+              : 'xAI',
         icon: (
           <img
-            src={model.provider === 'gemini' ? '/gemini.png' : '/openai.png'}
-            alt={model.provider === 'gemini' ? 'Gemini' : 'OpenAI'}
+            src={
+              model.provider === 'gemini'
+                ? '/gemini.png'
+                : model.provider === 'xai'
+                  ? '/xai.png'
+                  : '/openai.png'
+            }
+            alt={
+              model.provider === 'gemini'
+                ? 'Google DeepMind'
+                : model.provider === 'xai'
+                  ? 'xAI'
+                  : 'OpenAI'
+            }
             className="model-logo"
           />
         ),

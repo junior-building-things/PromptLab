@@ -111,7 +111,7 @@ export const initialAssets: AssetRecord[] = [
 export const initialModels: ModelRecord[] = [
   {
     id: 'model-openai-gpt-image',
-    name: 'gpt-image-1.5 (GPT-4o)',
+    name: 'gpt-image-1.5',
     provider: 'openai',
     apiModel: 'gpt-4o',
     endpoint: 'Responses API',
@@ -122,7 +122,7 @@ export const initialModels: ModelRecord[] = [
   },
   {
     id: 'model-gemini-nano-banana',
-    name: 'Nano Banana (gemini-2.5-flash)',
+    name: 'Nano Banana',
     provider: 'gemini',
     apiModel: 'gemini-2.5-flash',
     endpoint: 'Generate Content API',
@@ -133,7 +133,7 @@ export const initialModels: ModelRecord[] = [
   },
   {
     id: 'model-gemini-nano-banana-pro',
-    name: 'Nano Banana Pro (gemini-3-pro)',
+    name: 'Nano Banana Pro',
     provider: 'gemini',
     apiModel: 'gemini-3-pro',
     endpoint: 'Generate Content API',
@@ -141,6 +141,17 @@ export const initialModels: ModelRecord[] = [
     maxTokens: 1600,
     status: 'ready',
     envVar: 'VITE_GEMINI_API_KEY',
+  },
+  {
+    id: 'model-xai-aurora',
+    name: 'Aurora',
+    provider: 'xai',
+    apiModel: 'grok-4-1-fast-reasoning',
+    endpoint: 'Chat Completions API',
+    temperature: 0.4,
+    maxTokens: 1400,
+    status: 'ready',
+    envVar: 'VITE_XAI_API_KEY',
   },
 ];
 

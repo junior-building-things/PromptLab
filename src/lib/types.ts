@@ -1,4 +1,4 @@
-export type Provider = 'openai' | 'gemini';
+export type Provider = 'openai' | 'gemini' | 'xai';
 
 export type PromptProject = {
   id: string;

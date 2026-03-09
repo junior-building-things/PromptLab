@@ -364,15 +364,7 @@ p {
   position: relative;
 }
 
-.multi-dropdown summary {
-  list-style: none;
-}
-
-.multi-dropdown summary::-webkit-details-marker {
-  display: none;
-}
-
-.multi-dropdown[open] .multi-dropdown-trigger {
+.multi-dropdown.is-open .multi-dropdown-trigger {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
 }
@@ -389,6 +381,7 @@ p {
   background: rgba(255, 255, 255, 0.82);
   cursor: pointer;
   transition: border-color 120ms ease, box-shadow 120ms ease;
+  text-align: left;
 }
 
 .multi-dropdown-trigger-copy {

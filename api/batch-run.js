@@ -1,5 +1,6 @@
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -127,6 +128,63 @@ async function callGemini({ prompt, userInput, asset, model }) {
   };
 }
 
+async function callXAI({ prompt, userInput, asset, model }) {
+  if (!process.env.XAI_API_KEY) {
+    throw new Error('Missing XAI_API_KEY for xAI model execution.');
+  }
+
+  const content = [
+    {
+      type: 'text',
+      text: `User task:\n${userInput}\n\nAsset context:\n${buildAssetContext(asset) || 'None provided.'}`,
+    },
+  ];
+
+  if (asset?.kind === 'image-reference' && /^(https?:\/\/|data:image\/)/.test(asset.source)) {
+    content.unshift({
+      type: 'image_url',
+      image_url: {
+        url: asset.source,
+      },
+    });
+  }
+
+  const started = Date.now();
+  const response = await fetch(XAI_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: model.apiModel,
+      temperature: model.temperature,
+      max_tokens: model.maxTokens,
+      messages: [
+        {
+          role: 'system',
+          content: prompt.systemPrompt,
+        },
+        {
+          role: 'user',
+          content,
+        },
+      ],
+    }),
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error?.message || 'xAI request failed.');
+  }
+
+  const output = payload.choices?.[0]?.message?.content?.trim();
+  return {
+    output: output || 'xAI returned no text output.',
+    latencyMs: Date.now() - started,
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return json(res, 405, { error: 'Method not allowed' });
@@ -142,9 +200,14 @@ export default async function handler(req, res) {
 
     const results = await Promise.all(
       models.map(async (model) => {
-        const execution = model.provider === 'openai'
-          ? await callOpenAI({ prompt, userInput, asset, model })
-          : await callGemini({ prompt, userInput, asset, model });
+        let execution;
+        if (model.provider === 'openai') {
+          execution = await callOpenAI({ prompt, userInput, asset, model });
+        } else if (model.provider === 'gemini') {
+          execution = await callGemini({ prompt, userInput, asset, model });
+        } else {
+          execution = await callXAI({ prompt, userInput, asset, model });
+        }
 
         return {
           modelId: model.id,
