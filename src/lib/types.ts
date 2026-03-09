@@ -62,10 +62,14 @@ export type TestResult = {
   score: number;
 };
 
+export type BatchRunStatus = 'running' | 'completed' | 'failed';
+
 export type BatchRun = {
   id: string;
   name: string;
   createdAt: string;
+  status: BatchRunStatus;
+  errorMessage?: string;
   scenario: BatchScenario;
   results: TestResult[];
 };

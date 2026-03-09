@@ -352,12 +352,16 @@ p {
 
 .model-logo {
   width: 2.5rem;
+  min-width: 2.5rem;
   height: 2.5rem;
   display: block;
+  flex-shrink: 0;
+  aspect-ratio: 1 / 1;
   object-fit: contain;
   border-radius: 0;
   box-shadow: none;
   background: transparent;
+  image-rendering: -webkit-optimize-contrast;
 }
 
 .multi-dropdown {
@@ -370,9 +374,9 @@ p {
 }
 
 .multi-dropdown-trigger {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr) 1rem;
   align-items: center;
-  justify-content: space-between;
   gap: 0.9rem;
   width: 100%;
   padding: 0.85rem 1rem;
@@ -384,10 +388,17 @@ p {
   text-align: left;
 }
 
+.multi-dropdown-trigger-spacer {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
 .multi-dropdown-trigger-copy {
   display: grid;
-  gap: 0.12rem;
+  place-items: center;
   min-width: 0;
+  text-align: center;
 }
 
 .multi-dropdown-trigger-copy strong,
@@ -395,7 +406,14 @@ p {
   color: var(--surface-ink);
 }
 
-.multi-dropdown-trigger-copy p,
+.multi-dropdown-trigger-copy strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+
 .multi-dropdown-option-copy p {
   color: var(--muted);
   font-size: 0.88rem;
@@ -651,6 +669,12 @@ p {
   color: #334155;
 }
 
+.field-block-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .accent-card {
   background: linear-gradient(145deg, rgba(79, 70, 229, 0.13), rgba(124, 58, 237, 0.1));
   border-color: var(--border-strong);
@@ -828,6 +852,16 @@ p {
 .error-card {
   background: rgba(254, 242, 242, 0.88);
   border-color: rgba(248, 113, 113, 0.28);
+}
+
+.pill-progress {
+  background: rgba(79, 70, 229, 0.12);
+  color: var(--accent-strong);
+}
+
+.pill-danger {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
 }
 
 .composer-backdrop {

@@ -19,9 +19,26 @@ function normalizeBody(req) {
 function buildAssetContext(asset) {
   if (!asset) return '';
 
-  return [`Asset name: ${asset.name}`, `Asset type: ${asset.kind}`, `Asset source: ${asset.source}`]
+  const sourcePreview =
+    asset.kind === 'image-reference' && /^data:image\//.test(asset.source)
+      ? 'Uploaded image reference attached below.'
+      : asset.source;
+
+  return [`Asset name: ${asset.name}`, `Asset type: ${asset.kind}`, `Asset source: ${sourcePreview}`]
     .filter(Boolean)
     .join('\n');
+}
+
+function parseImageDataUrl(source) {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(source || '');
+  if (!match) {
+    return null;
+  }
+
+  return {
+    mimeType: match[1],
+    data: match[2],
+  };
 }
 
 function scoreOutput(text) {
@@ -89,6 +106,22 @@ async function callGemini({ prompt, userInput, asset, model }) {
     throw new Error('Missing GEMINI_API_KEY for Gemini model execution.');
   }
 
+  const userParts = [
+    {
+      text: `User task:\n${userInput}\n\nAsset context:\n${buildAssetContext(asset) || 'None provided.'}`,
+    },
+  ];
+  const imageData = asset?.kind === 'image-reference' ? parseImageDataUrl(asset.source) : null;
+
+  if (imageData) {
+    userParts.unshift({
+      inlineData: {
+        mimeType: imageData.mimeType,
+        data: imageData.data,
+      },
+    });
+  }
+
   const started = Date.now();
   const response = await fetch(`${GEMINI_URL}/${model.apiModel}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
     method: 'POST',
@@ -102,11 +135,7 @@ async function callGemini({ prompt, userInput, asset, model }) {
       contents: [
         {
           role: 'user',
-          parts: [
-            {
-              text: `User task:\n${userInput}\n\nAsset context:\n${buildAssetContext(asset) || 'None provided.'}`,
-            },
-          ],
+          parts: userParts,
         },
       ],
       generationConfig: {
@@ -121,9 +150,11 @@ async function callGemini({ prompt, userInput, asset, model }) {
     throw new Error(payload.error?.message || 'Gemini request failed.');
   }
 
-  const output = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('\n').trim();
+  const parts = payload.candidates?.[0]?.content?.parts || [];
+  const output = parts.map((part) => part.text || '').join('\n').trim();
+  const returnedImage = parts.some((part) => part.inlineData || part.fileData);
   return {
-    output: output || 'Gemini returned no text output.',
+    output: output || (returnedImage ? 'Gemini returned image output.' : 'Gemini returned no text output.'),
     latencyMs: Date.now() - started,
   };
 }
@@ -198,27 +229,48 @@ export default async function handler(req, res) {
       return json(res, 400, { error: 'Missing prompt, models, or userInput in request body.' });
     }
 
-    const results = await Promise.all(
+    const executions = await Promise.all(
       models.map(async (model) => {
-        let execution;
-        if (model.provider === 'openai') {
-          execution = await callOpenAI({ prompt, userInput, asset, model });
-        } else if (model.provider === 'gemini') {
-          execution = await callGemini({ prompt, userInput, asset, model });
-        } else {
-          execution = await callXAI({ prompt, userInput, asset, model });
-        }
+        try {
+          let execution;
+          if (model.provider === 'openai') {
+            execution = await callOpenAI({ prompt, userInput, asset, model });
+          } else if (model.provider === 'gemini') {
+            execution = await callGemini({ prompt, userInput, asset, model });
+          } else {
+            execution = await callXAI({ prompt, userInput, asset, model });
+          }
 
-        return {
-          modelId: model.id,
-          output: execution.output,
-          latencyMs: execution.latencyMs,
-          score: scoreOutput(execution.output),
-        };
+          return {
+            ok: true,
+            result: {
+              modelId: model.id,
+              output: execution.output,
+              latencyMs: execution.latencyMs,
+              score: scoreOutput(execution.output),
+            },
+          };
+        } catch (error) {
+          return {
+            ok: false,
+            error: {
+              modelId: model.id,
+              message:
+                error instanceof Error ? error.message : 'Model request failed unexpectedly.',
+            },
+          };
+        }
       }),
     );
 
-    return json(res, 200, { results });
+    const results = executions.filter((entry) => entry.ok).map((entry) => entry.result);
+    const errors = executions.filter((entry) => !entry.ok).map((entry) => entry.error);
+
+    if (results.length === 0 && errors.length > 0) {
+      return json(res, 200, { results: [], errors });
+    }
+
+    return json(res, 200, { results, errors });
   } catch (error) {
     return json(res, 500, {
       error: error instanceof Error ? error.message : 'Batch run failed unexpectedly.',

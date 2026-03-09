@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Cpu,
+  CircleAlert,
   FileText,
   History as HistoryIcon,
   ImageIcon,
@@ -14,13 +15,19 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../context/app-context';
-import type { AssetRecord, PromptVersion, TestResult } from '../lib/types';
+import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
+import type { AssetRecord, BatchRun, PromptVersion, TestResult } from '../lib/types';
 
 type ApiResult = {
   modelId: string;
   output: string;
   latencyMs: number;
   score: number;
+};
+
+type ApiError = {
+  modelId: string;
+  message: string;
 };
 
 type DropdownOption = {
@@ -44,15 +51,10 @@ function toggleSelection(values: string[], value: string) {
 function buildSummary(selectedIds: string[], options: DropdownOption[], emptyLabel: string) {
   if (selectedIds.length === 0) return emptyLabel;
 
-  const labels = options
+  return options
     .filter((option) => selectedIds.includes(option.id))
-    .map((option) => option.label);
-
-  if (labels.length <= 2) {
-    return labels.join(', ');
-  }
-
-  return `${labels.length} Selected`;
+    .map((option) => option.label)
+    .join(', ');
 }
 
 function TextIcon({ Icon }: { Icon: LucideIcon }) {
@@ -65,12 +67,14 @@ function TextIcon({ Icon }: { Icon: LucideIcon }) {
 
 function MultiSelectDropdown({
   label,
+  labelIcon,
   options,
   selectedIds,
   onToggle,
   emptyLabel,
 }: {
   label: string;
+  labelIcon: ReactNode;
   options: DropdownOption[];
   selectedIds: string[];
   onToggle: (id: string) => void;
@@ -105,16 +109,19 @@ function MultiSelectDropdown({
 
   return (
     <div className="field-block" ref={rootRef}>
-      <span>{label}</span>
+      <span className="field-block-label">
+        {labelIcon}
+        {label}
+      </span>
       <div className={`multi-dropdown${open ? ' is-open' : ''}`}>
         <button
           type="button"
           className="multi-dropdown-trigger"
           onClick={() => setOpen((current) => !current)}
         >
+          <span className="multi-dropdown-trigger-spacer" aria-hidden="true" />
           <div className="multi-dropdown-trigger-copy">
             <strong>{buildSummary(selectedIds, options, emptyLabel)}</strong>
-            <p>{selectedIds.length} selected</p>
           </div>
           <ChevronDown size={16} />
         </button>
@@ -149,7 +156,8 @@ function MultiSelectDropdown({
 }
 
 export function BatchTestPage() {
-  const { history, promptProjects, promptVersions, assets, models, createRun } = useAppContext();
+  const { history, promptProjects, promptVersions, assets, models, createRun, updateRun } =
+    useAppContext();
   const [composerOpen, setComposerOpen] = useState(false);
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
   const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>(
@@ -234,28 +242,11 @@ export function BatchTestPage() {
       readyModels.map((model) => ({
         id: model.id,
         label: model.name,
-        description:
-          model.provider === 'openai'
-            ? 'OpenAI'
-            : model.provider === 'gemini'
-              ? 'Google DeepMind'
-              : 'xAI',
+        description: getProviderLabel(model.provider),
         icon: (
           <img
-            src={
-              model.provider === 'gemini'
-                ? '/gemini.png'
-                : model.provider === 'xai'
-                  ? '/xai.png'
-                  : '/openai.png'
-            }
-            alt={
-              model.provider === 'gemini'
-                ? 'Google DeepMind'
-                : model.provider === 'xai'
-                  ? 'xAI'
-                  : 'OpenAI'
-            }
+            src={getProviderIconSrc(model.provider)}
+            alt={getProviderLabel(model.provider)}
             className="model-logo"
           />
         ),
@@ -315,7 +306,7 @@ export function BatchTestPage() {
     });
 
     const payload = (await response.json()) as
-      | { results: ApiResult[] }
+      | { results: ApiResult[]; errors?: ApiError[] }
       | { error?: string; details?: string };
 
     if (!response.ok || !('results' in payload)) {
@@ -323,7 +314,7 @@ export function BatchTestPage() {
       throw new Error(failurePayload.error || failurePayload.details || 'Batch run failed.');
     }
 
-    return payload.results;
+    return payload;
   }
 
   async function runBatch() {
@@ -341,19 +332,42 @@ export function BatchTestPage() {
       return;
     }
 
+    const draftScenario = {
+      promptId: selectedPrompts[0].id,
+      promptIds: selectedPrompts.map((prompt) => prompt.id),
+      assetIds: selectedImageReferenceIds.length > 0 ? selectedImageReferenceIds : undefined,
+      assetId: selectedImageReferenceIds[0],
+      userInputAssetIds: selectedTextInputAssetIds,
+      modelIds: selectedModelIds,
+      userInput: selectedUserInputs.join(' | '),
+    };
+    const draftRun = createRun({
+      name:
+        selectedPrompts.length === 1
+          ? `${getPromptLabel(selectedPrompts[0].id)} - ${format(new Date(), 'MMM d HH:mm')}`
+          : `${selectedPrompts.length} Prompt Selections - ${format(new Date(), 'MMM d HH:mm')}`,
+      status: 'running',
+      errorMessage: undefined,
+      scenario: draftScenario,
+      results: [],
+    });
+
     setRunning(true);
     setErrorMessage('');
+    closeComposer();
+    setExpandedTests((current) => new Set([draftRun.id, ...current]));
 
     try {
       const imageReferenceScenarios = selectedImageReferences.length > 0 ? selectedImageReferences : [undefined];
       const results: TestResult[] = [];
+      const errors: string[] = [];
 
       for (const prompt of selectedPrompts) {
         for (const imageReference of imageReferenceScenarios) {
           for (const userInput of selectedUserInputs) {
-            const apiResults = await executeScenario(prompt, selectedModels, imageReference, userInput);
+            const apiPayload = await executeScenario(prompt, selectedModels, imageReference, userInput);
 
-            apiResults.forEach((result, index) => {
+            apiPayload.results.forEach((result, index) => {
               results.push({
                 id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
                 promptId: prompt.id,
@@ -365,33 +379,27 @@ export function BatchTestPage() {
                 score: result.score,
               });
             });
+
+            apiPayload.errors?.forEach((error) => {
+              const model = getModel(error.modelId);
+              errors.push(`${model?.name ?? 'Unknown Model'}: ${error.message}`);
+            });
           }
         }
       }
 
-      const createdRun = createRun({
-        name:
-          selectedPrompts.length === 1
-            ? `${getPromptLabel(selectedPrompts[0].id)} - ${format(new Date(), 'MMM d HH:mm')}`
-            : `${selectedPrompts.length} Prompt Selections - ${format(new Date(), 'MMM d HH:mm')}`,
-        scenario: {
-          promptId: selectedPrompts[0].id,
-          promptIds: selectedPrompts.map((prompt) => prompt.id),
-          assetIds: selectedImageReferenceIds.length > 0 ? selectedImageReferenceIds : undefined,
-          assetId: selectedImageReferenceIds[0],
-          userInputAssetIds: selectedTextInputAssetIds,
-          modelIds: selectedModelIds,
-          userInput: selectedUserInputs.join(' | '),
-        },
+      const uniqueErrors = [...new Set(errors)];
+
+      updateRun(draftRun.id, {
+        status: uniqueErrors.length > 0 ? 'failed' : 'completed',
+        errorMessage: uniqueErrors.length > 0 ? uniqueErrors.join(' | ') : undefined,
         results,
       });
-
-      setExpandedTests((current) => new Set([createdRun.id, ...current]));
-      closeComposer();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Batch run failed for an unknown reason.',
-      );
+      updateRun(draftRun.id, {
+        status: 'failed',
+        errorMessage: error instanceof Error ? error.message : 'Batch run failed for an unknown reason.',
+      });
     } finally {
       setRunning(false);
     }
@@ -436,7 +444,30 @@ export function BatchTestPage() {
                         <h3>{run.name}</h3>
                         <div className="history-meta">
                           <span>{format(new Date(run.createdAt), 'MMM d, yyyy HH:mm')}</span>
-                          <span className="pill">{run.results.length} results</span>
+                          <span
+                            className={`pill ${
+                              run.status === 'failed'
+                                ? 'pill-danger'
+                                : run.status === 'running'
+                                  ? 'pill-progress'
+                                  : ''
+                            }`}
+                          >
+                            {run.status === 'running' ? (
+                              <>
+                                <LoaderCircle size={14} className="spin" />
+                                In Progress
+                              </>
+                            ) : run.status === 'failed' ? (
+                              <>
+                                <CircleAlert size={14} />
+                                Failed
+                              </>
+                            ) : (
+                              'Completed'
+                            )}
+                          </span>
+                          <span className="pill pill-subtle">{run.results.length} Results</span>
                         </div>
                       </div>
                     </div>
@@ -444,6 +475,20 @@ export function BatchTestPage() {
 
                   {expandedTests.has(run.id) ? (
                     <div className="history-results-grid">
+                      {run.status === 'running' ? (
+                        <div className="surface-card stat-card">
+                          <LoaderCircle size={18} className="spin" />
+                          <h3>Job In Progress</h3>
+                          <p>This batch job is still running.</p>
+                        </div>
+                      ) : null}
+                      {run.status === 'failed' ? (
+                        <div className="surface-card stat-card error-card">
+                          <AlertCircle size={18} />
+                          <h3>Job Failed</h3>
+                          <p>{run.errorMessage ?? 'Batch run failed for an unknown reason.'}</p>
+                        </div>
+                      ) : null}
                       {run.results.map((result) => {
                         const model = getModel(result.modelId);
                         const imageReference = getAsset(result.assetId);
@@ -520,7 +565,7 @@ export function BatchTestPage() {
                 </button>
                 <button className="button button-primary" onClick={runBatch} disabled={running}>
                   {running ? <LoaderCircle size={16} className="spin" /> : <Play size={16} />}
-                  {running ? 'Running...' : 'Create Batch Test'}
+                  {running ? 'Running...' : 'New Job'}
                 </button>
               </div>
             </header>
@@ -528,6 +573,7 @@ export function BatchTestPage() {
             <div className="stack-list">
               <MultiSelectDropdown
                 label="System Prompts"
+                labelIcon={<FileText size={15} />}
                 options={promptDropdownOptions}
                 selectedIds={selectedPromptIds}
                 onToggle={(id) => setSelectedPromptIds((current) => toggleSelection(current, id))}
@@ -536,6 +582,7 @@ export function BatchTestPage() {
 
               <MultiSelectDropdown
                 label="Image References"
+                labelIcon={<ImageIcon size={15} />}
                 options={imageReferenceDropdownOptions}
                 selectedIds={selectedImageReferenceIds}
                 onToggle={(id) =>
@@ -546,6 +593,7 @@ export function BatchTestPage() {
 
               <MultiSelectDropdown
                 label="Text Inputs"
+                labelIcon={<FileText size={15} />}
                 options={textInputDropdownOptions}
                 selectedIds={selectedTextInputAssetIds}
                 onToggle={(id) =>
@@ -556,6 +604,7 @@ export function BatchTestPage() {
 
               <MultiSelectDropdown
                 label="Models"
+                labelIcon={<Cpu size={15} />}
                 options={modelDropdownOptions}
                 selectedIds={selectedModelIds}
                 onToggle={(id) => setSelectedModelIds((current) => toggleSelection(current, id))}

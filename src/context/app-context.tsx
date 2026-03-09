@@ -70,6 +70,10 @@ type AppContextValue = AppState & {
   updateAsset: (id: string, draft: AssetDraft) => void;
   updateModel: (id: string, draft: Partial<ModelDraft>) => void;
   createRun: (run: Omit<BatchRun, 'id' | 'createdAt'>) => BatchRun;
+  updateRun: (
+    id: string,
+    updates: Partial<Pick<BatchRun, 'status' | 'errorMessage' | 'results' | 'scenario' | 'name'>>,
+  ) => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -130,13 +134,23 @@ function normalizeModels(models?: ModelRecord[]): ModelRecord[] {
 
     return {
       ...model,
-      apiModel: persisted.apiModel || model.apiModel,
       temperature: persisted.temperature ?? model.temperature,
       maxTokens: persisted.maxTokens ?? model.maxTokens,
       status: persisted.status ?? model.status,
-      envVar: persisted.envVar || model.envVar,
     };
   });
+}
+
+function normalizeHistory(history?: BatchRun[]): BatchRun[] {
+  if (!history) {
+    return initialHistory;
+  }
+
+  return history.map((run) => ({
+    ...run,
+    status: run.status ?? 'completed',
+    errorMessage: run.errorMessage,
+  }));
 }
 
 function normalizeState(state: AppState): AppState {
@@ -144,6 +158,7 @@ function normalizeState(state: AppState): AppState {
     ...state,
     assets: (state.assets ?? initialAssets).map(normalizeAsset),
     models: normalizeModels(state.models),
+    history: normalizeHistory(state.history),
   };
 }
 
@@ -170,7 +185,7 @@ function migrateLegacyState(legacy: LegacyState): AppState {
     })),
     assets: (legacy.assets ?? initialAssets).map(normalizeAsset),
     models: normalizeModels(legacy.models),
-    history: legacy.history ?? initialHistory,
+    history: normalizeHistory(legacy.history),
   };
 }
 
@@ -204,6 +219,35 @@ function latestVersionForProject(versions: PromptVersion[], projectId: string) {
   return versions
     .filter((version) => version.projectId === projectId)
     .sort((left, right) => right.version - left.version)[0];
+}
+
+function applyCompletedRun(current: AppState, run: BatchRun): AppState {
+  if (run.status !== 'completed') {
+    return current;
+  }
+
+  const touchedPromptIds = new Set(run.results.map((result) => result.promptId));
+  const touchedProjectIds = new Set(
+    current.promptVersions
+      .filter((version) => touchedPromptIds.has(version.id))
+      .map((version) => version.projectId),
+  );
+  const timestamp = new Date().toISOString();
+
+  return {
+    ...current,
+    history: current.history.map((entry) => (entry.id === run.id ? run : entry)),
+    promptVersions: current.promptVersions.map((version) =>
+      touchedPromptIds.has(version.id)
+        ? { ...version, runCount: version.runCount + 1, updatedAt: timestamp }
+        : version,
+    ),
+    promptProjects: touchedProjectIds.size > 0
+      ? current.promptProjects.map((project) =>
+          touchedProjectIds.has(project.id) ? { ...project, updatedAt: timestamp } : project,
+        )
+      : current.promptProjects,
+  };
 }
 
 export function AppProvider({ children }: PropsWithChildren) {
@@ -399,32 +443,55 @@ export function AppProvider({ children }: PropsWithChildren) {
     };
 
     setState((current) => {
-      const touchedPromptIds = new Set(createdRun.results.map((result) => result.promptId));
-      const touchedProjectIds = new Set(
-        current.promptVersions
-          .filter((version) => touchedPromptIds.has(version.id))
-          .map((version) => version.projectId),
-      );
-      const timestamp = new Date().toISOString();
+      if (createdRun.status !== 'completed') {
+        return {
+          ...current,
+          history: [createdRun, ...current.history],
+        };
+      }
 
-      return {
-        ...current,
-        history: [createdRun, ...current.history],
-        promptVersions: current.promptVersions.map((version) =>
-          touchedPromptIds.has(version.id)
-            ? { ...version, runCount: version.runCount + 1, updatedAt: timestamp }
-            : version,
-        ),
-        promptProjects: touchedProjectIds.size > 0
-          ? current.promptProjects.map((project) =>
-              touchedProjectIds.has(project.id) ? { ...project, updatedAt: timestamp } : project,
-            )
-          : current.promptProjects,
-      };
+      return applyCompletedRun(
+        {
+          ...current,
+          history: [createdRun, ...current.history],
+        },
+        createdRun,
+      );
     });
 
     return createdRun;
   }, []);
+
+  const updateRun = useCallback(
+    (
+      id: string,
+      updates: Partial<Pick<BatchRun, 'status' | 'errorMessage' | 'results' | 'scenario' | 'name'>>,
+    ) => {
+      setState((current) => {
+        const existing = current.history.find((run) => run.id === id);
+        if (!existing) {
+          return current;
+        }
+
+        const nextRun: BatchRun = {
+          ...existing,
+          ...updates,
+        };
+
+        const nextState = {
+          ...current,
+          history: current.history.map((run) => (run.id === id ? nextRun : run)),
+        };
+
+        if (existing.status === 'completed' || nextRun.status !== 'completed') {
+          return nextState;
+        }
+
+        return applyCompletedRun(nextState, nextRun);
+      });
+    },
+    [],
+  );
 
   const value = useMemo(
     () => ({
@@ -440,6 +507,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       updateAsset,
       updateModel,
       createRun,
+      updateRun,
     }),
     [
       createAsset,
@@ -454,6 +522,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       updateModel,
       updatePromptProject,
       updatePromptVersion,
+      updateRun,
     ],
   );
 
