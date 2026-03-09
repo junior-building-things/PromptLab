@@ -11,7 +11,7 @@ import {
   LoaderCircle,
   Play,
 } from 'lucide-react';
-import { type ChangeEvent, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
 import type { AssetRecord, PromptVersion, TestResult } from '../lib/types';
 
@@ -29,8 +29,8 @@ function parseTextInputs(source: string) {
     .filter(Boolean);
 }
 
-function getSelectedValues(event: ChangeEvent<HTMLSelectElement>) {
-  return Array.from(event.target.selectedOptions, (option) => option.value);
+function toggleSelection(values: string[], value: string) {
+  return values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];
 }
 
 export function BatchTestPage() {
@@ -42,7 +42,9 @@ export function BatchTestPage() {
   );
   const [selectedImageReferenceIds, setSelectedImageReferenceIds] = useState<string[]>([]);
   const [selectedTextInputAssetIds, setSelectedTextInputAssetIds] = useState<string[]>(
-    assets.find((asset) => asset.kind === 'text-inputs') ? [assets.find((asset) => asset.kind === 'text-inputs')!.id] : [],
+    assets.find((asset) => asset.kind === 'text-inputs')
+      ? [assets.find((asset) => asset.kind === 'text-inputs')!.id]
+      : [],
   );
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>(
     models.filter((model) => model.status === 'ready').slice(0, 2).map((model) => model.id),
@@ -337,69 +339,123 @@ export function BatchTestPage() {
             </header>
 
             <div className="stack-list">
-              <label className="field-block">
+              <div className="field-block">
                 <span>System Prompts</span>
-                <select
-                  className="multi-select"
-                  multiple
-                  value={selectedPromptIds}
-                  onChange={(event) => setSelectedPromptIds(getSelectedValues(event))}
-                >
-                  {versionOptions.map((prompt) => (
-                    <option key={prompt.id} value={prompt.id}>
-                      {prompt.projectName} · v{prompt.version} · {prompt.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="selection-strip">
+                  {versionOptions.map((prompt) => {
+                    const selected = selectedPromptIds.includes(prompt.id);
+                    return (
+                      <label
+                        key={prompt.id}
+                        className={`selection-card${selected ? ' is-selected' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() =>
+                            setSelectedPromptIds((current) => toggleSelection(current, prompt.id))
+                          }
+                        />
+                        <div className="selection-card-body">
+                          <strong>{prompt.projectName}</strong>
+                          <p>v{prompt.version}</p>
+                          <span className="selection-card-copy">{prompt.title}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
-              <label className="field-block">
+              <div className="field-block">
                 <span>Image References</span>
-                <select
-                  className="multi-select"
-                  multiple
-                  value={selectedImageReferenceIds}
-                  onChange={(event) => setSelectedImageReferenceIds(getSelectedValues(event))}
-                >
-                  {imageReferenceAssets.map((asset) => (
-                    <option key={asset.id} value={asset.id}>
-                      {asset.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="selection-strip">
+                  {imageReferenceAssets.map((asset) => {
+                    const selected = selectedImageReferenceIds.includes(asset.id);
+                    return (
+                      <label
+                        key={asset.id}
+                        className={`selection-card selection-card-image${selected ? ' is-selected' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() =>
+                            setSelectedImageReferenceIds((current) => toggleSelection(current, asset.id))
+                          }
+                        />
+                        <div className="selection-card-media">
+                          <img src={asset.source} alt={asset.name} className="selection-card-preview" />
+                        </div>
+                        <div className="selection-card-body">
+                          <strong>{asset.name}</strong>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
-              <label className="field-block">
+              <div className="field-block">
                 <span>Text Inputs</span>
-                <select
-                  className="multi-select"
-                  multiple
-                  value={selectedTextInputAssetIds}
-                  onChange={(event) => setSelectedTextInputAssetIds(getSelectedValues(event))}
-                >
-                  {textInputAssets.map((asset) => (
-                    <option key={asset.id} value={asset.id}>
-                      {asset.name} · {parseTextInputs(asset.source).length} inputs
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="selection-strip">
+                  {textInputAssets.map((asset) => {
+                    const selected = selectedTextInputAssetIds.includes(asset.id);
+                    return (
+                      <label
+                        key={asset.id}
+                        className={`selection-card${selected ? ' is-selected' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() =>
+                            setSelectedTextInputAssetIds((current) => toggleSelection(current, asset.id))
+                          }
+                        />
+                        <div className="selection-card-body">
+                          <strong>{asset.name}</strong>
+                          <p>{parseTextInputs(asset.source).length} inputs</p>
+                          <span className="selection-card-copy">
+                            {parseTextInputs(asset.source).slice(0, 2).join(', ')}
+                          </span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
-              <label className="field-block">
+              <div className="field-block">
                 <span>Models</span>
-                <select
-                  className="multi-select"
-                  multiple
-                  value={selectedModelIds}
-                  onChange={(event) => setSelectedModelIds(getSelectedValues(event))}
-                >
-                  {readyModels.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="selection-strip">
+                  {readyModels.map((model) => {
+                    const selected = selectedModelIds.includes(model.id);
+                    return (
+                      <label
+                        key={model.id}
+                        className={`selection-card selection-card-model${selected ? ' is-selected' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() =>
+                            setSelectedModelIds((current) => toggleSelection(current, model.id))
+                          }
+                        />
+                        <div className="selection-card-body selection-card-body-inline">
+                          <img
+                            className="model-logo"
+                            src={model.provider === 'gemini' ? '/gemini.png' : '/openai.png'}
+                            alt={model.provider === 'gemini' ? 'Gemini' : 'OpenAI'}
+                          />
+                          <strong>{model.name}</strong>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
               {errorMessage ? (
                 <article className="surface-card stat-card error-card">

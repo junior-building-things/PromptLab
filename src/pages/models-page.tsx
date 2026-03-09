@@ -19,7 +19,7 @@ export function ModelsPage() {
               <div className="model-identity">
                 <img
                   className="model-logo"
-                  src={model.provider === 'gemini' ? '/gemini.png' : '/open-ai.png'}
+                  src={model.provider === 'gemini' ? '/gemini.png' : '/openai.png'}
                   alt={model.provider === 'gemini' ? 'Gemini' : 'OpenAI'}
                 />
                 <h3>{model.name}</h3>
