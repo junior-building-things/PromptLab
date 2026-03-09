@@ -172,7 +172,11 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<AppState>(loadState);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.error('Failed to persist PromptLab state.', error);
+    }
   }, [state]);
 
   const createPromptProject = useCallback((draft?: Partial<PromptProjectDraft>) => {

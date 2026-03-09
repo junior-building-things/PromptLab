@@ -27,6 +27,55 @@ function parseTextInputs(source: string) {
     .filter(Boolean);
 }
 
+function readTextFile(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read text file.'));
+    reader.readAsText(file);
+  });
+}
+
+function readImageAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read image file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(source: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Failed to decode image.'));
+    image.src = source;
+  });
+}
+
+async function compressImageFile(file: File) {
+  const source = await readImageAsDataUrl(file);
+  const image = await loadImage(source);
+  const maxDimension = 1400;
+  const longestSide = Math.max(image.width, image.height);
+  const scale = longestSide > maxDimension ? maxDimension / longestSide : 1;
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement('canvas');
+
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('Failed to prepare image upload.');
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.82);
+}
+
 export function AssetsPage() {
   const { assets, createAsset, removeAsset } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -73,27 +122,23 @@ export function AssetsPage() {
     closeComposer();
   }
 
-  function readFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      setDraft((current) => ({ ...current, source: result }));
-    };
-
-    if (draft.kind === 'image-reference') {
-      reader.readAsDataURL(file);
-      return;
-    }
-
-    reader.readAsText(file);
-  }
-
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+
     setSelectedFileName(file.name);
-    readFile(file);
     event.target.value = '';
+
+    try {
+      const result =
+        draft.kind === 'image-reference'
+          ? await compressImageFile(file)
+          : await readTextFile(file);
+
+      setDraft((current) => ({ ...current, source: result }));
+    } catch (error) {
+      console.error('Failed to process uploaded asset.', error);
+    }
   }
 
   function handleRemoveAsset(assetId: string, assetName: string) {
