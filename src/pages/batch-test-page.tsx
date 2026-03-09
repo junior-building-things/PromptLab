@@ -259,7 +259,12 @@ export function BatchTestPage() {
   useEffect(() => {
     if (!openRunMenuId) return;
 
-    function handlePointerDown() {
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Element && target.closest('.history-card-menu')) {
+        return;
+      }
+
       setOpenRunMenuId(null);
     }
 

@@ -818,7 +818,7 @@ p {
 
 .history-shell {
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .history-toggle {
@@ -834,6 +834,8 @@ p {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
+  position: relative;
+  z-index: 2;
 }
 
 .history-shell-header .history-toggle {
@@ -897,7 +899,7 @@ p {
 }
 
 .batch-results-table td {
-  min-width: 260px;
+  min-width: 220px;
   padding-top: 0.5rem;
 }
 
