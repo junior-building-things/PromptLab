@@ -1,32 +1,62 @@
 import { format } from 'date-fns';
-import { Save, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { CopyPlus, Save, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
 
 export function PromptDetailPage() {
-  const { title } = useParams();
-  const { prompts, history, updatePrompt } = useAppContext();
-  const prompt = prompts.find((entry) => entry.id === title);
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    promptProjects,
+    promptVersions,
+    history,
+    createPromptVersion,
+    updatePromptProject,
+    updatePromptVersion,
+  } = useAppContext();
 
-  const [draft, setDraft] = useState(() => ({
-    title: prompt?.title ?? '',
-    summary: prompt?.summary ?? '',
-    systemPrompt: prompt?.systemPrompt ?? '',
-    tags: prompt?.tags.join(', ') ?? '',
-  }));
+  const project = promptProjects.find((entry) => entry.id === projectId);
+  const versions = useMemo(
+    () =>
+      promptVersions
+        .filter((entry) => entry.projectId === projectId)
+        .sort((left, right) => right.version - left.version),
+    [projectId, promptVersions],
+  );
+  const selectedVersionId = searchParams.get('version') ?? versions[0]?.id;
+  const selectedVersion = versions.find((entry) => entry.id === selectedVersionId) ?? versions[0];
+
+  const [draft, setDraft] = useState({
+    projectName: project?.name ?? '',
+    title: selectedVersion?.title ?? '',
+    summary: selectedVersion?.summary ?? '',
+    systemPrompt: selectedVersion?.systemPrompt ?? '',
+    tags: selectedVersion?.tags.join(', ') ?? '',
+  });
+
+  useEffect(() => {
+    setDraft({
+      projectName: project?.name ?? '',
+      title: selectedVersion?.title ?? '',
+      summary: selectedVersion?.summary ?? '',
+      systemPrompt: selectedVersion?.systemPrompt ?? '',
+      tags: selectedVersion?.tags.join(', ') ?? '',
+    });
+  }, [project?.name, selectedVersion]);
 
   const relatedRuns = useMemo(
-    () => history.filter((run) => run.scenario.promptId === prompt?.id).slice(0, 3),
-    [history, prompt?.id],
+    () => history.filter((run) => run.scenario.promptId === selectedVersion?.id).slice(0, 4),
+    [history, selectedVersion?.id],
   );
 
-  if (!prompt) {
+  if (!project || !selectedVersion) {
     return (
       <section className="page-stack">
         <div className="surface-card empty-card">
-          <h2>Prompt not found</h2>
-          <p>The route is valid, but there is no prompt matching this id in local state.</p>
+          <h2>Prompt project not found</h2>
+          <p>The route is valid, but there is no project matching this id in local state.</p>
           <Link to="/" className="button button-primary">
             Back to prompts
           </Link>
@@ -35,40 +65,64 @@ export function PromptDetailPage() {
     );
   }
 
+  const activeProject = project;
+  const activeVersion = selectedVersion;
+
+  function saveVersion() {
+    updatePromptProject(activeProject.id, { name: draft.projectName });
+    updatePromptVersion(activeVersion.id, {
+      title: draft.title,
+      summary: draft.summary,
+      systemPrompt: draft.systemPrompt,
+      tags: draft.tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    });
+  }
+
+  function createVersionAndSelect() {
+    const created = createPromptVersion(activeProject.id);
+    if (!created) return;
+    setSearchParams({ version: created.id });
+  }
+
   return (
     <section className="page-stack">
       <header className="hero-card prompt-detail-hero">
         <div>
-          <p className="eyebrow">Prompt detail</p>
-          <h2>{prompt.title}</h2>
+          <p className="eyebrow">Prompt project</p>
+          <h2>{activeProject.name}</h2>
           <p>
-            Refine the system prompt, track recent runs, and keep prompt intent stable across model
-            comparisons.
+            Review every version under this project, choose the active draft, and keep edits scoped
+            to the selected version.
           </p>
         </div>
-        <button
-          className="button button-primary"
-          onClick={() =>
-            updatePrompt(prompt.id, {
-              title: draft.title,
-              summary: draft.summary,
-              systemPrompt: draft.systemPrompt,
-              tags: draft.tags
-                .split(',')
-                .map((tag) => tag.trim())
-                .filter(Boolean),
-            })
-          }
-        >
-          <Save size={16} />
-          Save prompt
-        </button>
+        <div className="button-row-inline">
+          <button className="button button-secondary" onClick={createVersionAndSelect}>
+            <CopyPlus size={16} />
+            New version
+          </button>
+          <button className="button button-primary" onClick={saveVersion}>
+            <Save size={16} />
+            Save version
+          </button>
+        </div>
       </header>
 
       <div className="detail-grid">
         <article className="surface-card form-card">
           <label className="field-block">
-            <span>Prompt title</span>
+            <span>Project name</span>
+            <input
+              value={draft.projectName}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, projectName: event.target.value }))
+              }
+            />
+          </label>
+          <label className="field-block">
+            <span>Version title</span>
             <input
               value={draft.title}
               onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
@@ -106,17 +160,40 @@ export function PromptDetailPage() {
 
         <aside className="detail-sidebar">
           <article className="surface-card stat-card">
-            <p className="eyebrow">Prompt metadata</p>
+            <p className="eyebrow">All versions</p>
+            <div className="stack-list compact-list">
+              {versions.map((version) => (
+                <button
+                  key={version.id}
+                  className={`version-row${version.id === activeVersion.id ? ' is-selected' : ''}`}
+                  onClick={() => setSearchParams({ version: version.id })}
+                >
+                  <div>
+                    <strong>v{version.version}</strong>
+                    <p>{version.title}</p>
+                  </div>
+                  <span className="pill pill-subtle">{version.runCount} runs</span>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className="surface-card stat-card">
+            <p className="eyebrow">Selected version</p>
+            <div className="stat-row">
+              <span>Version</span>
+              <strong>v{activeVersion.version}</strong>
+            </div>
             <div className="stat-row">
               <span>Last updated</span>
-              <strong>{format(new Date(prompt.updatedAt), 'MMM d, yyyy HH:mm')}</strong>
+              <strong>{format(new Date(activeVersion.updatedAt), 'MMM d, yyyy HH:mm')}</strong>
             </div>
             <div className="stat-row">
               <span>Total runs</span>
-              <strong>{prompt.runCount}</strong>
+              <strong>{activeVersion.runCount}</strong>
             </div>
             <div className="tag-row">
-              {prompt.tags.map((tag) => (
+              {activeVersion.tags.map((tag) => (
                 <span className="tag-chip" key={tag}>
                   {tag}
                 </span>
@@ -127,17 +204,21 @@ export function PromptDetailPage() {
           <article className="surface-card stat-card">
             <p className="eyebrow">Recent runs</p>
             {relatedRuns.length === 0 ? (
-              <p className="muted-copy">No batch runs have used this prompt yet.</p>
+              <p className="muted-copy">No batch runs have used this version yet.</p>
             ) : (
               <div className="stack-list compact-list">
                 {relatedRuns.map((run) => (
-                  <div key={run.id} className="list-row">
+                  <button
+                    key={run.id}
+                    className="version-row"
+                    onClick={() => navigate('/history')}
+                  >
                     <div>
                       <strong>{run.name}</strong>
                       <p>{format(new Date(run.createdAt), 'MMM d, yyyy HH:mm')}</p>
                     </div>
                     <span className="pill pill-subtle">{run.results.length} outputs</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -145,10 +226,10 @@ export function PromptDetailPage() {
 
           <article className="surface-card stat-card accent-card">
             <Sparkles size={18} />
-            <h3>Production note</h3>
+            <h3>Versioning rule</h3>
             <p>
-              The next step is to replace the mocked batch executor with server-side calls to OpenAI
-              Responses and Gemini Generate Content endpoints.
+              Create a new version when the prompt intent shifts, not just when copy changes. Keep
+              versions tight so batch history stays comparable.
             </p>
           </article>
         </aside>

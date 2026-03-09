@@ -13,7 +13,7 @@ import { useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
 
 export function HistoryPage() {
-  const { history, prompts, models, assets } = useAppContext();
+  const { history, promptProjects, promptVersions, models, assets } = useAppContext();
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
 
   const counters = useMemo(() => history.reduce((sum, run) => sum + run.results.length, 0), [history]);
@@ -27,7 +27,13 @@ export function HistoryPage() {
     });
   };
 
-  const getPrompt = (id: string) => prompts.find((entry) => entry.id === id);
+  const getPromptVersion = (id: string) => promptVersions.find((entry) => entry.id === id);
+  const getPromptLabel = (id: string) => {
+    const version = getPromptVersion(id);
+    if (!version) return 'Unknown prompt';
+    const project = promptProjects.find((entry) => entry.id === version.projectId);
+    return `${project?.name ?? 'Unknown project'} · v${version.version}`;
+  };
   const getModel = (id: string) => models.find((entry) => entry.id === id);
   const getAsset = (id?: string) => assets.find((entry) => entry.id === id);
 
@@ -75,7 +81,6 @@ export function HistoryPage() {
               {expandedTests.has(run.id) ? (
                 <div className="history-results-grid">
                   {run.results.map((result) => {
-                    const prompt = getPrompt(result.promptId);
                     const model = getModel(result.modelId);
                     const asset = getAsset(result.assetId);
 
@@ -93,7 +98,7 @@ export function HistoryPage() {
                             <FileText size={15} />
                             <div>
                               <span>Prompt</span>
-                              <strong>{prompt?.title ?? 'Unknown prompt'}</strong>
+                              <strong>{getPromptLabel(result.promptId)}</strong>
                             </div>
                           </div>
                           {asset ? (

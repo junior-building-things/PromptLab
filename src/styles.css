@@ -268,6 +268,16 @@ p {
   color: var(--accent-strong);
 }
 
+.button-danger {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.button-small {
+  padding: 0.62rem 0.88rem;
+  font-size: 0.9rem;
+}
+
 .search-input {
   display: flex;
   align-items: center;
@@ -319,6 +329,10 @@ p {
 
 .card-grid-prompts {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.prompt-project-card {
+  cursor: pointer;
 }
 
 .prompt-card,
@@ -392,6 +406,14 @@ p {
 .output-panel p:first-of-type {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.button-row-inline,
+.project-version-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
 }
 
 .detail-grid {
@@ -480,6 +502,33 @@ p {
   margin-top: 0.2rem;
 }
 
+.version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  text-align: left;
+}
+
+.version-row.is-selected {
+  border-color: var(--border-strong);
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.version-row strong {
+  display: block;
+  color: var(--surface-ink);
+}
+
+.version-row p {
+  margin-top: 0.2rem;
+}
+
 .env-hint {
   display: inline-flex;
   align-items: center;
@@ -513,6 +562,11 @@ p {
   padding: 1rem;
   border-radius: 18px;
   background: #f8faff;
+}
+
+.error-card {
+  background: rgba(254, 242, 242, 0.88);
+  border-color: rgba(248, 113, 113, 0.28);
 }
 
 .empty-card {

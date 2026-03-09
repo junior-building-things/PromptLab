@@ -1,9 +1,9 @@
 import { format } from 'date-fns';
 import { AlertCircle, LoaderCircle, Play, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
-import type { AssetRecord, BatchRun, TestResult } from '../lib/types';
+import type { BatchRun, TestResult } from '../lib/types';
 
 type ApiResult = {
   modelId: string;
@@ -13,11 +13,24 @@ type ApiResult = {
 };
 
 export function BatchTestPage() {
-  const { prompts, assets, models, createRun } = useAppContext();
+  const { promptProjects, promptVersions, assets, models, createRun } = useAppContext();
   const navigate = useNavigate();
   const readyModels = useMemo(() => models.filter((model) => model.status === 'ready'), [models]);
+  const versionOptions = useMemo(
+    () =>
+      promptVersions
+        .map((version) => {
+          const project = promptProjects.find((entry) => entry.id === version.projectId);
+          return {
+            ...version,
+            projectName: project?.name ?? 'Unknown project',
+          };
+        })
+        .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
+    [promptProjects, promptVersions],
+  );
 
-  const [promptId, setPromptId] = useState(prompts[0]?.id ?? '');
+  const [promptId, setPromptId] = useState(versionOptions[0]?.id ?? '');
   const [assetId, setAssetId] = useState(assets[0]?.id ?? '');
   const [userInput, setUserInput] = useState(
     'Summarize the material, identify weaknesses in the prompt, and draft an improved response.',
@@ -29,7 +42,13 @@ export function BatchTestPage() {
   const [previewRun, setPreviewRun] = useState<BatchRun | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const selectedPrompt = prompts.find((prompt) => prompt.id === promptId);
+  useEffect(() => {
+    if (!promptId && versionOptions[0]?.id) {
+      setPromptId(versionOptions[0].id);
+    }
+  }, [promptId, versionOptions]);
+
+  const selectedPrompt = versionOptions.find((prompt) => prompt.id === promptId);
 
   async function runBatch() {
     if (!selectedPrompt || selectedModelIds.length === 0) return;
@@ -72,7 +91,7 @@ export function BatchTestPage() {
       }));
 
       const run = createRun({
-        name: `${selectedPrompt.title} - ${format(new Date(), 'MMM d HH:mm')}`,
+        name: `${selectedPrompt.projectName} v${selectedPrompt.version} - ${format(new Date(), 'MMM d HH:mm')}`,
         scenario: { promptId, assetId: assetId || undefined, modelIds: selectedModelIds, userInput },
         results,
       });
@@ -100,8 +119,8 @@ export function BatchTestPage() {
           <p className="eyebrow">Run comparisons</p>
           <h2>Batch test</h2>
           <p>
-            Pick a prompt, optional asset, and model set, then stage a run. The UI is ready now;
-            the next production step is replacing the mock executor with real API requests.
+            Pick a prompt version, optional asset, and model set, then stage a run. The UI is ready
+            now; the next production step is replacing the mock executor with real API requests.
           </p>
         </div>
         <button className="button button-primary" onClick={runBatch} disabled={running}>
@@ -113,11 +132,11 @@ export function BatchTestPage() {
       <div className="detail-grid">
         <article className="surface-card form-card">
           <label className="field-block">
-            <span>System prompt</span>
+            <span>System prompt version</span>
             <select value={promptId} onChange={(event) => setPromptId(event.target.value)}>
-              {prompts.map((prompt) => (
+              {versionOptions.map((prompt) => (
                 <option key={prompt.id} value={prompt.id}>
-                  {prompt.title}
+                  {prompt.projectName} · v{prompt.version} · {prompt.title}
                 </option>
               ))}
             </select>
@@ -172,6 +191,23 @@ export function BatchTestPage() {
               on Vercel.
             </p>
           </article>
+
+          {selectedPrompt ? (
+            <article className="surface-card stat-card">
+              <p className="eyebrow">Selected prompt</p>
+              <h3>{selectedPrompt.projectName}</h3>
+              <p>
+                v{selectedPrompt.version} · {selectedPrompt.title}
+              </p>
+              <div className="tag-row">
+                {selectedPrompt.tags.map((tag) => (
+                  <span key={tag} className="tag-chip">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </article>
+          ) : null}
 
           {errorMessage ? (
             <article className="surface-card stat-card error-card">

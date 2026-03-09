@@ -18,7 +18,6 @@ export function AppLayout() {
             <Bot size={22} />
           </div>
           <div>
-            <p className="eyebrow">Prompt Operations</p>
             <h1>PromptLab</h1>
           </div>
         </div>

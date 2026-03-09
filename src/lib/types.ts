@@ -1,7 +1,16 @@
 export type Provider = 'openai' | 'gemini';
 
-export type PromptRecord = {
+export type PromptProject = {
   id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PromptVersion = {
+  id: string;
+  projectId: string;
+  version: number;
   title: string;
   summary: string;
   systemPrompt: string;

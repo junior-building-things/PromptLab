@@ -1,20 +1,69 @@
-import type { AssetRecord, BatchRun, ModelRecord, PromptRecord } from '../lib/types';
+import type { AssetRecord, BatchRun, ModelRecord, PromptProject, PromptVersion } from '../lib/types';
 
-export const initialPrompts: PromptRecord[] = [
+export const initialPromptProjects: PromptProject[] = [
   {
-    id: 'prompt-onboarding',
-    title: 'Onboarding Explainer',
-    summary: 'Explain a new feature clearly without sounding robotic.',
+    id: 'project-onboarding',
+    name: 'Onboarding Explainer',
+    createdAt: '2026-03-02T08:00:00.000Z',
+    updatedAt: '2026-03-08T16:10:00.000Z',
+  },
+  {
+    id: 'project-support',
+    name: 'Support Draft Triage',
+    createdAt: '2026-03-03T09:00:00.000Z',
+    updatedAt: '2026-03-09T01:05:00.000Z',
+  },
+  {
+    id: 'project-vision',
+    name: 'Vision Prompt Critique',
+    createdAt: '2026-03-04T10:00:00.000Z',
+    updatedAt: '2026-03-07T13:45:00.000Z',
+  },
+];
+
+export const initialPromptVersions: PromptVersion[] = [
+  {
+    id: 'prompt-onboarding-v1',
+    projectId: 'project-onboarding',
+    version: 1,
+    title: 'Initial framing draft',
+    summary: 'First pass for explaining a new feature clearly without sounding robotic.',
+    systemPrompt:
+      'You are a product copywriter. Explain the feature and benefits clearly, avoid hype, and keep the structure easy to scan.',
+    tags: ['launch', 'copy'],
+    updatedAt: '2026-03-05T14:00:00.000Z',
+    runCount: 4,
+  },
+  {
+    id: 'prompt-onboarding-v2',
+    projectId: 'project-onboarding',
+    version: 2,
+    title: 'Launch-message refinement',
+    summary: 'Tightened benefits language and clearer framing for in-app surfaces.',
+    systemPrompt:
+      'You are a product copywriter. Turn product context into concise launch messaging with clear benefits, no hype, and concrete user outcomes. Prefer short sentences and scannable structure.',
+    tags: ['launch', 'copy', 'product'],
+    updatedAt: '2026-03-07T11:20:00.000Z',
+    runCount: 6,
+  },
+  {
+    id: 'prompt-onboarding-v3',
+    projectId: 'project-onboarding',
+    version: 3,
+    title: 'Current production candidate',
+    summary: 'Latest launch explainer tuned for product announcements and app copy.',
     systemPrompt:
       'You are a product copywriter. Turn product context into concise launch messaging with clear benefits, no hype, and concrete user outcomes.',
     tags: ['launch', 'copy', 'product'],
     updatedAt: '2026-03-08T16:10:00.000Z',
-    runCount: 18,
+    runCount: 8,
   },
   {
-    id: 'prompt-support',
-    title: 'Support Draft Triage',
-    summary: 'Categorize inbound support issues and draft a first response.',
+    id: 'prompt-support-v1',
+    projectId: 'project-support',
+    version: 1,
+    title: 'Support issue classifier',
+    summary: 'Categorize inbound support issues and draft a calm first response.',
     systemPrompt:
       'You are a support operations assistant. Classify the issue, identify urgency, and draft a response that is calm, direct, and policy-safe.',
     tags: ['support', 'ops'],
@@ -22,8 +71,10 @@ export const initialPrompts: PromptRecord[] = [
     runCount: 11,
   },
   {
-    id: 'prompt-vision',
-    title: 'Vision Prompt Critique',
+    id: 'prompt-vision-v1',
+    projectId: 'project-vision',
+    version: 1,
+    title: 'Multimodal prompt QA',
     summary: 'Review prompt quality for multimodal generation jobs.',
     systemPrompt:
       'You are a prompt engineer. Evaluate prompt clarity, missing constraints, and likely failure modes when used with image-capable foundation models.',
@@ -102,7 +153,7 @@ export const initialHistory: BatchRun[] = [
     name: 'Launch Copy Regression Check',
     createdAt: '2026-03-08T17:45:00.000Z',
     scenario: {
-      promptId: 'prompt-onboarding',
+      promptId: 'prompt-onboarding-v3',
       assetId: 'asset-release-notes',
       modelIds: ['model-openai-4o', 'model-gemini-2.5-pro'],
       userInput: 'Summarize what shipped and draft a friendly in-app announcement.',
@@ -110,7 +161,7 @@ export const initialHistory: BatchRun[] = [
     results: [
       {
         id: 'result-launch-openai',
-        promptId: 'prompt-onboarding',
+        promptId: 'prompt-onboarding-v3',
         modelId: 'model-openai-4o',
         assetId: 'asset-release-notes',
         latencyMs: 1820,
@@ -120,7 +171,7 @@ export const initialHistory: BatchRun[] = [
       },
       {
         id: 'result-launch-gemini',
-        promptId: 'prompt-onboarding',
+        promptId: 'prompt-onboarding-v3',
         modelId: 'model-gemini-2.5-pro',
         assetId: 'asset-release-notes',
         latencyMs: 2240,

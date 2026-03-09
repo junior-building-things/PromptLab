@@ -1,24 +1,74 @@
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowRight, Plus, Search } from 'lucide-react';
+import { CopyPlus, FolderPlus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
 
 export function PromptsPage() {
-  const { prompts, createPrompt } = useAppContext();
+  const {
+    promptProjects,
+    promptVersions,
+    createPromptProject,
+    createPromptVersion,
+    removePromptProject,
+  } = useAppContext();
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
 
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return prompts;
+  const cards = useMemo(() => {
+    return promptProjects
+      .map((project) => {
+        const versions = promptVersions
+          .filter((version) => version.projectId === project.id)
+          .sort((left, right) => right.version - left.version);
+        const latestVersion = versions[0];
 
-    return prompts.filter((prompt) => {
-      return [prompt.title, prompt.summary, prompt.tags.join(' '), prompt.systemPrompt]
-        .join(' ')
-        .toLowerCase()
-        .includes(term);
-    });
-  }, [prompts, query]);
+        return {
+          project,
+          versions,
+          latestVersion,
+        };
+      })
+      .filter(({ latestVersion }) => latestVersion)
+      .filter(({ project, versions, latestVersion }) => {
+        const term = query.trim().toLowerCase();
+        if (!term) return true;
+
+        return [
+          project.name,
+          latestVersion.title,
+          latestVersion.summary,
+          latestVersion.systemPrompt,
+          ...versions.flatMap((version) => [version.title, version.summary, version.tags.join(' ')]),
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(term);
+      })
+      .sort((left, right) =>
+        new Date(right.project.updatedAt).getTime() - new Date(left.project.updatedAt).getTime(),
+      );
+  }, [promptProjects, promptVersions, query]);
+
+  function handleNewProject() {
+    const created = createPromptProject();
+    navigate(`/prompts/${created.project.id}?version=${created.version.id}`);
+  }
+
+  function handleCreateVersion(projectId: string) {
+    const created = createPromptVersion(projectId);
+    if (created) {
+      navigate(`/prompts/${projectId}?version=${created.id}`);
+    }
+  }
+
+  function handleRemoveProject(projectId: string, projectName: string) {
+    if (!window.confirm(`Remove ${projectName} and all of its prompt versions?`)) {
+      return;
+    }
+
+    removePromptProject(projectId);
+  }
 
   return (
     <section className="page-stack">
@@ -27,23 +77,13 @@ export function PromptsPage() {
           <p className="eyebrow">Prompt workspace</p>
           <h2>Prompt library</h2>
           <p>
-            Organize system prompts by workflow, keep prompt intent crisp, and track what you test
-            against real providers.
+            Organize prompts as projects, create versioned iterations, and keep the latest candidate
+            easy to test.
           </p>
         </div>
-        <button
-          className="button button-primary"
-          onClick={() =>
-            createPrompt({
-              title: 'New Prompt Draft',
-              summary: 'Fresh draft ready for editing.',
-              systemPrompt: 'Describe the role, task, inputs, and output constraints here.',
-              tags: ['draft'],
-            })
-          }
-        >
-          <Plus size={16} />
-          New prompt
+        <button className="button button-primary" onClick={handleNewProject}>
+          <FolderPlus size={16} />
+          New project
         </button>
       </header>
 
@@ -53,38 +93,76 @@ export function PromptsPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search prompt title, summary, tags, or body"
+            placeholder="Search project names, version titles, tags, or prompt bodies"
           />
         </label>
-        <div className="pill">{filtered.length} prompts</div>
+        <div className="pill">{cards.length} projects</div>
       </div>
 
       <div className="card-grid card-grid-prompts">
-        {filtered.map((prompt) => (
-          <article key={prompt.id} className="surface-card prompt-card">
+        {cards.map(({ project, versions, latestVersion }) => (
+          <article
+            key={project.id}
+            className="surface-card prompt-card prompt-project-card"
+            onClick={() => navigate(`/prompts/${project.id}?version=${latestVersion.id}`)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                navigate(`/prompts/${project.id}?version=${latestVersion.id}`);
+              }
+            }}
+          >
             <div className="prompt-card-topline">
               <div className="tag-row">
-                {prompt.tags.map((tag) => (
+                {latestVersion.tags.map((tag) => (
                   <span key={tag} className="tag-chip">
                     {tag}
                   </span>
                 ))}
               </div>
-              <span className="meta-text">{prompt.runCount} runs</span>
+              <span className="meta-text">{latestVersion.runCount} runs</span>
             </div>
+
             <div>
-              <h3>{prompt.title}</h3>
-              <p>{prompt.summary}</p>
+              <h3>{project.name}</h3>
+              <p>{latestVersion.summary}</p>
             </div>
-            <pre className="code-snippet">{prompt.systemPrompt}</pre>
-            <footer className="card-footer">
+
+            <div className="project-version-meta">
+              <span className="pill">Latest v{latestVersion.version}</span>
+              <span className="pill pill-subtle">{versions.length} versions</span>
+            </div>
+
+            <pre className="code-snippet">{latestVersion.systemPrompt}</pre>
+
+            <footer className="card-footer card-footer-actions">
               <span className="meta-text">
-                Updated {formatDistanceToNow(new Date(prompt.updatedAt), { addSuffix: true })}
+                Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
               </span>
-              <Link className="inline-link" to={`/prompts/${encodeURIComponent(prompt.id)}`}>
-                Open
-                <ArrowRight size={16} />
-              </Link>
+              <div className="button-row-inline">
+                <button
+                  className="button button-secondary button-small"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleCreateVersion(project.id);
+                  }}
+                >
+                  <CopyPlus size={15} />
+                  Create
+                </button>
+                <button
+                  className="button button-danger button-small"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleRemoveProject(project.id, project.name);
+                  }}
+                >
+                  <Trash2 size={15} />
+                  Remove
+                </button>
+              </div>
             </footer>
           </article>
         ))}

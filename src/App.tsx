@@ -15,7 +15,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<AppLayout />}>
             <Route index element={<PromptsPage />} />
-            <Route path="prompts/:title" element={<PromptDetailPage />} />
+            <Route path="prompts/:projectId" element={<PromptDetailPage />} />
             <Route path="assets" element={<AssetsPage />} />
             <Route path="models" element={<ModelsPage />} />
             <Route path="batch-test" element={<BatchTestPage />} />
