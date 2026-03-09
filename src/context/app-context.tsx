@@ -286,7 +286,9 @@ export function AppProvider({ children }: PropsWithChildren) {
         ...current,
         promptProjects: current.promptProjects.filter((project) => project.id !== projectId),
         promptVersions: current.promptVersions.filter((version) => version.projectId !== projectId),
-        history: current.history.filter((run) => !versionIds.has(run.scenario.promptId)),
+        history: current.history.filter(
+          (run) => !run.results.some((result) => versionIds.has(result.promptId)),
+        ),
       };
     });
   }, []);
@@ -307,7 +309,9 @@ export function AppProvider({ children }: PropsWithChildren) {
           ? current.promptProjects
           : current.promptProjects.filter((project) => project.id !== target.projectId),
         promptVersions: remainingVersions,
-        history: current.history.filter((run) => run.scenario.promptId !== versionId),
+        history: current.history.filter(
+          (run) => !run.results.some((result) => result.promptId === versionId),
+        ),
       };
     });
   }, []);
@@ -357,20 +361,25 @@ export function AppProvider({ children }: PropsWithChildren) {
     };
 
     setState((current) => {
-      const target = current.promptVersions.find((version) => version.id === createdRun.scenario.promptId);
+      const touchedPromptIds = new Set(createdRun.results.map((result) => result.promptId));
+      const touchedProjectIds = new Set(
+        current.promptVersions
+          .filter((version) => touchedPromptIds.has(version.id))
+          .map((version) => version.projectId),
+      );
       const timestamp = new Date().toISOString();
 
       return {
         ...current,
         history: [createdRun, ...current.history],
         promptVersions: current.promptVersions.map((version) =>
-          version.id === createdRun.scenario.promptId
+          touchedPromptIds.has(version.id)
             ? { ...version, runCount: version.runCount + 1, updatedAt: timestamp }
             : version,
         ),
-        promptProjects: target
+        promptProjects: touchedProjectIds.size > 0
           ? current.promptProjects.map((project) =>
-              project.id === target.projectId ? { ...project, updatedAt: timestamp } : project,
+              touchedProjectIds.has(project.id) ? { ...project, updatedAt: timestamp } : project,
             )
           : current.promptProjects,
       };

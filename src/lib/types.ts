@@ -43,6 +43,7 @@ export type ModelRecord = {
 
 export type BatchScenario = {
   promptId: string;
+  promptIds?: string[];
   assetIds?: string[];
   userInputAssetIds?: string[];
   assetId?: string;

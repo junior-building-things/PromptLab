@@ -1,9 +1,19 @@
 import { format } from 'date-fns';
-import { AlertCircle, LoaderCircle, Play } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {
+  AlertCircle,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Cpu,
+  FileText,
+  History as HistoryIcon,
+  ImageIcon,
+  LoaderCircle,
+  Play,
+} from 'lucide-react';
+import { type ChangeEvent, useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
-import type { AssetRecord, BatchRun, TestResult } from '../lib/types';
+import type { AssetRecord, PromptVersion, TestResult } from '../lib/types';
 
 type ApiResult = {
   modelId: string;
@@ -19,9 +29,28 @@ function parseTextInputs(source: string) {
     .filter(Boolean);
 }
 
+function getSelectedValues(event: ChangeEvent<HTMLSelectElement>) {
+  return Array.from(event.target.selectedOptions, (option) => option.value);
+}
+
 export function BatchTestPage() {
-  const { promptProjects, promptVersions, assets, models, createRun } = useAppContext();
-  const navigate = useNavigate();
+  const { history, promptProjects, promptVersions, assets, models, createRun } = useAppContext();
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
+  const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>(
+    promptVersions[0] ? [promptVersions[0].id] : [],
+  );
+  const [selectedImageReferenceIds, setSelectedImageReferenceIds] = useState<string[]>([]);
+  const [selectedTextInputAssetIds, setSelectedTextInputAssetIds] = useState<string[]>(
+    assets.find((asset) => asset.kind === 'text-inputs') ? [assets.find((asset) => asset.kind === 'text-inputs')!.id] : [],
+  );
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>(
+    models.filter((model) => model.status === 'ready').slice(0, 2).map((model) => model.id),
+  );
+  const [running, setRunning] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const counters = useMemo(() => history.reduce((sum, run) => sum + run.results.length, 0), [history]);
   const readyModels = useMemo(() => models.filter((model) => model.status === 'ready'), [models]);
   const versionOptions = useMemo(
     () =>
@@ -36,7 +65,7 @@ export function BatchTestPage() {
         .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
     [promptProjects, promptVersions],
   );
-  const imageAssets = useMemo(
+  const imageReferenceAssets = useMemo(
     () => assets.filter((asset) => asset.kind === 'image-reference'),
     [assets],
   );
@@ -45,36 +74,42 @@ export function BatchTestPage() {
     [assets],
   );
 
-  const [promptId, setPromptId] = useState(versionOptions[0]?.id ?? '');
-  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(
-    imageAssets[0] ? [imageAssets[0].id] : [],
-  );
-  const [selectedUserInputAssetIds, setSelectedUserInputAssetIds] = useState<string[]>(
-    textInputAssets[0] ? [textInputAssets[0].id] : [],
-  );
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>(
-    readyModels.slice(0, 2).map((model) => model.id),
-  );
-  const [running, setRunning] = useState(false);
-  const [previewRun, setPreviewRun] = useState<BatchRun | null>(null);
-  const [errorMessage, setErrorMessage] = useState('');
+  function toggleExpand(id: string) {
+    setExpandedTests((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
-  useEffect(() => {
-    if (!promptId && versionOptions[0]?.id) {
-      setPromptId(versionOptions[0].id);
-    }
-  }, [promptId, versionOptions]);
+  function getPromptLabel(id: string) {
+    const version = promptVersions.find((entry) => entry.id === id);
+    if (!version) return 'Unknown Prompt';
+    const project = promptProjects.find((entry) => entry.id === version.projectId);
+    return `${project?.name ?? 'Unknown Project'} · v${version.version}`;
+  }
 
-  const selectedPrompt = versionOptions.find((prompt) => prompt.id === promptId);
-  const selectedUserInputs = useMemo(
-    () =>
-      textInputAssets
-        .filter((asset) => selectedUserInputAssetIds.includes(asset.id))
-        .flatMap((asset) => parseTextInputs(asset.source)),
-    [selectedUserInputAssetIds, textInputAssets],
-  );
+  function getModel(id: string) {
+    return models.find((entry) => entry.id === id);
+  }
+
+  function getAsset(id?: string) {
+    return assets.find((entry) => entry.id === id);
+  }
+
+  function openComposer() {
+    setComposerOpen(true);
+    setErrorMessage('');
+  }
+
+  function closeComposer() {
+    setComposerOpen(false);
+    setErrorMessage('');
+  }
 
   async function executeScenario(
+    prompt: PromptVersion,
     selectedModels: typeof models,
     asset: AssetRecord | undefined,
     userInput: string,
@@ -83,7 +118,7 @@ export function BatchTestPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        prompt: selectedPrompt,
+        prompt,
         asset,
         models: selectedModels,
         userInput,
@@ -103,8 +138,17 @@ export function BatchTestPage() {
   }
 
   async function runBatch() {
-    if (!selectedPrompt || selectedModelIds.length === 0 || selectedUserInputs.length === 0) {
-      setErrorMessage('Select at least one model and one user input asset before running.');
+    const selectedPrompts = versionOptions.filter((prompt) => selectedPromptIds.includes(prompt.id));
+    const selectedModels = readyModels.filter((model) => selectedModelIds.includes(model.id));
+    const selectedImageReferences = imageReferenceAssets.filter((asset) =>
+      selectedImageReferenceIds.includes(asset.id),
+    );
+    const selectedUserInputs = textInputAssets
+      .filter((asset) => selectedTextInputAssetIds.includes(asset.id))
+      .flatMap((asset) => parseTextInputs(asset.source));
+
+    if (selectedPrompts.length === 0 || selectedModels.length === 0 || selectedUserInputs.length === 0) {
+      setErrorMessage('Select at least one system prompt, text input, and model before running.');
       return;
     }
 
@@ -112,214 +156,262 @@ export function BatchTestPage() {
     setErrorMessage('');
 
     try {
-      const selectedModels = models.filter((model) => selectedModelIds.includes(model.id));
-      const selectedAssets = assets.filter((asset) => selectedAssetIds.includes(asset.id));
-      const assetScenarios = selectedAssets.length > 0 ? selectedAssets : [undefined];
+      const imageReferenceScenarios = selectedImageReferences.length > 0 ? selectedImageReferences : [undefined];
       const results: TestResult[] = [];
 
-      for (const asset of assetScenarios) {
-        for (const userInput of selectedUserInputs) {
-          const apiResults = await executeScenario(selectedModels, asset, userInput);
+      for (const prompt of selectedPrompts) {
+        for (const imageReference of imageReferenceScenarios) {
+          for (const userInput of selectedUserInputs) {
+            const apiResults = await executeScenario(prompt, selectedModels, imageReference, userInput);
 
-          apiResults.forEach((result, index) => {
-            results.push({
-              id: `result-${result.modelId}-${Date.now()}-${results.length + index}`,
-              promptId,
-              modelId: result.modelId,
-              assetId: asset?.id,
-              userInput,
-              output: result.output,
-              latencyMs: result.latencyMs,
-              score: result.score,
+            apiResults.forEach((result, index) => {
+              results.push({
+                id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
+                promptId: prompt.id,
+                modelId: result.modelId,
+                assetId: imageReference?.id,
+                userInput,
+                output: result.output,
+                latencyMs: result.latencyMs,
+                score: result.score,
+              });
             });
-          });
+          }
         }
       }
 
-      const run = createRun({
-        name: `${selectedPrompt.projectName} v${selectedPrompt.version} - ${format(new Date(), 'MMM d HH:mm')}`,
+      const createdRun = createRun({
+        name:
+          selectedPrompts.length === 1
+            ? `${getPromptLabel(selectedPrompts[0].id)} - ${format(new Date(), 'MMM d HH:mm')}`
+            : `${selectedPrompts.length} Prompt Selections - ${format(new Date(), 'MMM d HH:mm')}`,
         scenario: {
-          promptId,
-          assetIds: selectedAssetIds.length > 0 ? selectedAssetIds : undefined,
-          userInputAssetIds: selectedUserInputAssetIds,
-          assetId: selectedAssetIds[0],
+          promptId: selectedPrompts[0].id,
+          promptIds: selectedPrompts.map((prompt) => prompt.id),
+          assetIds: selectedImageReferenceIds.length > 0 ? selectedImageReferenceIds : undefined,
+          assetId: selectedImageReferenceIds[0],
+          userInputAssetIds: selectedTextInputAssetIds,
           modelIds: selectedModelIds,
           userInput: selectedUserInputs.join(' | '),
         },
         results,
       });
 
-      setPreviewRun(run);
+      setExpandedTests((current) => new Set([createdRun.id, ...current]));
+      closeComposer();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Batch run failed for an unknown reason.';
-      setErrorMessage(message);
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Batch run failed for an unknown reason.',
+      );
     } finally {
       setRunning(false);
     }
   }
 
-  function toggleModel(modelId: string) {
-    setSelectedModelIds((current) =>
-      current.includes(modelId) ? current.filter((id) => id !== modelId) : [...current, modelId],
-    );
-  }
-
-  function toggleAsset(assetId: string) {
-    setSelectedAssetIds((current) =>
-      current.includes(assetId) ? current.filter((id) => id !== assetId) : [...current, assetId],
-    );
-  }
-
-  function toggleUserInputAsset(assetId: string) {
-    setSelectedUserInputAssetIds((current) =>
-      current.includes(assetId) ? current.filter((id) => id !== assetId) : [...current, assetId],
-    );
-  }
-
   return (
-    <section className="page-stack">
-      <header className="hero-card">
-        <div>
-          <h2>Batch Test</h2>
-          <p>Batch test different prompts and assets.</p>
-        </div>
-        <button className="button button-primary" onClick={runBatch} disabled={running}>
-          {running ? <LoaderCircle size={16} className="spin" /> : <Play size={16} />}
-          {running ? 'Running...' : 'Run Batch'}
-        </button>
-      </header>
-
-      <div className="detail-grid">
-        <article className="surface-card form-card">
-          <label className="field-block">
-            <span>System Prompt Version</span>
-            <select value={promptId} onChange={(event) => setPromptId(event.target.value)}>
-              {versionOptions.map((prompt) => (
-                <option key={prompt.id} value={prompt.id}>
-                  {prompt.projectName} · v{prompt.version} · {prompt.title}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="field-block">
-            <span>Assets</span>
-            <div className="checkbox-grid">
-              {imageAssets.map((asset) => (
-                <label key={asset.id} className="checkbox-card">
-                  <input
-                    type="checkbox"
-                    checked={selectedAssetIds.includes(asset.id)}
-                    onChange={() => toggleAsset(asset.id)}
-                  />
-                  <div>
-                    <strong>{asset.name}</strong>
-                  </div>
-                </label>
-              ))}
-            </div>
+    <>
+      <section className="page-stack">
+        <header className="hero-card">
+          <div>
+            <h2>Batch Test</h2>
+            <p>Run and review previous batch tests.</p>
           </div>
+          <button className="button button-primary" onClick={openComposer}>
+            <Play size={16} />
+            New Batch Test
+          </button>
+        </header>
 
-          <div className="field-block">
-            <span>User Inputs</span>
-            <div className="checkbox-grid">
-              {textInputAssets.map((asset) => {
-                const count = parseTextInputs(asset.source).length;
-                return (
-                  <label key={asset.id} className="checkbox-card">
-                    <input
-                      type="checkbox"
-                      checked={selectedUserInputAssetIds.includes(asset.id)}
-                      onChange={() => toggleUserInputAsset(asset.id)}
-                    />
-                    <div>
-                      <strong>{asset.name}</strong>
-                      <p>{count} inputs</p>
-                    </div>
-                  </label>
-                );
-              })}
+        <div className="stack-list">
+          {history.length === 0 ? (
+            <div className="surface-card empty-card">
+              <HistoryIcon size={44} />
+              <h3>No Batch Tests Yet</h3>
+              <p>Create a batch test to compare prompts, image references, text inputs, and models.</p>
             </div>
-          </div>
-
-          <div className="field-block">
-            <span>Models</span>
-            <div className="checkbox-grid">
-              {readyModels.map((model) => (
-                <label key={model.id} className="checkbox-card">
-                  <input
-                    type="checkbox"
-                    checked={selectedModelIds.includes(model.id)}
-                    onChange={() => toggleModel(model.id)}
-                  />
-                  <div>
-                    <strong>{model.name}</strong>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-        </article>
-
-        <aside className="detail-sidebar">
-          <article className="surface-card stat-card">
-            <h3>Batch Size</h3>
-            <p>
-              {Math.max(selectedAssetIds.length, 1)} asset sets × {selectedUserInputs.length} user inputs ×{' '}
-              {selectedModelIds.length} models
-            </p>
-          </article>
-
-          {selectedPrompt ? (
-            <article className="surface-card stat-card">
-              <h3>{selectedPrompt.projectName}</h3>
-              <p>
-                v{selectedPrompt.version} · {selectedPrompt.title}
-              </p>
-              <div className="tag-row">
-                {selectedPrompt.tags.map((tag) => (
-                  <span key={tag} className="tag-chip">
-                    {tag}
-                  </span>
-                ))}
+          ) : (
+            <>
+              <div className="toolbar-card">
+                <div className="pill pill-subtle">{history.length} batch tests</div>
+                <div className="pill pill-subtle">{counters} outputs logged</div>
               </div>
-            </article>
-          ) : null}
 
-          {errorMessage ? (
-            <article className="surface-card stat-card error-card">
-              <AlertCircle size={18} />
-              <h3>Run Failed</h3>
-              <p>{errorMessage}</p>
-            </article>
-          ) : null}
-
-          {previewRun ? (
-            <article className="surface-card stat-card">
-              <h3>{previewRun.name}</h3>
-              <p className="muted-copy">{format(new Date(previewRun.createdAt), 'MMM d, yyyy HH:mm')}</p>
-              <div className="stack-list compact-list">
-                {previewRun.results.slice(0, 6).map((result) => {
-                  const model = models.find((entry) => entry.id === result.modelId);
-                  return (
-                    <div className="list-row" key={result.id}>
-                      <div>
-                        <strong>{model?.name}</strong>
-                        <p>{result.userInput ?? 'No User Input'}</p>
+              {history.map((run) => (
+                <article key={run.id} className="surface-card history-shell">
+                  <button className="history-toggle" onClick={() => toggleExpand(run.id)}>
+                    <div className="list-card-topline">
+                      <div className="icon-pill icon-pill-muted">
+                        {expandedTests.has(run.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                       </div>
-                      <span className="pill pill-subtle">{result.score}/100</span>
+                      <div>
+                        <h3>{run.name}</h3>
+                        <div className="history-meta">
+                          <span>{format(new Date(run.createdAt), 'MMM d, yyyy HH:mm')}</span>
+                          <span className="pill">{run.results.length} results</span>
+                        </div>
+                      </div>
                     </div>
-                  );
-                })}
+                  </button>
+
+                  {expandedTests.has(run.id) ? (
+                    <div className="history-results-grid">
+                      {run.results.map((result) => {
+                        const model = getModel(result.modelId);
+                        const imageReference = getAsset(result.assetId);
+
+                        return (
+                          <div className="surface-card history-result-card" key={result.id}>
+                            <div className="stack-list compact-list">
+                              <div className="meta-pair">
+                                <Cpu size={15} />
+                                <div>
+                                  <span>Model</span>
+                                  <strong>{model?.name ?? 'Unknown Model'}</strong>
+                                </div>
+                              </div>
+                              <div className="meta-pair">
+                                <FileText size={15} />
+                                <div>
+                                  <span>System Prompt</span>
+                                  <strong>{getPromptLabel(result.promptId)}</strong>
+                                </div>
+                              </div>
+                              {result.userInput ? (
+                                <div className="meta-pair">
+                                  <FileText size={15} />
+                                  <div>
+                                    <span>Text Input</span>
+                                    <strong>{result.userInput}</strong>
+                                  </div>
+                                </div>
+                              ) : null}
+                              {imageReference ? (
+                                <div className="meta-pair">
+                                  <ImageIcon size={15} />
+                                  <div>
+                                    <span>Image Reference</span>
+                                    <strong>{imageReference.name}</strong>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="output-panel">
+                              <p className="eyebrow">Output</p>
+                              <p>{result.output}</p>
+                            </div>
+                            <div className="history-result-footer">
+                              <span className="pill pill-subtle">{result.latencyMs} ms</span>
+                              <span className="pill pill-success">
+                                <CheckCircle size={14} />
+                                {result.score}/100
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </>
+          )}
+        </div>
+      </section>
+
+      {composerOpen ? (
+        <div className="composer-backdrop" onClick={closeComposer}>
+          <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
+            <header className="composer-sheet-header">
+              <div>
+                <h3>New Batch Test</h3>
               </div>
-              <button className="button button-secondary" onClick={() => navigate('/history')}>
-                View In History
-              </button>
-            </article>
-          ) : null}
-        </aside>
-      </div>
-    </section>
+              <div className="button-row-inline">
+                <button className="button button-secondary" onClick={closeComposer}>
+                  Cancel
+                </button>
+                <button className="button button-primary" onClick={runBatch} disabled={running}>
+                  {running ? <LoaderCircle size={16} className="spin" /> : <Play size={16} />}
+                  {running ? 'Running...' : 'Create Batch Test'}
+                </button>
+              </div>
+            </header>
+
+            <div className="stack-list">
+              <label className="field-block">
+                <span>System Prompts</span>
+                <select
+                  className="multi-select"
+                  multiple
+                  value={selectedPromptIds}
+                  onChange={(event) => setSelectedPromptIds(getSelectedValues(event))}
+                >
+                  {versionOptions.map((prompt) => (
+                    <option key={prompt.id} value={prompt.id}>
+                      {prompt.projectName} · v{prompt.version} · {prompt.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-block">
+                <span>Image References</span>
+                <select
+                  className="multi-select"
+                  multiple
+                  value={selectedImageReferenceIds}
+                  onChange={(event) => setSelectedImageReferenceIds(getSelectedValues(event))}
+                >
+                  {imageReferenceAssets.map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {asset.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-block">
+                <span>Text Inputs</span>
+                <select
+                  className="multi-select"
+                  multiple
+                  value={selectedTextInputAssetIds}
+                  onChange={(event) => setSelectedTextInputAssetIds(getSelectedValues(event))}
+                >
+                  {textInputAssets.map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {asset.name} · {parseTextInputs(asset.source).length} inputs
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-block">
+                <span>Models</span>
+                <select
+                  className="multi-select"
+                  multiple
+                  value={selectedModelIds}
+                  onChange={(event) => setSelectedModelIds(getSelectedValues(event))}
+                >
+                  {readyModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {errorMessage ? (
+                <article className="surface-card stat-card error-card">
+                  <AlertCircle size={18} />
+                  <h3>Run Failed</h3>
+                  <p>{errorMessage}</p>
+                </article>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </>
   );
 }

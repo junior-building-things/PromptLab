@@ -79,6 +79,12 @@ textarea {
   resize: vertical;
 }
 
+select[multiple],
+.multi-select {
+  min-height: 11rem;
+  padding: 0.6rem;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);

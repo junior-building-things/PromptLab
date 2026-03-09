@@ -1,4 +1,4 @@
-import { Bot, Cpu, History, ImageIcon, PlaySquare, Sparkles } from 'lucide-react';
+import { Bot, Cpu, ImageIcon, PlaySquare, Sparkles } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 const navItems = [
@@ -6,7 +6,6 @@ const navItems = [
   { to: '/assets', label: 'Assets', icon: ImageIcon },
   { to: '/models', label: 'Models', icon: Cpu },
   { to: '/batch-test', label: 'Batch Test', icon: PlaySquare },
-  { to: '/history', label: 'History', icon: History },
 ];
 
 export function AppLayout() {
