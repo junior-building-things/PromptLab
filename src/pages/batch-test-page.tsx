@@ -10,8 +10,9 @@ import {
   ImageIcon,
   LoaderCircle,
   Play,
+  type LucideIcon,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
 import type { AssetRecord, PromptVersion, TestResult } from '../lib/types';
 
@@ -20,6 +21,13 @@ type ApiResult = {
   output: string;
   latencyMs: number;
   score: number;
+};
+
+type DropdownOption = {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: ReactNode;
 };
 
 function parseTextInputs(source: string) {
@@ -31,6 +39,80 @@ function parseTextInputs(source: string) {
 
 function toggleSelection(values: string[], value: string) {
   return values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];
+}
+
+function buildSummary(selectedIds: string[], options: DropdownOption[], emptyLabel: string) {
+  if (selectedIds.length === 0) return emptyLabel;
+
+  const labels = options
+    .filter((option) => selectedIds.includes(option.id))
+    .map((option) => option.label);
+
+  if (labels.length <= 2) {
+    return labels.join(', ');
+  }
+
+  return `${labels.length} Selected`;
+}
+
+function TextIcon({ Icon }: { Icon: LucideIcon }) {
+  return (
+    <span className="multi-dropdown-option-glyph">
+      <Icon size={16} />
+    </span>
+  );
+}
+
+function MultiSelectDropdown({
+  label,
+  options,
+  selectedIds,
+  onToggle,
+  emptyLabel,
+}: {
+  label: string;
+  options: DropdownOption[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  emptyLabel: string;
+}) {
+  return (
+    <label className="field-block">
+      <span>{label}</span>
+      <details className="multi-dropdown">
+        <summary className="multi-dropdown-trigger">
+          <div className="multi-dropdown-trigger-copy">
+            <strong>{buildSummary(selectedIds, options, emptyLabel)}</strong>
+            <p>{selectedIds.length} selected</p>
+          </div>
+          <ChevronDown size={16} />
+        </summary>
+        <div className="multi-dropdown-menu">
+          {options.map((option) => {
+            const checked = selectedIds.includes(option.id);
+
+            return (
+              <label
+                key={option.id}
+                className={`multi-dropdown-option${checked ? ' is-selected' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onToggle(option.id)}
+                />
+                {option.icon ? <span className="multi-dropdown-option-icon">{option.icon}</span> : null}
+                <div className="multi-dropdown-option-copy">
+                  <strong>{option.label}</strong>
+                  {option.description ? <p>{option.description}</p> : null}
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </details>
+    </label>
+  );
 }
 
 export function BatchTestPage() {
@@ -74,6 +156,60 @@ export function BatchTestPage() {
   const textInputAssets = useMemo(
     () => assets.filter((asset) => asset.kind === 'text-inputs'),
     [assets],
+  );
+
+  const promptDropdownOptions = useMemo<DropdownOption[]>(
+    () =>
+      versionOptions.map((prompt) => ({
+        id: prompt.id,
+        label: `${prompt.projectName} · v${prompt.version}`,
+        description: prompt.title,
+        icon: <TextIcon Icon={FileText} />,
+      })),
+    [versionOptions],
+  );
+
+  const imageReferenceDropdownOptions = useMemo<DropdownOption[]>(
+    () =>
+      imageReferenceAssets.map((asset) => ({
+        id: asset.id,
+        label: asset.name,
+        icon: (
+          <img
+            src={asset.source}
+            alt={asset.name}
+            className="multi-dropdown-option-thumb"
+          />
+        ),
+      })),
+    [imageReferenceAssets],
+  );
+
+  const textInputDropdownOptions = useMemo<DropdownOption[]>(
+    () =>
+      textInputAssets.map((asset) => ({
+        id: asset.id,
+        label: asset.name,
+        description: `${parseTextInputs(asset.source).length} inputs`,
+        icon: <TextIcon Icon={FileText} />,
+      })),
+    [textInputAssets],
+  );
+
+  const modelDropdownOptions = useMemo<DropdownOption[]>(
+    () =>
+      readyModels.map((model) => ({
+        id: model.id,
+        label: model.name,
+        icon: (
+          <img
+            src={model.provider === 'gemini' ? '/gemini.png' : '/openai.png'}
+            alt={model.provider === 'gemini' ? 'Gemini' : 'OpenAI'}
+            className="model-logo"
+          />
+        ),
+      })),
+    [readyModels],
   );
 
   function toggleExpand(id: string) {
@@ -339,123 +475,41 @@ export function BatchTestPage() {
             </header>
 
             <div className="stack-list">
-              <div className="field-block">
-                <span>System Prompts</span>
-                <div className="selection-strip">
-                  {versionOptions.map((prompt) => {
-                    const selected = selectedPromptIds.includes(prompt.id);
-                    return (
-                      <label
-                        key={prompt.id}
-                        className={`selection-card${selected ? ' is-selected' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() =>
-                            setSelectedPromptIds((current) => toggleSelection(current, prompt.id))
-                          }
-                        />
-                        <div className="selection-card-body">
-                          <strong>{prompt.projectName}</strong>
-                          <p>v{prompt.version}</p>
-                          <span className="selection-card-copy">{prompt.title}</span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              <MultiSelectDropdown
+                label="System Prompts"
+                options={promptDropdownOptions}
+                selectedIds={selectedPromptIds}
+                onToggle={(id) => setSelectedPromptIds((current) => toggleSelection(current, id))}
+                emptyLabel="Select System Prompts"
+              />
 
-              <div className="field-block">
-                <span>Image References</span>
-                <div className="selection-strip">
-                  {imageReferenceAssets.map((asset) => {
-                    const selected = selectedImageReferenceIds.includes(asset.id);
-                    return (
-                      <label
-                        key={asset.id}
-                        className={`selection-card selection-card-image${selected ? ' is-selected' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() =>
-                            setSelectedImageReferenceIds((current) => toggleSelection(current, asset.id))
-                          }
-                        />
-                        <div className="selection-card-media">
-                          <img src={asset.source} alt={asset.name} className="selection-card-preview" />
-                        </div>
-                        <div className="selection-card-body">
-                          <strong>{asset.name}</strong>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              <MultiSelectDropdown
+                label="Image References"
+                options={imageReferenceDropdownOptions}
+                selectedIds={selectedImageReferenceIds}
+                onToggle={(id) =>
+                  setSelectedImageReferenceIds((current) => toggleSelection(current, id))
+                }
+                emptyLabel="Select Image References"
+              />
 
-              <div className="field-block">
-                <span>Text Inputs</span>
-                <div className="selection-strip">
-                  {textInputAssets.map((asset) => {
-                    const selected = selectedTextInputAssetIds.includes(asset.id);
-                    return (
-                      <label
-                        key={asset.id}
-                        className={`selection-card${selected ? ' is-selected' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() =>
-                            setSelectedTextInputAssetIds((current) => toggleSelection(current, asset.id))
-                          }
-                        />
-                        <div className="selection-card-body">
-                          <strong>{asset.name}</strong>
-                          <p>{parseTextInputs(asset.source).length} inputs</p>
-                          <span className="selection-card-copy">
-                            {parseTextInputs(asset.source).slice(0, 2).join(', ')}
-                          </span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              <MultiSelectDropdown
+                label="Text Inputs"
+                options={textInputDropdownOptions}
+                selectedIds={selectedTextInputAssetIds}
+                onToggle={(id) =>
+                  setSelectedTextInputAssetIds((current) => toggleSelection(current, id))
+                }
+                emptyLabel="Select Text Inputs"
+              />
 
-              <div className="field-block">
-                <span>Models</span>
-                <div className="selection-strip">
-                  {readyModels.map((model) => {
-                    const selected = selectedModelIds.includes(model.id);
-                    return (
-                      <label
-                        key={model.id}
-                        className={`selection-card selection-card-model${selected ? ' is-selected' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() =>
-                            setSelectedModelIds((current) => toggleSelection(current, model.id))
-                          }
-                        />
-                        <div className="selection-card-body selection-card-body-inline">
-                          <img
-                            className="model-logo"
-                            src={model.provider === 'gemini' ? '/gemini.png' : '/openai.png'}
-                            alt={model.provider === 'gemini' ? 'Gemini' : 'OpenAI'}
-                          />
-                          <strong>{model.name}</strong>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              <MultiSelectDropdown
+                label="Models"
+                options={modelDropdownOptions}
+                selectedIds={selectedModelIds}
+                onToggle={(id) => setSelectedModelIds((current) => toggleSelection(current, id))}
+                emptyLabel="Select Models"
+              />
 
               {errorMessage ? (
                 <article className="surface-card stat-card error-card">
