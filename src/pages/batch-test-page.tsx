@@ -94,12 +94,10 @@ function TextIcon({ Icon }: { Icon: LucideIcon }) {
 
 function BatchResultCell({
   results,
-  getAssetName,
   isRunning,
   placeholderCount,
 }: {
   results: TestResult[];
-  getAssetName: (id?: string) => string | undefined;
   isRunning: boolean;
   placeholderCount: number;
 }) {
@@ -109,9 +107,6 @@ function BatchResultCell({
         <div className="batch-table-cell-stack">
           {Array.from({ length: placeholderCount }).map((_, index) => (
             <div key={index} className="batch-table-result">
-              {placeholderCount > 1 ? (
-                <div className="batch-table-result-meta">Image Reference {index + 1}</div>
-              ) : null}
               <div className="batch-table-output-placeholder" />
             </div>
           ))}
@@ -126,9 +121,6 @@ function BatchResultCell({
     <div className="batch-table-cell-stack">
       {results.map((result) => (
         <div key={result.id} className="batch-table-result">
-          {results.length > 1 && result.assetId ? (
-            <div className="batch-table-result-meta">{getAssetName(result.assetId) ?? 'Image Reference'}</div>
-          ) : null}
           {isImageOutput(result.outputImage) ? (
             <img
               className="batch-table-output-image"
@@ -777,7 +769,6 @@ export function BatchTestPage() {
                                         <td key={column.id}>
                                           <BatchResultCell
                                             results={cell?.results ?? []}
-                                            getAssetName={getAssetName}
                                             isRunning={run.status === 'running'}
                                             placeholderCount={
                                               run.scenario.assetIds && run.scenario.assetIds.length > 0
