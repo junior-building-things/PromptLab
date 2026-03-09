@@ -537,6 +537,7 @@ export function BatchTestPage() {
                 assetId: imageReference?.id,
                 userInput,
                 output: result.output,
+                outputImage: result.outputImage,
                 latencyMs: result.latencyMs,
                 score: result.score,
               });
