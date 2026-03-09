@@ -26,10 +26,7 @@ const STORAGE_KEY = 'promptlab-state-v2';
 
 type PromptProjectDraft = {
   name: string;
-  title: string;
-  summary: string;
   systemPrompt: string;
-  tags: string[];
 };
 
 type PromptVersionDraft = Omit<PromptVersion, 'id' | 'projectId' | 'version' | 'updatedAt' | 'runCount'>;
@@ -63,7 +60,7 @@ type LegacyState = {
 
 type AppContextValue = AppState & {
   createPromptProject: (draft?: Partial<PromptProjectDraft>) => { project: PromptProject; version: PromptVersion };
-  createPromptVersion: (projectId: string) => PromptVersion | null;
+  createPromptVersion: (projectId: string, systemPrompt?: string) => PromptVersion | null;
   updatePromptProject: (projectId: string, updates: Partial<Pick<PromptProject, 'name'>>) => void;
   updatePromptVersion: (versionId: string, draft: PromptVersionDraft) => void;
   removePromptProject: (projectId: string) => void;
@@ -164,11 +161,11 @@ export function AppProvider({ children }: PropsWithChildren) {
       id: makeId('prompt'),
       projectId,
       version: 1,
-      title: draft?.title ?? 'Initial Draft',
-      summary: draft?.summary ?? 'Fresh prompt version ready for editing.',
+      title: 'Prompt v1',
+      summary: '',
       systemPrompt:
         draft?.systemPrompt ?? 'Describe the role, task, inputs, and output constraints here.',
-      tags: draft?.tags ?? ['draft'],
+      tags: [],
       updatedAt: timestamp,
       runCount: 0,
     };
@@ -182,7 +179,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     return { project, version };
   }, []);
 
-  const createPromptVersion = useCallback((projectId: string) => {
+  const createPromptVersion = useCallback((projectId: string, systemPrompt?: string) => {
     let created: PromptVersion | null = null;
 
     setState((current) => {
@@ -196,7 +193,10 @@ export function AppProvider({ children }: PropsWithChildren) {
         ...latest,
         id: makeId('prompt'),
         version: latest.version + 1,
-        title: `${latest.title} copy`,
+        title: `Prompt v${latest.version + 1}`,
+        summary: '',
+        systemPrompt: systemPrompt || latest.systemPrompt,
+        tags: [],
         updatedAt: timestamp,
         runCount: 0,
       };

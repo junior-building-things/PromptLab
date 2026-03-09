@@ -1,8 +1,12 @@
 import { formatDistanceToNow } from 'date-fns';
-import { CopyPlus, FolderPlus, Search, Trash2 } from 'lucide-react';
+import { FolderPlus, MoreHorizontal, Plus, Search, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
+
+type ComposerState =
+  | { mode: 'project'; projectId: null; projectName: string; systemPrompt: string }
+  | { mode: 'prompt'; projectId: string; projectName: string; systemPrompt: string };
 
 export function PromptsPage() {
   const {
@@ -14,6 +18,8 @@ export function PromptsPage() {
   } = useAppContext();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const [composer, setComposer] = useState<ComposerState | null>(null);
+  const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
 
   const cards = useMemo(() => {
     return promptProjects
@@ -36,7 +42,6 @@ export function PromptsPage() {
 
         return [
           project.name,
-          latestVersion.title,
           latestVersion.summary,
           latestVersion.systemPrompt,
           ...versions.flatMap((version) => [version.title, version.summary, version.tags.join(' ')]),
@@ -50,16 +55,48 @@ export function PromptsPage() {
       );
   }, [promptProjects, promptVersions, query]);
 
-  function handleNewProject() {
-    const created = createPromptProject();
-    navigate(`/prompts/${created.project.id}?version=${created.version.id}`);
+  function openProjectComposer() {
+    setComposer({
+      mode: 'project',
+      projectId: null,
+      projectName: '',
+      systemPrompt: '',
+    });
   }
 
-  function handleCreateVersion(projectId: string) {
-    const created = createPromptVersion(projectId);
-    if (created) {
-      navigate(`/prompts/${projectId}?version=${created.id}`);
+  function openPromptComposer(projectId: string, projectName: string) {
+    setComposer({
+      mode: 'prompt',
+      projectId,
+      projectName,
+      systemPrompt: '',
+    });
+    setMenuProjectId(null);
+  }
+
+  function closeComposer() {
+    setComposer(null);
+  }
+
+  function submitComposer() {
+    if (!composer) return;
+    if (!composer.projectName.trim() || !composer.systemPrompt.trim()) return;
+
+    if (composer.mode === 'project') {
+      const created = createPromptProject({
+        name: composer.projectName.trim(),
+        systemPrompt: composer.systemPrompt.trim(),
+      });
+      navigate(`/prompts/${created.project.id}?version=${created.version.id}`);
+      closeComposer();
+      return;
     }
+
+    const created = createPromptVersion(composer.projectId, composer.systemPrompt.trim());
+    if (created) {
+      navigate(`/prompts/${composer.projectId}?version=${created.id}`);
+    }
+    closeComposer();
   }
 
   function handleRemoveProject(projectId: string, projectName: string) {
@@ -68,105 +105,195 @@ export function PromptsPage() {
     }
 
     removePromptProject(projectId);
+    setMenuProjectId(null);
   }
 
   return (
-    <section className="page-stack">
-      <header className="hero-card">
-        <div>
-          <p className="eyebrow">Prompt workspace</p>
-          <h2>Prompt library</h2>
-          <p>
-            Organize prompts as projects, create versioned iterations, and keep the latest candidate
-            easy to test.
-          </p>
+    <>
+      <section className="page-stack">
+        <header className="hero-card">
+          <div>
+            <p className="eyebrow">Prompt workspace</p>
+            <h2>Prompt library</h2>
+            <p>
+              Organize prompts as projects, create versioned iterations, and keep the latest candidate
+              easy to test.
+            </p>
+          </div>
+          <button className="button button-primary" onClick={openProjectComposer}>
+            <FolderPlus size={16} />
+            New project
+          </button>
+        </header>
+
+        <div className="toolbar-card">
+          <label className="search-input">
+            <Search size={16} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search project names or prompt bodies"
+            />
+          </label>
+          <div className="pill">{cards.length} projects</div>
         </div>
-        <button className="button button-primary" onClick={handleNewProject}>
-          <FolderPlus size={16} />
-          New project
-        </button>
-      </header>
 
-      <div className="toolbar-card">
-        <label className="search-input">
-          <Search size={16} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search project names, version titles, tags, or prompt bodies"
-          />
-        </label>
-        <div className="pill">{cards.length} projects</div>
-      </div>
-
-      <div className="card-grid card-grid-prompts">
-        {cards.map(({ project, versions, latestVersion }) => (
-          <article
-            key={project.id}
-            className="surface-card prompt-card prompt-project-card"
-            onClick={() => navigate(`/prompts/${project.id}?version=${latestVersion.id}`)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                navigate(`/prompts/${project.id}?version=${latestVersion.id}`);
-              }
-            }}
-          >
-            <div className="prompt-card-topline">
-              <div className="tag-row">
-                {latestVersion.tags.map((tag) => (
-                  <span key={tag} className="tag-chip">
-                    {tag}
-                  </span>
-                ))}
+        <div className="card-grid card-grid-prompts">
+          {cards.map(({ project, versions, latestVersion }) => (
+            <article
+              key={project.id}
+              className="surface-card prompt-card prompt-project-card"
+              onClick={() => navigate(`/prompts/${project.id}?version=${latestVersion.id}`)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate(`/prompts/${project.id}?version=${latestVersion.id}`);
+                }
+              }}
+            >
+              <div className="prompt-card-header">
+                <div className="project-version-meta">
+                  <span className="pill">Latest v{latestVersion.version}</span>
+                  <span className="pill pill-subtle">{versions.length} versions</span>
+                </div>
+                <div className="button-row-inline card-actions-corner">
+                  <button
+                    className="button button-secondary button-small"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openPromptComposer(project.id, project.name);
+                    }}
+                  >
+                    <Plus size={15} />
+                    New prompt
+                  </button>
+                  <div className="card-menu-wrap">
+                    <button
+                      className="icon-action-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setMenuProjectId((current) => (current === project.id ? null : project.id));
+                      }}
+                      aria-label="Project actions"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {menuProjectId === project.id ? (
+                      <div className="card-menu-sheet" onClick={(event) => event.stopPropagation()}>
+                        <button
+                          className="menu-sheet-action menu-sheet-danger"
+                          onClick={() => handleRemoveProject(project.id, project.name)}
+                        >
+                          <Trash2 size={15} />
+                          Remove
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-              <span className="meta-text">{latestVersion.runCount} runs</span>
-            </div>
 
-            <div>
-              <h3>{project.name}</h3>
-              <p>{latestVersion.summary}</p>
-            </div>
+              <div>
+                <h3>{project.name}</h3>
+                <p>{latestVersion.summary || 'Latest prompt version ready for iteration.'}</p>
+              </div>
 
-            <div className="project-version-meta">
-              <span className="pill">Latest v{latestVersion.version}</span>
-              <span className="pill pill-subtle">{versions.length} versions</span>
-            </div>
+              {latestVersion.tags.length > 0 ? (
+                <div className="tag-row">
+                  {latestVersion.tags.map((tag) => (
+                    <span key={tag} className="tag-chip">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
 
-            <pre className="code-snippet">{latestVersion.systemPrompt}</pre>
+              <pre className="code-snippet">{latestVersion.systemPrompt}</pre>
 
-            <footer className="card-footer card-footer-actions">
-              <span className="meta-text">
-                Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
-              </span>
+              <footer className="card-footer card-footer-actions">
+                <span className="meta-text">{latestVersion.runCount} runs</span>
+                <span className="meta-text">
+                  Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
+                </span>
+              </footer>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {composer ? (
+        <div className="composer-backdrop" onClick={closeComposer}>
+          <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
+            <header className="composer-sheet-header">
+              <div>
+                <p className="eyebrow">{composer.mode === 'project' ? 'New project' : 'New prompt'}</p>
+                <h3>
+                  {composer.mode === 'project' ? 'Create a prompt project' : 'Create a new prompt'}
+                </h3>
+                <p>
+                  {composer.mode === 'project'
+                    ? 'Start a new project with its first prompt.'
+                    : 'Add a new prompt version under this project.'}
+                </p>
+              </div>
               <div className="button-row-inline">
-                <button
-                  className="button button-secondary button-small"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleCreateVersion(project.id);
-                  }}
-                >
-                  <CopyPlus size={15} />
-                  Create
+                <button className="button button-secondary" onClick={closeComposer}>
+                  Cancel
                 </button>
-                <button
-                  className="button button-danger button-small"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleRemoveProject(project.id, project.name);
-                  }}
-                >
-                  <Trash2 size={15} />
-                  Remove
+                <button className="button button-primary" onClick={submitComposer}>
+                  {composer.mode === 'project' ? 'Create project' : 'Create prompt'}
                 </button>
               </div>
-            </footer>
-          </article>
-        ))}
-      </div>
-    </section>
+            </header>
+
+            <div className="stack-list">
+              <label className="field-block">
+                <span>Project name</span>
+                <input
+                  value={composer.projectName}
+                  disabled={composer.mode === 'prompt'}
+                  onChange={(event) =>
+                    setComposer((current) =>
+                      current
+                        ? {
+                            ...current,
+                            projectName: event.target.value,
+                          }
+                        : current,
+                    )
+                  }
+                  placeholder="Launch Messaging"
+                />
+              </label>
+
+              <label className="field-block">
+                <span>System prompt</span>
+                <textarea
+                  rows={12}
+                  value={composer.systemPrompt}
+                  onChange={(event) =>
+                    setComposer((current) =>
+                      current
+                        ? {
+                            ...current,
+                            systemPrompt: event.target.value,
+                          }
+                        : current,
+                    )
+                  }
+                  placeholder="Describe the role, task, inputs, and output constraints here."
+                />
+              </label>
+            </div>
+
+            <button className="composer-close-button" onClick={closeComposer} aria-label="Close composer">
+              <X size={18} />
+            </button>
+          </section>
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -335,6 +335,13 @@ p {
   cursor: pointer;
 }
 
+.prompt-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
 .prompt-card,
 .list-card,
 .model-card,
@@ -414,6 +421,11 @@ p {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.65rem;
+}
+
+.card-actions-corner {
+  position: relative;
+  justify-content: flex-end;
 }
 
 .detail-grid {
@@ -502,6 +514,55 @@ p {
   margin-top: 0.2rem;
 }
 
+.card-menu-wrap {
+  position: relative;
+}
+
+.icon-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #334155;
+}
+
+.card-menu-sheet {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.55rem);
+  min-width: 10rem;
+  padding: 0.45rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+
+.menu-sheet-action {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 12px;
+  padding: 0.8rem 0.9rem;
+  color: #334155;
+}
+
+.menu-sheet-action:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.menu-sheet-danger {
+  color: #b91c1c;
+}
+
 .version-row {
   display: flex;
   align-items: center;
@@ -569,6 +630,55 @@ p {
   border-color: rgba(248, 113, 113, 0.28);
 }
 
+.composer-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(8px);
+  z-index: 30;
+}
+
+.composer-sheet {
+  position: relative;
+  width: min(760px, 100%);
+  display: grid;
+  gap: 1.2rem;
+  padding: 1.4rem;
+}
+
+.composer-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-right: 3rem;
+}
+
+.composer-close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #334155;
+}
+
+input:disabled,
+textarea:disabled {
+  background: rgba(226, 232, 240, 0.48);
+  color: #475569;
+  cursor: not-allowed;
+}
+
 .empty-card {
   place-items: center;
   text-align: center;
@@ -611,8 +721,10 @@ p {
   .hero-card,
   .page-heading-row,
   .toolbar-card,
+  .composer-sheet-header,
   .section-header-inline,
   .card-footer,
+  .prompt-card-header,
   .prompt-card-topline,
   .model-card-header,
   .history-result-footer {
@@ -622,6 +734,10 @@ p {
 
   .toolbar-card {
     align-items: stretch;
+  }
+
+  .composer-sheet-header {
+    padding-right: 0;
   }
 
   .main-panel-inner {
