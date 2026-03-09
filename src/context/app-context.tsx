@@ -84,6 +84,11 @@ const defaultState: AppState = {
   history: initialHistory,
 };
 
+const legacyModelIdMap: Record<string, string> = {
+  'model-openai-4o': 'model-openai-gpt-image',
+  'model-gemini-2.5-pro': 'model-gemini-nano-banana',
+};
+
 function normalizeAssetKind(kind?: string): AssetRecord['kind'] {
   if (kind === 'image-reference' || kind === 'image') {
     return 'image-reference';
@@ -102,10 +107,43 @@ function normalizeAsset(asset: AssetRecord & { note?: string; kind?: string }): 
   };
 }
 
+function normalizeModels(models?: ModelRecord[]): ModelRecord[] {
+  if (!models || models.length === 0) {
+    return initialModels;
+  }
+
+  const persistedById = new Map<string, ModelRecord>();
+
+  models.forEach((model) => {
+    persistedById.set(model.id, model);
+    const mappedId = legacyModelIdMap[model.id];
+    if (mappedId) {
+      persistedById.set(mappedId, model);
+    }
+  });
+
+  return initialModels.map((model) => {
+    const persisted = persistedById.get(model.id);
+    if (!persisted) {
+      return model;
+    }
+
+    return {
+      ...model,
+      apiModel: persisted.apiModel || model.apiModel,
+      temperature: persisted.temperature ?? model.temperature,
+      maxTokens: persisted.maxTokens ?? model.maxTokens,
+      status: persisted.status ?? model.status,
+      envVar: persisted.envVar || model.envVar,
+    };
+  });
+}
+
 function normalizeState(state: AppState): AppState {
   return {
     ...state,
     assets: (state.assets ?? initialAssets).map(normalizeAsset),
+    models: normalizeModels(state.models),
   };
 }
 
@@ -131,7 +169,7 @@ function migrateLegacyState(legacy: LegacyState): AppState {
       runCount: prompt.runCount,
     })),
     assets: (legacy.assets ?? initialAssets).map(normalizeAsset),
-    models: legacy.models ?? initialModels,
+    models: normalizeModels(legacy.models),
     history: legacy.history ?? initialHistory,
   };
 }
