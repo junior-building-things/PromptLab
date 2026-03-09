@@ -46,6 +46,81 @@ function scoreOutput(text) {
   return Math.max(72, Math.min(98, 72 + lengthScore));
 }
 
+function toDataUrl(mimeType, data) {
+  if (!mimeType || !data) {
+    return undefined;
+  }
+
+  return `data:${mimeType};base64,${data}`;
+}
+
+function collectCandidateImage(value) {
+  if (!value) return undefined;
+
+  if (typeof value === 'string') {
+    if (/^data:image\//.test(value) || /^https?:\/\//.test(value)) {
+      return value;
+    }
+    return undefined;
+  }
+
+  if (typeof value !== 'object') {
+    return undefined;
+  }
+
+  if (value.inlineData?.mimeType?.startsWith('image/') && value.inlineData?.data) {
+    return toDataUrl(value.inlineData.mimeType, value.inlineData.data);
+  }
+
+  if (value.fileData?.mimeType?.startsWith('image/') && value.fileData?.fileUri) {
+    return value.fileData.fileUri;
+  }
+
+  if (value.image_url?.url) {
+    return value.image_url.url;
+  }
+
+  if (value.image_url) {
+    return collectCandidateImage(value.image_url);
+  }
+
+  if (value.imageUrl) {
+    return collectCandidateImage(value.imageUrl);
+  }
+
+  if (value.file_uri) {
+    return value.file_uri;
+  }
+
+  if (value.url && /^https?:\/\//.test(value.url)) {
+    return value.url;
+  }
+
+  if (value.result) {
+    return collectCandidateImage(value.result);
+  }
+
+  if (value.b64_json) {
+    return toDataUrl(value.mime_type || value.mimeType || 'image/png', value.b64_json);
+  }
+
+  if (Array.isArray(value.content)) {
+    for (const entry of value.content) {
+      const candidate = collectCandidateImage(entry);
+      if (candidate) return candidate;
+    }
+  }
+
+  if (Array.isArray(value.output)) {
+    for (const entry of value.output) {
+      const candidate = collectCandidateImage(entry);
+      if (candidate) return candidate;
+    }
+  }
+
+  return undefined;
+}
+
 async function callOpenAI({ prompt, userInput, asset, model }) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('Missing OPENAI_API_KEY for OpenAI model execution.');
@@ -94,9 +169,11 @@ async function callOpenAI({ prompt, userInput, asset, model }) {
     throw new Error(payload.error?.message || 'OpenAI request failed.');
   }
 
+  const outputImage = collectCandidateImage(payload);
   const output = payload.output_text || payload.output?.flatMap((item) => item.content || []).map((item) => item.text || '').join('\n').trim();
   return {
     output: output || 'OpenAI returned no text output.',
+    outputImage,
     latencyMs: Date.now() - started,
   };
 }
@@ -151,10 +228,12 @@ async function callGemini({ prompt, userInput, asset, model }) {
   }
 
   const parts = payload.candidates?.[0]?.content?.parts || [];
+  const outputImage = parts.map((part) => collectCandidateImage(part)).find(Boolean);
   const output = parts.map((part) => part.text || '').join('\n').trim();
   const returnedImage = parts.some((part) => part.inlineData || part.fileData);
   return {
     output: output || (returnedImage ? 'Gemini returned image output.' : 'Gemini returned no text output.'),
+    outputImage,
     latencyMs: Date.now() - started,
   };
 }
@@ -210,8 +289,10 @@ async function callXAI({ prompt, userInput, asset, model }) {
   }
 
   const output = payload.choices?.[0]?.message?.content?.trim();
+  const outputImage = collectCandidateImage(payload.choices?.[0]?.message?.content);
   return {
     output: output || 'xAI returned no text output.',
+    outputImage,
     latencyMs: Date.now() - started,
   };
 }
@@ -246,6 +327,7 @@ export default async function handler(req, res) {
             result: {
               modelId: model.id,
               output: execution.output,
+              outputImage: execution.outputImage,
               latencyMs: execution.latencyMs,
               score: scoreOutput(execution.output),
             },

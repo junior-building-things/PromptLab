@@ -58,6 +58,7 @@ export type TestResult = {
   assetId?: string;
   userInput?: string;
   output: string;
+  outputImage?: string;
   latencyMs: number;
   score: number;
 };

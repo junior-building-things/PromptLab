@@ -21,6 +21,7 @@ import type { AssetRecord, BatchRun, PromptVersion, TestResult } from '../lib/ty
 type ApiResult = {
   modelId: string;
   output: string;
+  outputImage?: string;
   latencyMs: number;
   score: number;
 };
@@ -35,6 +36,20 @@ type DropdownOption = {
   label: string;
   description?: string;
   icon?: ReactNode;
+};
+
+type BatchTableCell = {
+  rowId: string;
+  columnId: string;
+  results: TestResult[];
+};
+
+type BatchTable = {
+  key: string;
+  title: string;
+  columns: Array<{ id: string; label: string }>;
+  rows: Array<{ id: string; label: string }>;
+  cells: Map<string, BatchTableCell>;
 };
 
 function parseTextInputs(source: string) {
@@ -57,11 +72,54 @@ function buildSummary(selectedIds: string[], options: DropdownOption[], emptyLab
     .join(', ');
 }
 
+function isImageOutput(value?: string) {
+  return Boolean(value && (/^data:image\//.test(value) || /^https?:\/\//.test(value)));
+}
+
+function buildCellKey(rowId: string, columnId: string) {
+  return `${rowId}::${columnId}`;
+}
+
 function TextIcon({ Icon }: { Icon: LucideIcon }) {
   return (
     <span className="multi-dropdown-option-glyph">
       <Icon size={16} />
     </span>
+  );
+}
+
+function BatchResultCell({
+  results,
+  getAssetName,
+}: {
+  results: TestResult[];
+  getAssetName: (id?: string) => string | undefined;
+}) {
+  if (results.length === 0) {
+    return <div className="batch-table-empty">No Result</div>;
+  }
+
+  return (
+    <div className="batch-table-cell-stack">
+      {results.map((result) => (
+        <div key={result.id} className="batch-table-result">
+          {results.length > 1 && result.assetId ? (
+            <div className="batch-table-result-meta">{getAssetName(result.assetId) ?? 'Image Reference'}</div>
+          ) : null}
+          {isImageOutput(result.outputImage) ? (
+            <img
+              className="batch-table-output-image"
+              src={result.outputImage}
+              alt="Generated output"
+            />
+          ) : (
+            <div className="batch-table-output-fallback">
+              <p>{result.output || 'No image output returned.'}</p>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -278,6 +336,92 @@ export function BatchTestPage() {
     return assets.find((entry) => entry.id === id);
   }
 
+  function getAssetName(id?: string) {
+    return getAsset(id)?.name;
+  }
+
+  function getRowLabels(run: BatchRun) {
+    const labels = new Map<string, string>();
+
+    run.results.forEach((result) => {
+      if (result.userInput) {
+        labels.set(result.userInput, result.userInput);
+      }
+    });
+
+    if (labels.size === 0 && run.scenario.userInput) {
+      run.scenario.userInput.split(' | ').forEach((value) => {
+        if (value.trim()) {
+          labels.set(value, value);
+        }
+      });
+    }
+
+    return [...labels.entries()].map(([id, label]) => ({ id, label }));
+  }
+
+  function buildRunTables(run: BatchRun): BatchTable[] {
+    const promptIds = [...new Set(run.results.map((result) => result.promptId))];
+    const modelIds = [...new Set(run.results.map((result) => result.modelId))];
+    const rows = getRowLabels(run);
+
+    const promptColumns = promptIds.map((id) => ({ id, label: getPromptLabel(id) }));
+    const modelColumns = modelIds.map((id) => ({ id, label: getModel(id)?.name ?? 'Unknown Model' }));
+    const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
+
+    const tableConfigs =
+      promptColumns.length > 1 && modelColumns.length > 1
+        ? modelColumns.map((modelColumn) => ({
+            key: modelColumn.id,
+            title: modelColumn.label,
+            scopeModelId: modelColumn.id,
+            columns: promptColumns,
+          }))
+        : [
+            {
+              key: 'default',
+              title:
+                modelColumns.length > 1 && promptColumns.length <= 1
+                  ? 'Results'
+                  : modelColumns[0]?.label ?? 'Results',
+              scopeModelId: undefined,
+              columns: usePromptColumns ? promptColumns : modelColumns,
+            },
+          ];
+
+    return tableConfigs.map((config) => {
+      const cells = new Map<string, BatchTableCell>();
+
+      run.results
+        .filter((result) => (config.scopeModelId ? result.modelId === config.scopeModelId : true))
+        .forEach((result) => {
+          const rowId = result.userInput ?? 'default';
+          const columnId = usePromptColumns ? result.promptId : result.modelId;
+          const key = buildCellKey(rowId, columnId);
+          const existing = cells.get(key);
+
+          if (existing) {
+            existing.results.push(result);
+            return;
+          }
+
+          cells.set(key, {
+            rowId,
+            columnId,
+            results: [result],
+          });
+        });
+
+      return {
+        key: config.key,
+        title: config.title,
+        columns: config.columns,
+        rows,
+        cells,
+      };
+    });
+  }
+
   function openComposer() {
     setComposerOpen(true);
     setErrorMessage('');
@@ -474,7 +618,35 @@ export function BatchTestPage() {
                   </button>
 
                   {expandedTests.has(run.id) ? (
-                    <div className="history-results-grid">
+                    <div className="batch-results-stack">
+                      <div className="surface-card batch-meta-card">
+                        <div className="meta-pair">
+                          <HistoryIcon size={15} />
+                          <div>
+                            <span>Created Time</span>
+                            <strong>{format(new Date(run.createdAt), 'MMM d, yyyy HH:mm')}</strong>
+                          </div>
+                        </div>
+                        <div className="meta-pair">
+                          {run.status === 'running' ? (
+                            <LoaderCircle size={15} className="spin" />
+                          ) : run.status === 'failed' ? (
+                            <CircleAlert size={15} />
+                          ) : (
+                            <CheckCircle size={15} />
+                          )}
+                          <div>
+                            <span>Status</span>
+                            <strong>
+                              {run.status === 'running'
+                                ? 'In Progress'
+                                : run.status === 'failed'
+                                  ? 'Failed'
+                                  : 'Completed'}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
                       {run.status === 'running' ? (
                         <div className="surface-card stat-card">
                           <LoaderCircle size={18} className="spin" />
@@ -489,60 +661,43 @@ export function BatchTestPage() {
                           <p>{run.errorMessage ?? 'Batch run failed for an unknown reason.'}</p>
                         </div>
                       ) : null}
-                      {run.results.map((result) => {
-                        const model = getModel(result.modelId);
-                        const imageReference = getAsset(result.assetId);
-
-                        return (
-                          <div className="surface-card history-result-card" key={result.id}>
-                            <div className="stack-list compact-list">
-                              <div className="meta-pair">
-                                <Cpu size={15} />
-                                <div>
-                                  <span>Model</span>
-                                  <strong>{model?.name ?? 'Unknown Model'}</strong>
-                                </div>
-                              </div>
-                              <div className="meta-pair">
-                                <FileText size={15} />
-                                <div>
-                                  <span>System Prompt</span>
-                                  <strong>{getPromptLabel(result.promptId)}</strong>
-                                </div>
-                              </div>
-                              {result.userInput ? (
-                                <div className="meta-pair">
-                                  <FileText size={15} />
-                                  <div>
-                                    <span>Text Input</span>
-                                    <strong>{result.userInput}</strong>
-                                  </div>
-                                </div>
-                              ) : null}
-                              {imageReference ? (
-                                <div className="meta-pair">
-                                  <ImageIcon size={15} />
-                                  <div>
-                                    <span>Image Reference</span>
-                                    <strong>{imageReference.name}</strong>
-                                  </div>
-                                </div>
-                              ) : null}
-                            </div>
-                            <div className="output-panel">
-                              <p className="eyebrow">Output</p>
-                              <p>{result.output}</p>
-                            </div>
-                            <div className="history-result-footer">
-                              <span className="pill pill-subtle">{result.latencyMs} ms</span>
-                              <span className="pill pill-success">
-                                <CheckCircle size={14} />
-                                {result.score}/100
-                              </span>
-                            </div>
+                      {buildRunTables(run).map((table) => (
+                        <div className="surface-card batch-table-shell" key={table.key}>
+                          <div className="section-header-inline">
+                            <h3>{table.title}</h3>
                           </div>
-                        );
-                      })}
+                          <div className="batch-table-scroll">
+                            <table className="batch-results-table">
+                              <thead>
+                                <tr>
+                                  <th>Text Inputs</th>
+                                  {table.columns.map((column) => (
+                                    <th key={column.id}>{column.label}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {table.rows.map((row) => (
+                                  <tr key={row.id}>
+                                    <th>{row.label}</th>
+                                    {table.columns.map((column) => {
+                                      const cell = table.cells.get(buildCellKey(row.id, column.id));
+                                      return (
+                                        <td key={column.id}>
+                                          <BatchResultCell
+                                            results={cell?.results ?? []}
+                                            getAssetName={getAssetName}
+                                          />
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : null}
                 </article>
