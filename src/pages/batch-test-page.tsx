@@ -116,8 +116,8 @@ export function BatchTestPage() {
     <section className="page-stack">
       <header className="hero-card">
         <div>
-          <p className="eyebrow">Run comparisons</p>
-          <h2>Batch test</h2>
+          <p className="eyebrow">Run Comparisons</p>
+          <h2>Batch Test</h2>
           <p>
             Pick a prompt version, optional asset, and model set, then stage a run. The UI is ready
             now; the next production step is replacing the mock executor with real API requests.
@@ -125,7 +125,7 @@ export function BatchTestPage() {
         </div>
         <button className="button button-primary" onClick={runBatch} disabled={running}>
           {running ? <LoaderCircle size={16} className="spin" /> : <Play size={16} />}
-          {running ? 'Running...' : 'Run batch'}
+          {running ? 'Running...' : 'Run Batch'}
         </button>
       </header>
 
@@ -194,7 +194,7 @@ export function BatchTestPage() {
 
           {selectedPrompt ? (
             <article className="surface-card stat-card">
-              <p className="eyebrow">Selected prompt</p>
+              <p className="eyebrow">Selected Prompt</p>
               <h3>{selectedPrompt.projectName}</h3>
               <p>
                 v{selectedPrompt.version} · {selectedPrompt.title}
@@ -219,7 +219,7 @@ export function BatchTestPage() {
 
           {previewRun ? (
             <article className="surface-card stat-card">
-              <p className="eyebrow">Latest run</p>
+              <p className="eyebrow">Latest Run</p>
               <h3>{previewRun.name}</h3>
               <p className="muted-copy">{format(new Date(previewRun.createdAt), 'MMM d, yyyy HH:mm')}</p>
               <div className="stack-list compact-list">
@@ -237,7 +237,7 @@ export function BatchTestPage() {
                 })}
               </div>
               <button className="button button-secondary" onClick={() => navigate('/history')}>
-                View in history
+                View In History
               </button>
             </article>
           ) : null}

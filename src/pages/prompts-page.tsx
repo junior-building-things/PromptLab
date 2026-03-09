@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from 'date-fns';
-import { FolderPlus, MoreHorizontal, Plus, Search, Trash2, X } from 'lucide-react';
+import { FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
@@ -109,8 +109,8 @@ export function PromptsPage() {
       <section className="page-stack">
         <header className="hero-card">
           <div>
-            <p className="eyebrow">Prompt workspace</p>
-            <h2>Prompt library</h2>
+            <p className="eyebrow">Prompt Workspace</p>
+            <h2>Prompt Library</h2>
             <p>
               Organize prompts as projects, create versioned iterations, and keep the latest candidate
               easy to test.
@@ -118,7 +118,7 @@ export function PromptsPage() {
           </div>
           <button className="button button-primary" onClick={openProjectComposer}>
             <FolderPlus size={16} />
-            New project
+            New Project
           </button>
         </header>
 
@@ -163,7 +163,7 @@ export function PromptsPage() {
                     }}
                   >
                     <Plus size={15} />
-                    New prompt
+                    New Prompt
                   </button>
                   <div className="card-menu-wrap">
                     <button
@@ -224,9 +224,9 @@ export function PromptsPage() {
           <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
             <header className="composer-sheet-header">
               <div>
-                <p className="eyebrow">{composer.mode === 'project' ? 'New project' : 'New prompt'}</p>
+                <p className="eyebrow">{composer.mode === 'project' ? 'New Project' : 'New Prompt'}</p>
                 <h3>
-                  {composer.mode === 'project' ? 'Create a prompt project' : 'Create a new prompt'}
+                  {composer.mode === 'project' ? 'Create a Prompt Project' : 'Create a New Prompt'}
                 </h3>
                 <p>
                   {composer.mode === 'project'
@@ -239,7 +239,7 @@ export function PromptsPage() {
                   Cancel
                 </button>
                 <button className="button button-primary" onClick={submitComposer}>
-                  {composer.mode === 'project' ? 'Create project' : 'Create prompt'}
+                  {composer.mode === 'project' ? 'Create Project' : 'Create Prompt'}
                 </button>
               </div>
             </header>
@@ -283,10 +283,6 @@ export function PromptsPage() {
                 />
               </label>
             </div>
-
-            <button className="composer-close-button" onClick={closeComposer} aria-label="Close composer">
-              <X size={18} />
-            </button>
           </section>
         </div>
       ) : null}

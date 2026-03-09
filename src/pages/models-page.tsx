@@ -8,7 +8,7 @@ export function ModelsPage() {
     <section className="page-stack">
       <header className="page-heading-row">
         <div>
-          <p className="eyebrow">Provider configuration</p>
+          <p className="eyebrow">Provider Configuration</p>
           <h2>Models</h2>
           <p>Prepare OpenAI and Gemini model presets before batch tests hit the network.</p>
         </div>
@@ -36,7 +36,7 @@ export function ModelsPage() {
 
             <div className="settings-grid">
               <label className="field-block">
-                <span>Model id</span>
+                <span>Model ID</span>
                 <input
                   value={model.apiModel}
                   onChange={(event) => updateModel(model.id, { apiModel: event.target.value })}

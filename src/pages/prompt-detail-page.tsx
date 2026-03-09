@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
-import { FileText, Trash2 } from 'lucide-react';
+import { FileText, MoreHorizontal, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
 
@@ -7,6 +8,7 @@ export function PromptDetailPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { promptProjects, promptVersions, removePromptProject, removePromptVersion } = useAppContext();
+  const [menuVersionId, setMenuVersionId] = useState<string | null>(null);
 
   const project = promptProjects.find((entry) => entry.id === projectId);
   const versions = promptVersions
@@ -17,10 +19,10 @@ export function PromptDetailPage() {
     return (
       <section className="page-stack">
         <div className="surface-card empty-card">
-          <h2>Prompt project not found</h2>
+          <h2>Prompt Project Not Found</h2>
           <p>The route is valid, but there is no project matching this id in local state.</p>
           <Link to="/" className="button button-primary">
-            Back to prompts
+            Back To Prompts
           </Link>
         </div>
       </section>
@@ -29,8 +31,8 @@ export function PromptDetailPage() {
 
   const activeProject = project;
 
-  function handleDeleteProject() {
-    if (!window.confirm(`Delete ${activeProject.name} and all prompts under it?`)) {
+  function handleRemoveProject() {
+    if (!window.confirm(`Remove ${activeProject.name} and all prompts under it?`)) {
       return;
     }
 
@@ -38,13 +40,14 @@ export function PromptDetailPage() {
     navigate('/');
   }
 
-  function handleDeletePrompt(versionId: string, versionNumber: number) {
-    if (!window.confirm(`Delete prompt v${versionNumber}?`)) {
+  function handleRemovePrompt(versionId: string, versionNumber: number) {
+    if (!window.confirm(`Remove Prompt v${versionNumber}?`)) {
       return;
     }
 
     const isLastVersion = versions.length === 1;
     removePromptVersion(versionId);
+    setMenuVersionId(null);
 
     if (isLastVersion) {
       navigate('/');
@@ -55,13 +58,13 @@ export function PromptDetailPage() {
     <section className="page-stack">
       <header className="hero-card prompt-detail-hero">
         <div>
-          <p className="eyebrow">Prompt project</p>
+          <p className="eyebrow">Prompt Project</p>
           <h2>{activeProject.name}</h2>
           <p>All prompts under this project, sorted by latest first.</p>
         </div>
-        <button className="button button-secondary" onClick={handleDeleteProject}>
+        <button className="button button-secondary" onClick={handleRemoveProject}>
           <Trash2 size={16} />
-          Delete project
+          Remove Project
         </button>
       </header>
 
@@ -80,13 +83,28 @@ export function PromptDetailPage() {
                   </p>
                 </div>
               </div>
-              <button
-                className="button button-danger button-small"
-                onClick={() => handleDeletePrompt(version.id, version.version)}
-              >
-                <Trash2 size={15} />
-                Delete
-              </button>
+              <div className="card-menu-wrap">
+                <button
+                  className="icon-action-button"
+                  onClick={() =>
+                    setMenuVersionId((current) => (current === version.id ? null : version.id))
+                  }
+                  aria-label="Prompt Actions"
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+                {menuVersionId === version.id ? (
+                  <div className="card-menu-sheet">
+                    <button
+                      className="menu-sheet-action menu-sheet-danger"
+                      onClick={() => handleRemovePrompt(version.id, version.version)}
+                    >
+                      <Trash2 size={15} />
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {version.summary ? <p>{version.summary}</p> : null}

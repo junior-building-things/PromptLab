@@ -23,7 +23,7 @@ export function AssetsPage() {
     <section className="page-stack">
       <header className="page-heading-row">
         <div>
-          <p className="eyebrow">Reusable context</p>
+          <p className="eyebrow">Reusable Context</p>
           <h2>Assets</h2>
           <p>Attach screenshots, transcripts, PDFs, or raw text to batch jobs.</p>
         </div>
@@ -32,7 +32,7 @@ export function AssetsPage() {
       <div className="detail-grid">
         <article className="surface-card form-card">
           <div className="section-header-inline">
-            <h3>Create asset</h3>
+            <h3>Create Asset</h3>
             <button
               className="button button-primary"
               onClick={() => {
@@ -42,7 +42,7 @@ export function AssetsPage() {
               }}
             >
               <Plus size={16} />
-              Add asset
+              Add Asset
             </button>
           </div>
           <label className="field-block">

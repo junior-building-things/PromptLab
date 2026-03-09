@@ -54,7 +54,7 @@ export function HistoryPage() {
         {history.length === 0 ? (
           <div className="surface-card empty-card">
             <HistoryIcon size={44} />
-            <h3>No history yet</h3>
+            <h3>No History Yet</h3>
             <p>Run a batch test to start logging history and comparing model outputs.</p>
           </div>
         ) : (
