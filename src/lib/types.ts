@@ -19,14 +19,13 @@ export type PromptVersion = {
   runCount: number;
 };
 
-export type AssetKind = 'image' | 'document' | 'text';
+export type AssetKind = 'text-inputs' | 'image-reference';
 
 export type AssetRecord = {
   id: string;
   name: string;
   kind: AssetKind;
   source: string;
-  note: string;
   updatedAt: string;
 };
 

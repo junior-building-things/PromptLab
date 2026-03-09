@@ -18,7 +18,7 @@ function normalizeBody(req) {
 function buildAssetContext(asset) {
   if (!asset) return '';
 
-  return [`Asset name: ${asset.name}`, `Asset kind: ${asset.kind}`, `Asset note: ${asset.note}`, `Asset source: ${asset.source}`]
+  return [`Asset name: ${asset.name}`, `Asset type: ${asset.kind}`, `Asset source: ${asset.source}`]
     .filter(Boolean)
     .join('\n');
 }
@@ -40,7 +40,7 @@ async function callOpenAI({ prompt, userInput, asset, model }) {
     },
   ];
 
-  if (asset?.kind === 'image' && /^https?:\/\//.test(asset.source)) {
+  if (asset?.kind === 'image-reference' && /^(https?:\/\/|data:image\/)/.test(asset.source)) {
     content.unshift({
       type: 'input_image',
       image_url: asset.source,

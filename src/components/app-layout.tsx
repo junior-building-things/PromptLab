@@ -39,14 +39,6 @@ export function AppLayout() {
           })}
         </nav>
 
-        <div className="sidebar-card">
-          <p className="eyebrow">API stack</p>
-          <h2>OpenAI + Gemini</h2>
-          <p>
-            Compare models side-by-side, attach assets, and preserve history before shipping a
-            prompt into production.
-          </p>
-        </div>
       </aside>
 
       <main className="main-panel">

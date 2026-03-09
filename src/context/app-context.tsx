@@ -53,7 +53,7 @@ type LegacyPromptRecord = {
 
 type LegacyState = {
   prompts?: LegacyPromptRecord[];
-  assets?: AssetRecord[];
+  assets?: Array<AssetRecord & { note?: string; kind?: string }>;
   models?: ModelRecord[];
   history?: BatchRun[];
 };
@@ -83,6 +83,31 @@ const defaultState: AppState = {
   history: initialHistory,
 };
 
+function normalizeAssetKind(kind?: string): AssetRecord['kind'] {
+  if (kind === 'image-reference' || kind === 'image') {
+    return 'image-reference';
+  }
+
+  return 'text-inputs';
+}
+
+function normalizeAsset(asset: AssetRecord & { note?: string; kind?: string }): AssetRecord {
+  return {
+    id: asset.id,
+    name: asset.name,
+    kind: normalizeAssetKind(asset.kind),
+    source: asset.source,
+    updatedAt: asset.updatedAt,
+  };
+}
+
+function normalizeState(state: AppState): AppState {
+  return {
+    ...state,
+    assets: (state.assets ?? initialAssets).map(normalizeAsset),
+  };
+}
+
 function migrateLegacyState(legacy: LegacyState): AppState {
   const prompts = legacy.prompts ?? [];
 
@@ -104,7 +129,7 @@ function migrateLegacyState(legacy: LegacyState): AppState {
       updatedAt: prompt.updatedAt,
       runCount: prompt.runCount,
     })),
-    assets: legacy.assets ?? initialAssets,
+    assets: (legacy.assets ?? initialAssets).map(normalizeAsset),
     models: legacy.models ?? initialModels,
     history: legacy.history ?? initialHistory,
   };
@@ -118,7 +143,7 @@ function loadState(): AppState {
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored) as AppState;
+      return normalizeState(JSON.parse(stored) as AppState);
     } catch {
       return defaultState;
     }
