@@ -663,13 +663,6 @@ export function BatchTestPage() {
 
                   {expandedTests.has(run.id) ? (
                     <div className="batch-results-stack">
-                      {run.status === 'running' ? (
-                        <div className="surface-card stat-card">
-                          <LoaderCircle size={18} className="spin" />
-                          <h3>Job In Progress</h3>
-                          <p>This batch job is still running.</p>
-                        </div>
-                      ) : null}
                       {run.status === 'failed' ? (
                         <div className="surface-card stat-card error-card">
                           <AlertCircle size={18} />
