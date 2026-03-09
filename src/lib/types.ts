@@ -43,6 +43,8 @@ export type ModelRecord = {
 
 export type BatchScenario = {
   promptId: string;
+  assetIds?: string[];
+  userInputAssetIds?: string[];
   assetId?: string;
   modelIds: string[];
   userInput: string;
@@ -53,6 +55,7 @@ export type TestResult = {
   promptId: string;
   modelId: string;
   assetId?: string;
+  userInput?: string;
   output: string;
   latencyMs: number;
   score: number;

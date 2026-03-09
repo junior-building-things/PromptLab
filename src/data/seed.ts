@@ -110,8 +110,8 @@ export const initialAssets: AssetRecord[] = [
 
 export const initialModels: ModelRecord[] = [
   {
-    id: 'model-openai-4o',
-    name: 'GPT-4o',
+    id: 'model-openai-gpt-image',
+    name: 'gpt-image-1.5 (GPT-4o)',
     provider: 'openai',
     apiModel: 'gpt-4o',
     endpoint: 'Responses API',
@@ -121,25 +121,25 @@ export const initialModels: ModelRecord[] = [
     envVar: 'VITE_OPENAI_API_KEY',
   },
   {
-    id: 'model-openai-4.1-mini',
-    name: 'GPT-4.1 Mini',
-    provider: 'openai',
-    apiModel: 'gpt-4.1-mini',
-    endpoint: 'Responses API',
-    temperature: 0.2,
-    maxTokens: 900,
-    status: 'ready',
-    envVar: 'VITE_OPENAI_API_KEY',
-  },
-  {
-    id: 'model-gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
+    id: 'model-gemini-nano-banana',
+    name: 'Nano Banana (gemini-2.5-flash)',
     provider: 'gemini',
-    apiModel: 'gemini-2.5-pro',
+    apiModel: 'gemini-2.5-flash',
     endpoint: 'Generate Content API',
     temperature: 0.5,
     maxTokens: 1400,
-    status: 'draft',
+    status: 'ready',
+    envVar: 'VITE_GEMINI_API_KEY',
+  },
+  {
+    id: 'model-gemini-nano-banana-pro',
+    name: 'Nano Banana Pro (gemini-3-pro)',
+    provider: 'gemini',
+    apiModel: 'gemini-3-pro',
+    endpoint: 'Generate Content API',
+    temperature: 0.5,
+    maxTokens: 1600,
+    status: 'ready',
     envVar: 'VITE_GEMINI_API_KEY',
   },
 ];
@@ -151,16 +151,19 @@ export const initialHistory: BatchRun[] = [
     createdAt: '2026-03-08T17:45:00.000Z',
     scenario: {
       promptId: 'prompt-onboarding-v3',
+      assetIds: ['asset-release-notes'],
+      userInputAssetIds: ['asset-release-notes'],
       assetId: 'asset-release-notes',
-      modelIds: ['model-openai-4o', 'model-gemini-2.5-pro'],
+      modelIds: ['model-openai-gpt-image', 'model-gemini-nano-banana'],
       userInput: 'Summarize what shipped and draft a friendly in-app announcement.',
     },
     results: [
       {
         id: 'result-launch-openai',
         promptId: 'prompt-onboarding-v3',
-        modelId: 'model-openai-4o',
+        modelId: 'model-openai-gpt-image',
         assetId: 'asset-release-notes',
+        userInput: 'Summarize what shipped and draft a friendly in-app announcement.',
         latencyMs: 1820,
         score: 92,
         output:
@@ -169,8 +172,9 @@ export const initialHistory: BatchRun[] = [
       {
         id: 'result-launch-gemini',
         promptId: 'prompt-onboarding-v3',
-        modelId: 'model-gemini-2.5-pro',
+        modelId: 'model-gemini-nano-banana',
         assetId: 'asset-release-notes',
+        userInput: 'Summarize what shipped and draft a friendly in-app announcement.',
         latencyMs: 2240,
         score: 88,
         output:

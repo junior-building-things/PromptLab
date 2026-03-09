@@ -39,7 +39,7 @@ export function HistoryPage() {
 
   return (
     <section className="page-stack">
-      <header className="page-heading-row">
+      <header className="hero-card">
         <div>
           <h2>History</h2>
           <p>View past batch testing results.</p>
@@ -101,6 +101,15 @@ export function HistoryPage() {
                               <strong>{getPromptLabel(result.promptId)}</strong>
                             </div>
                           </div>
+                          {result.userInput ? (
+                            <div className="meta-pair">
+                              <FileText size={15} />
+                              <div>
+                                <span>User Input</span>
+                                <strong>{result.userInput}</strong>
+                              </div>
+                            </div>
+                          ) : null}
                           {asset ? (
                             <div className="meta-pair">
                               <ImageIcon size={15} />

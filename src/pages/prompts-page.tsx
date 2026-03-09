@@ -109,7 +109,6 @@ export function PromptsPage() {
       <section className="page-stack">
         <header className="hero-card">
           <div>
-            <p className="eyebrow">Prompt Workspace</p>
             <h2>Prompt Library</h2>
             <p>
               Organize prompts as projects, create versioned iterations, and keep the latest candidate
@@ -224,15 +223,7 @@ export function PromptsPage() {
           <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
             <header className="composer-sheet-header">
               <div>
-                <p className="eyebrow">{composer.mode === 'project' ? 'New Project' : 'New Prompt'}</p>
-                <h3>
-                  {composer.mode === 'project' ? 'Create a Prompt Project' : 'Create a New Prompt'}
-                </h3>
-                <p>
-                  {composer.mode === 'project'
-                    ? 'Start a new project with its first prompt.'
-                    : 'Add a new prompt version under this project.'}
-                </p>
+                <h3>{composer.mode === 'project' ? 'Create Project' : 'Create Prompt'}</h3>
               </div>
               <div className="button-row-inline">
                 <button className="button button-secondary" onClick={closeComposer}>

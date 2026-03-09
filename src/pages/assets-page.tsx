@@ -153,9 +153,8 @@ export function AssetsPage() {
   return (
     <>
       <section className="page-stack">
-        <header className="page-heading-row">
+        <header className="hero-card">
           <div>
-            <p className="eyebrow">Reusable Context</p>
             <h2>Assets</h2>
             <p>Store reusable text inputs and image references for prompt testing.</p>
           </div>

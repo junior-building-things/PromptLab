@@ -169,7 +169,8 @@ p {
 
 .surface-card,
 .hero-card,
-.toolbar-card {
+.toolbar-card,
+.page-heading-row {
   border-radius: 26px;
   background: var(--surface);
   backdrop-filter: blur(10px);
@@ -341,6 +342,20 @@ p {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.model-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.model-logo {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
 
 .asset-card,

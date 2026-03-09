@@ -1,14 +1,27 @@
 import { format } from 'date-fns';
-import { FileText, MoreHorizontal, Trash2 } from 'lucide-react';
+import { FileText, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
 
+type ComposerState = {
+  projectId: string;
+  projectName: string;
+  systemPrompt: string;
+};
+
 export function PromptDetailPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  const { promptProjects, promptVersions, removePromptProject, removePromptVersion } = useAppContext();
+  const {
+    promptProjects,
+    promptVersions,
+    createPromptVersion,
+    removePromptProject,
+    removePromptVersion,
+  } = useAppContext();
   const [menuVersionId, setMenuVersionId] = useState<string | null>(null);
+  const [composer, setComposer] = useState<ComposerState | null>(null);
 
   const project = promptProjects.find((entry) => entry.id === projectId);
   const versions = promptVersions
@@ -30,6 +43,24 @@ export function PromptDetailPage() {
   }
 
   const activeProject = project;
+
+  function openPromptComposer() {
+    setComposer({
+      projectId: activeProject.id,
+      projectName: activeProject.name,
+      systemPrompt: '',
+    });
+  }
+
+  function closeComposer() {
+    setComposer(null);
+  }
+
+  function submitComposer() {
+    if (!composer || !composer.systemPrompt.trim()) return;
+    createPromptVersion(composer.projectId, composer.systemPrompt.trim());
+    closeComposer();
+  }
 
   function handleRemoveProject() {
     if (!window.confirm(`Remove ${activeProject.name} and all prompts under it?`)) {
@@ -55,74 +86,127 @@ export function PromptDetailPage() {
   }
 
   return (
-    <section className="page-stack">
-      <header className="hero-card prompt-detail-hero">
-        <div>
-          <p className="eyebrow">Prompt Project</p>
-          <h2>{activeProject.name}</h2>
-          <p>All prompts under this project, sorted by latest first.</p>
-        </div>
-        <button className="button button-secondary" onClick={handleRemoveProject}>
-          <Trash2 size={16} />
-          Remove Project
-        </button>
-      </header>
+    <>
+      <section className="page-stack">
+        <header className="hero-card prompt-detail-hero">
+          <div>
+            <h2>{activeProject.name}</h2>
+            <p>All prompts under this project, sorted by latest first.</p>
+          </div>
+          <div className="button-row-inline">
+            <button className="button button-secondary" onClick={handleRemoveProject}>
+              <Trash2 size={16} />
+              Remove Project
+            </button>
+            <button className="button button-primary" onClick={openPromptComposer}>
+              <Plus size={16} />
+              New Prompt
+            </button>
+          </div>
+        </header>
 
-      <div className="stack-list">
-        {versions.map((version) => (
-          <article key={version.id} className="surface-card project-prompt-card">
-            <div className="project-prompt-card-header">
-              <div className="list-card-topline">
-                <div className="icon-pill icon-pill-muted">
-                  <FileText size={18} />
-                </div>
-                <div>
-                  <h3>Prompt v{version.version}</h3>
-                  <p>
-                    Updated {format(new Date(version.updatedAt), 'MMM d, yyyy HH:mm')} · {version.runCount} runs
-                  </p>
-                </div>
-              </div>
-              <div className="card-menu-wrap">
-                <button
-                  className="icon-action-button"
-                  onClick={() =>
-                    setMenuVersionId((current) => (current === version.id ? null : version.id))
-                  }
-                  aria-label="Prompt Actions"
-                >
-                  <MoreHorizontal size={18} />
-                </button>
-                {menuVersionId === version.id ? (
-                  <div className="card-menu-sheet">
-                    <button
-                      className="menu-sheet-action menu-sheet-danger"
-                      onClick={() => handleRemovePrompt(version.id, version.version)}
-                    >
-                      <Trash2 size={15} />
-                      Remove
-                    </button>
+        <div className="stack-list">
+          {versions.map((version) => (
+            <article key={version.id} className="surface-card project-prompt-card">
+              <div className="project-prompt-card-header">
+                <div className="list-card-topline">
+                  <div className="icon-pill icon-pill-muted">
+                    <FileText size={18} />
                   </div>
-                ) : null}
+                  <div>
+                    <h3>Prompt v{version.version}</h3>
+                    <p>
+                      Updated {format(new Date(version.updatedAt), 'MMM d, yyyy HH:mm')} · {version.runCount} runs
+                    </p>
+                  </div>
+                </div>
+                <div className="card-menu-wrap">
+                  <button
+                    className="icon-action-button"
+                    onClick={() =>
+                      setMenuVersionId((current) => (current === version.id ? null : version.id))
+                    }
+                    aria-label="Prompt Actions"
+                  >
+                    <MoreHorizontal size={18} />
+                  </button>
+                  {menuVersionId === version.id ? (
+                    <div className="card-menu-sheet">
+                      <button
+                        className="menu-sheet-action menu-sheet-danger"
+                        onClick={() => handleRemovePrompt(version.id, version.version)}
+                      >
+                        <Trash2 size={15} />
+                        Remove
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
+
+              {version.summary ? <p>{version.summary}</p> : null}
+
+              {version.tags.length > 0 ? (
+                <div className="tag-row">
+                  {version.tags.map((tag) => (
+                    <span className="tag-chip" key={tag}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              <pre className="code-snippet">{version.systemPrompt}</pre>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {composer ? (
+        <div className="composer-backdrop" onClick={closeComposer}>
+          <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
+            <header className="composer-sheet-header">
+              <div>
+                <h3>Create Prompt</h3>
+              </div>
+              <div className="button-row-inline">
+                <button className="button button-secondary" onClick={closeComposer}>
+                  Cancel
+                </button>
+                <button className="button button-primary" onClick={submitComposer}>
+                  Create Prompt
+                </button>
+              </div>
+            </header>
+
+            <div className="stack-list">
+              <label className="field-block">
+                <span>Project Name</span>
+                <input value={composer.projectName} disabled />
+              </label>
+
+              <label className="field-block">
+                <span>System Prompt</span>
+                <textarea
+                  rows={12}
+                  value={composer.systemPrompt}
+                  onChange={(event) =>
+                    setComposer((current) =>
+                      current
+                        ? {
+                            ...current,
+                            systemPrompt: event.target.value,
+                          }
+                        : current,
+                    )
+                  }
+                  placeholder="Describe the role, task, inputs, and output constraints here."
+                />
+              </label>
             </div>
-
-            {version.summary ? <p>{version.summary}</p> : null}
-
-            {version.tags.length > 0 ? (
-              <div className="tag-row">
-                {version.tags.map((tag) => (
-                  <span className="tag-chip" key={tag}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            <pre className="code-snippet">{version.systemPrompt}</pre>
-          </article>
-        ))}
-      </div>
-    </section>
+          </section>
+        </div>
+      ) : null}
+    </>
   );
 }
