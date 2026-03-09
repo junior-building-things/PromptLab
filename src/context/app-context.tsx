@@ -148,8 +148,11 @@ function normalizeHistory(history?: BatchRun[]): BatchRun[] {
 
   return history.map((run) => ({
     ...run,
-    status: run.status ?? 'completed',
-    errorMessage: run.errorMessage,
+    status: run.status === 'running' ? 'failed' : (run.status ?? 'completed'),
+    errorMessage:
+      run.status === 'running'
+        ? run.errorMessage || 'This batch job did not complete. The page was likely refreshed or the request timed out.'
+        : run.errorMessage,
   }));
 }
 

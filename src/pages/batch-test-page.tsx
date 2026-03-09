@@ -52,6 +52,8 @@ type BatchTable = {
   cells: Map<string, BatchTableCell>;
 };
 
+const BATCH_REQUEST_TIMEOUT_MS = 90000;
+
 function parseTextInputs(source: string) {
   return source
     .split(',')
@@ -438,16 +440,32 @@ export function BatchTestPage() {
     asset: AssetRecord | undefined,
     userInput: string,
   ) {
-    const response = await fetch('/api/batch-run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt,
-        asset,
-        models: selectedModels,
-        userInput,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), BATCH_REQUEST_TIMEOUT_MS);
+
+    let response: Response;
+
+    try {
+      response = await fetch('/api/batch-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          asset,
+          models: selectedModels,
+          userInput,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Batch job timed out before the provider returned a result.');
+      }
+
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
 
     const payload = (await response.json()) as
       | { results: ApiResult[]; errors?: ApiError[] }
