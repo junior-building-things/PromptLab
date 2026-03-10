@@ -12,9 +12,9 @@ function GoogleMark() {
 }
 
 const featureItems = [
-  { icon: Sparkles, className: 'feature-icon-prompts', label: 'Organize prompts by project' },
+  { icon: Sparkles, className: 'feature-icon-prompts', label: 'Organize prompts by project and version' },
   { icon: ImageIcon, className: 'feature-icon-assets', label: 'Upload and store testing assets' },
-  { icon: PlaySquare, className: 'feature-icon-batch', label: 'Run high-speed batch tests' },
+  { icon: PlaySquare, className: 'feature-icon-batch', label: 'Seamless batch test different prompts and models' },
 ];
 
 type LoginScreenProps = {

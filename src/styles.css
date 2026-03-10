@@ -80,7 +80,7 @@ body {
 }
 
 .auth-card {
-  width: min(560px, 100%);
+  width: min(520px, 100%);
   display: grid;
   gap: 1.8rem;
   padding: 2.35rem 2.4rem 2rem;
