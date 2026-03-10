@@ -154,10 +154,34 @@ function MultiSelectDropdown({
   emptyLabel: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [opensUpward, setOpensUpward] = useState(false);
+  const [menuMaxHeight, setMenuMaxHeight] = useState<number>(288);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setOpensUpward(false);
+      setMenuMaxHeight(288);
+      return;
+    }
+
+    function updateMenuPosition() {
+      const trigger = rootRef.current?.querySelector('.multi-dropdown-trigger');
+      if (!(trigger instanceof HTMLElement)) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const viewportPadding = 20;
+      const preferredHeight = 288;
+      const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - viewportPadding);
+      const spaceAbove = Math.max(0, rect.top - viewportPadding);
+      const shouldOpenUpward = spaceBelow < 240 && spaceAbove > spaceBelow;
+      const availableHeight = shouldOpenUpward ? spaceAbove : spaceBelow;
+
+      setOpensUpward(shouldOpenUpward);
+      setMenuMaxHeight(Math.min(preferredHeight, availableHeight));
+    }
+
+    updateMenuPosition();
 
     function handlePointerDown(event: MouseEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
@@ -171,10 +195,14 @@ function MultiSelectDropdown({
       }
     }
 
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
@@ -186,7 +214,7 @@ function MultiSelectDropdown({
         {labelIcon}
         {label}
       </span>
-      <div className={`multi-dropdown${open ? ' is-open' : ''}`}>
+      <div className={`multi-dropdown${open ? ' is-open' : ''}${opensUpward ? ' opens-upward' : ''}`}>
         <button
           type="button"
           className="multi-dropdown-trigger"
@@ -198,28 +226,31 @@ function MultiSelectDropdown({
           <ChevronDown size={16} />
         </button>
         {open ? (
-          <div className="multi-dropdown-menu">
-          {options.map((option) => {
-            const checked = selectedIds.includes(option.id);
+          <div
+            className="multi-dropdown-menu"
+            style={{ maxHeight: `${menuMaxHeight}px` }}
+          >
+            {options.map((option) => {
+              const checked = selectedIds.includes(option.id);
 
-            return (
-              <label
-                key={option.id}
-                className={`multi-dropdown-option${checked ? ' is-selected' : ''}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => onToggle(option.id)}
-                />
-                {option.icon ? <span className="multi-dropdown-option-icon">{option.icon}</span> : null}
-                <div className="multi-dropdown-option-copy">
-                  <strong>{option.label}</strong>
-                  {option.description ? <p>{option.description}</p> : null}
-                </div>
-              </label>
-            );
-          })}
+              return (
+                <label
+                  key={option.id}
+                  className={`multi-dropdown-option${checked ? ' is-selected' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggle(option.id)}
+                  />
+                  {option.icon ? <span className="multi-dropdown-option-icon">{option.icon}</span> : null}
+                  <div className="multi-dropdown-option-copy">
+                    <strong>{option.label}</strong>
+                    {option.description ? <p>{option.description}</p> : null}
+                  </div>
+                </label>
+              );
+            })}
           </div>
         ) : null}
       </div>

@@ -197,15 +197,21 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
     throw new Error('Missing Gemini API key. Add it in the Models view before running a batch test.');
   }
 
+  const imageData = asset?.kind === 'image-reference' ? parseImageDataUrl(asset.source) : null;
+  const instructionLines = [
+    prompt.systemPrompt.trim(),
+    `User task:\n${userInput}`,
+    imageData ? 'Reference image attached below.' : undefined,
+    !imageData ? `Asset context:\n${buildAssetContext(asset) || 'None provided.'}` : undefined,
+  ].filter(Boolean);
   const userParts = [
     {
-      text: `User task:\n${userInput}\n\nAsset context:\n${buildAssetContext(asset) || 'None provided.'}`,
+      text: instructionLines.join('\n\n'),
     },
   ];
-  const imageData = asset?.kind === 'image-reference' ? parseImageDataUrl(asset.source) : null;
 
   if (imageData) {
-    userParts.unshift({
+    userParts.push({
       inlineData: {
         mimeType: imageData.mimeType,
         data: imageData.data,
@@ -220,9 +226,6 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: prompt.systemPrompt }],
-      },
       contents: [
         {
           role: 'user',
@@ -232,6 +235,10 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
       generationConfig: {
         temperature: model.temperature,
         maxOutputTokens: model.maxTokens,
+        responseModalities: ['IMAGE'],
+        imageConfig: {
+          aspectRatio: '1:1',
+        },
       },
     }),
   });

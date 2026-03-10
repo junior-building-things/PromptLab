@@ -673,6 +673,11 @@ p {
   box-shadow: var(--shadow);
 }
 
+.multi-dropdown.opens-upward .multi-dropdown-menu {
+  top: auto;
+  bottom: calc(100% + 0.55rem);
+}
+
 .multi-dropdown-option {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);
