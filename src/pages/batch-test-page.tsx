@@ -636,6 +636,21 @@ export function BatchTestPage() {
 
             results.push(...nextResults);
 
+            const errorResults =
+              apiPayload.errors?.map((error, index) => ({
+                id: `result-error-${prompt.id}-${error.modelId}-${Date.now()}-${results.length + nextResults.length + index}`,
+                promptId: prompt.id,
+                modelId: error.modelId,
+                assetId: imageReference?.id,
+                userInput,
+                output: `Error: ${error.message}`,
+                outputImage: undefined,
+                latencyMs: 0,
+                score: 0,
+              })) ?? [];
+
+            results.push(...errorResults);
+
             apiPayload.errors?.forEach((error) => {
               const model = getModel(error.modelId);
               errors.push(`${model?.name ?? 'Unknown Model'}: ${error.message}`);
