@@ -150,8 +150,11 @@ export function PromptsPage() {
             >
               <div className="prompt-card-header">
                 <div className="project-version-meta">
-                  <span className="pill">Latest v{latestVersion.version}</span>
-                  <span className="pill pill-subtle">{versions.length} versions</span>
+                  <span className="pill">v{latestVersion.version}</span>
+                  <span className="pill pill-subtle">{versions.length} prompts</span>
+                  <span className="meta-text">
+                    Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
+                  </span>
                 </div>
                 <div className="button-row-inline card-actions-corner">
                   <button
@@ -192,7 +195,7 @@ export function PromptsPage() {
 
               <div>
                 <h3>{project.name}</h3>
-                <p>{latestVersion.summary || 'Latest prompt version ready for iteration.'}</p>
+                {latestVersion.summary ? <p>{latestVersion.summary}</p> : null}
               </div>
 
               {latestVersion.tags.length > 0 ? (
@@ -206,13 +209,6 @@ export function PromptsPage() {
               ) : null}
 
               <pre className="code-snippet">{latestVersion.systemPrompt}</pre>
-
-              <footer className="card-footer card-footer-actions">
-                <span className="meta-text">{latestVersion.runCount} runs</span>
-                <span className="meta-text">
-                  Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
-                </span>
-              </footer>
             </article>
           ))}
         </div>

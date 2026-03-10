@@ -262,7 +262,6 @@ export function BatchTestPage() {
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [openRunMenuId]);
 
-  const counters = useMemo(() => history.reduce((sum, run) => sum + run.results.length, 0), [history]);
   const readyModels = useMemo(
     () => models.filter((model) => model.status === 'ready' && providerKeys[model.provider]?.hasKey),
     [models, providerKeys],
@@ -671,11 +670,6 @@ export function BatchTestPage() {
             </div>
           ) : (
             <>
-              <div className="toolbar-card">
-                <div className="pill pill-subtle">{history.length} batch tests</div>
-                <div className="pill pill-subtle">{counters} outputs logged</div>
-              </div>
-
               {history.map((run) => (
                 <article key={run.id} className="surface-card history-shell">
                   <div className="history-shell-header">

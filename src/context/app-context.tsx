@@ -404,6 +404,34 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
     };
   }, [initialLocalState]);
 
+  const persistStateNow = useCallback(async (nextState: AppState) => {
+    try {
+      const response = await fetch('/api/user-state', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ state: nextState }),
+      });
+
+      const payload = await readApiPayload<ApiErrorPayload>(response);
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to save PromptLab workspace state.');
+      }
+
+      setStorageError('');
+      return true;
+    } catch (error) {
+      setStorageError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to save PromptLab workspace state.',
+      );
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     if (!storageReady) {
       return undefined;
@@ -415,34 +443,14 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
     }
 
     const timeoutId = window.setTimeout(async () => {
-      try {
-        const response = await fetch('/api/user-state', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ state }),
-        });
-
-        const payload = await readApiPayload<ApiErrorPayload>(response);
-        if (!response.ok) {
-          throw new Error(payload.error || 'Failed to save PromptLab workspace state.');
-        }
-
+      const saved = await persistStateNow(state);
+      if (saved) {
         lastSavedSnapshot.current = snapshot;
-        setStorageError('');
-      } catch (error) {
-        setStorageError(
-          error instanceof Error
-            ? error.message
-            : 'Failed to save PromptLab workspace state.',
-        );
       }
     }, SAVE_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [state, storageReady]);
+  }, [persistStateNow, state, storageReady]);
 
   const createPromptProject = useCallback((draft?: Partial<PromptProjectDraft>) => {
     const projectId = makeId('project');
@@ -680,11 +688,30 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   }, []);
 
   const removeRun = useCallback((id: string) => {
-    setState((current) => ({
-      ...current,
-      history: current.history.filter((run) => run.id !== id),
-    }));
-  }, []);
+    let nextState: AppState | null = null;
+
+    setState((current) => {
+      nextState = {
+        ...current,
+        history: current.history.filter((run) => run.id !== id),
+      };
+
+      return nextState;
+    });
+
+    if (storageReady && nextState) {
+      const payload = JSON.stringify({ state: nextState });
+      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+        navigator.sendBeacon(
+          '/api/user-state',
+          new Blob([payload], {
+            type: 'application/json',
+          }),
+        );
+      }
+      void persistStateNow(nextState);
+    }
+  }, [persistStateNow, storageReady]);
 
   const createRun = useCallback((run: Omit<BatchRun, 'id' | 'createdAt'>) => {
     const createdRun: BatchRun = {

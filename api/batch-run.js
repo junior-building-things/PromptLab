@@ -71,6 +71,10 @@ function collectCandidateImage(value) {
     return undefined;
   }
 
+  if (value.type === 'image_generation_call' && typeof value.result === 'string') {
+    return toDataUrl(value.mime_type || value.mimeType || 'image/png', value.result);
+  }
+
   if (value.inlineData?.mimeType?.startsWith('image/') && value.inlineData?.data) {
     return toDataUrl(value.inlineData.mimeType, value.inlineData.data);
   }
@@ -152,8 +156,15 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
     },
     body: JSON.stringify({
       model: model.apiModel,
-      temperature: model.temperature,
-      max_output_tokens: model.maxTokens,
+      tools: [
+        {
+          type: 'image_generation',
+          action: 'generate',
+          size: '1024x1024',
+          quality: 'high',
+        },
+      ],
+      tool_choice: { type: 'image_generation' },
       input: [
         {
           role: 'system',
@@ -175,7 +186,7 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
   const outputImage = collectCandidateImage(payload);
   const output = payload.output_text || payload.output?.flatMap((item) => item.content || []).map((item) => item.text || '').join('\n').trim();
   return {
-    output: output || 'OpenAI returned no text output.',
+    output: output || (outputImage ? 'OpenAI returned image output.' : 'OpenAI returned no text output.'),
     outputImage,
     latencyMs: Date.now() - started,
   };

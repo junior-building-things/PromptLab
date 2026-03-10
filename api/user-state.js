@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       return json(res, 200, workspace);
     }
 
-    if (req.method === 'PUT') {
+    if (req.method === 'PUT' || req.method === 'POST') {
       const body = normalizeBody(req);
       if (!body?.state) {
         return json(res, 400, { error: 'Missing state payload.' });
