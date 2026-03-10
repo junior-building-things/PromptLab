@@ -73,15 +73,15 @@ body {
 }
 
 .brand-icon.auth-brand-icon {
-  width: 9.8rem;
-  height: 9.8rem;
+  width: 7.35rem;
+  height: 7.35rem;
   border-radius: 30px;
   margin-bottom: 0.05rem;
 }
 
 .brand-icon.auth-brand-icon svg {
-  width: 3.6rem;
-  height: 3.6rem;
+  width: 2.7rem;
+  height: 2.7rem;
 }
 
 .auth-card {
