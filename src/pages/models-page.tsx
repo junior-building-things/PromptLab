@@ -71,8 +71,6 @@ export function ModelsPage() {
                     className="provider-logo"
                     src={getProviderIconSrc(provider)}
                     alt={providerCardTitle[provider]}
-                    width={96}
-                    height={96}
                   />
                   <div>
                     <h3>{providerCardTitle[provider]}</h3>

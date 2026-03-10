@@ -1,4 +1,7 @@
 import type { Provider } from './types';
+import openaiLogo from '../assets/openai.png';
+import geminiLogo from '../assets/gemini.png';
+import xaiLogo from '../assets/xai.png';
 
 export const providerLabel: Record<Provider, string> = {
   openai: 'OpenAI',
@@ -7,9 +10,9 @@ export const providerLabel: Record<Provider, string> = {
 };
 
 const providerIconSrc: Record<Provider, string> = {
-  openai: '/openai.png?v=4',
-  gemini: '/gemini.png?v=4',
-  xai: '/xai.png?v=4',
+  openai: openaiLogo,
+  gemini: geminiLogo,
+  xai: xaiLogo,
 };
 
 export function getProviderLabel(provider: Provider) {

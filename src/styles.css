@@ -584,6 +584,10 @@ p {
 .provider-logo {
   display: block;
   flex-shrink: 0;
+  width: auto;
+  height: auto;
+  max-width: 96px;
+  max-height: 96px;
 }
 
 .multi-dropdown {
