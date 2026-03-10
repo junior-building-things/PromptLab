@@ -32,7 +32,6 @@ export function LoginScreen({ loading, errorMessage, onLogin }: LoginScreenProps
             <Bot size={30} />
           </div>
           <h1>PromptLab</h1>
-          <p>Version, test, and compare your prompts across multiple models and assets.</p>
         </div>
 
         <div className="auth-card">
