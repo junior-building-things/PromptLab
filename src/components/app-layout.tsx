@@ -1,5 +1,6 @@
-import { Bot, Cpu, ImageIcon, PlaySquare, Sparkles } from 'lucide-react';
+import { Bot, Cpu, ImageIcon, LogOut, PlaySquare, Sparkles } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '../context/auth-context';
 
 const navItems = [
   { to: '/', label: 'Prompts', icon: Sparkles },
@@ -9,6 +10,8 @@ const navItems = [
 ];
 
 export function AppLayout() {
+  const { user, logout } = useAuth();
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -37,6 +40,28 @@ export function AppLayout() {
             );
           })}
         </nav>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user-card">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.name} className="sidebar-user-avatar" />
+            ) : (
+              <div className="sidebar-user-avatar sidebar-user-avatar-fallback">
+                {user?.name?.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+
+            <div className="sidebar-user-copy">
+              <strong>{user?.name}</strong>
+              <span>{user?.email || 'Signed In With Google'}</span>
+            </div>
+          </div>
+
+          <button type="button" className="button button-secondary sidebar-logout" onClick={() => void logout()}>
+            <LogOut size={16} />
+            Sign Out
+          </button>
+        </div>
 
       </aside>
 
