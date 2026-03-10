@@ -71,6 +71,10 @@ type UserStateResponse = {
   error?: string;
 };
 
+type ApiErrorPayload = {
+  error?: string;
+};
+
 type AppContextValue = AppState & {
   providerKeys: ProviderKeyMap;
   storageReady: boolean;
@@ -266,6 +270,23 @@ function loadState(storageKey: string): AppState {
   return defaultState;
 }
 
+async function readApiPayload<T>(response: Response): Promise<T> {
+  const raw = await response.text();
+
+  if (!raw) {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    const normalized = raw.trim();
+    const message =
+      normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
+    throw new Error(message || 'The server returned an unreadable response.');
+  }
+}
+
 function latestVersionForProject(versions: PromptVersion[], projectId: string) {
   return versions
     .filter((version) => version.projectId === projectId)
@@ -334,7 +355,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         const response = await fetch('/api/user-state', {
           credentials: 'include',
         });
-        const payload = (await response.json()) as UserStateResponse;
+        const payload = await readApiPayload<UserStateResponse>(response);
 
         if (!response.ok) {
           throw new Error(payload.error || 'Failed to load PromptLab workspace state.');
@@ -404,7 +425,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
           body: JSON.stringify({ state }),
         });
 
-        const payload = (await response.json()) as { error?: string };
+        const payload = await readApiPayload<ApiErrorPayload>(response);
         if (!response.ok) {
           throw new Error(payload.error || 'Failed to save PromptLab workspace state.');
         }
@@ -614,7 +635,10 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         credentials: 'include',
         body: JSON.stringify({ provider, apiKey: trimmed }),
       });
-      const payload = (await response.json()) as { providerKeys?: Partial<ProviderKeyMap>; error?: string };
+      const payload = await readApiPayload<{
+        providerKeys?: Partial<ProviderKeyMap>;
+        error?: string;
+      }>(response);
 
       if (!response.ok) {
         throw new Error(payload.error || 'Failed to save the provider API key.');
@@ -639,7 +663,10 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         credentials: 'include',
         body: JSON.stringify({ provider, apiKey: '' }),
       });
-      const payload = (await response.json()) as { providerKeys?: Partial<ProviderKeyMap>; error?: string };
+      const payload = await readApiPayload<{
+        providerKeys?: Partial<ProviderKeyMap>;
+        error?: string;
+      }>(response);
 
       if (!response.ok) {
         throw new Error(payload.error || 'Failed to remove the provider API key.');

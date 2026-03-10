@@ -13,7 +13,6 @@ export function ModelsPage() {
     saveProviderKey,
     removeProviderKey,
     savingProvider,
-    storageError,
   } = useAppContext();
   const [draftKeys, setDraftKeys] = useState<Record<Provider, string>>({
     openai: '',
@@ -60,10 +59,10 @@ export function ModelsPage() {
         </div>
       </header>
 
-      {pageMessage || storageError ? (
-        <article className={`surface-card stat-card ${storageError ? 'error-card' : ''}`}>
-          <h3>{storageError ? 'Storage Error' : 'Update'}</h3>
-          <p>{storageError || pageMessage}</p>
+      {pageMessage ? (
+        <article className="surface-card stat-card">
+          <h3>Update</h3>
+          <p>{pageMessage}</p>
         </article>
       ) : null}
 
