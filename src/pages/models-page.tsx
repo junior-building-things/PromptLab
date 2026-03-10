@@ -5,6 +5,12 @@ import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
 import type { Provider } from '../lib/types';
 
 const providerOrder: Provider[] = ['openai', 'gemini', 'xai'];
+const providerCardTitle: Record<Provider, string> = {
+  openai: 'OpenAI',
+  gemini: 'Google',
+  xai: 'xAI',
+};
+const hiddenKeyMask = '••••••••••••••••';
 
 export function ModelsPage() {
   const {
@@ -19,6 +25,7 @@ export function ModelsPage() {
     gemini: '',
     xai: '',
   });
+  const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [pageMessage, setPageMessage] = useState('');
 
   const providerModels = useMemo(
@@ -34,6 +41,7 @@ export function ModelsPage() {
     try {
       await saveProviderKey(provider, draftKeys[provider]);
       setDraftKeys((current) => ({ ...current, [provider]: '' }));
+      setEditingProvider(null);
       setPageMessage(`${getProviderLabel(provider)} API key saved.`);
     } catch (error) {
       setPageMessage(error instanceof Error ? error.message : 'Failed to save API key.');
@@ -44,6 +52,7 @@ export function ModelsPage() {
     try {
       await removeProviderKey(provider);
       setDraftKeys((current) => ({ ...current, [provider]: '' }));
+      setEditingProvider(null);
       setPageMessage(`${getProviderLabel(provider)} API key removed.`);
     } catch (error) {
       setPageMessage(error instanceof Error ? error.message : 'Failed to remove API key.');
@@ -71,20 +80,12 @@ export function ModelsPage() {
           {providerModels.map(({ provider, models: modelsForProvider }) => (
             <article key={provider} className="surface-card model-card provider-key-card">
               <div className="model-card-header">
-                <div className="model-identity">
-                  <img
-                    className="model-logo"
-                    src={getProviderIconSrc(provider)}
-                    alt={getProviderLabel(provider)}
-                  />
+                <div>
                   <div>
-                    <h3>{getProviderLabel(provider)} API Key</h3>
-                    <p>{providerKeys[provider].hasKey ? 'Key saved for this provider.' : 'No API key saved yet.'}</p>
+                    <h3>{providerCardTitle[provider]}</h3>
+                    {!providerKeys[provider].hasKey ? <p>No API key saved yet.</p> : null}
                   </div>
                 </div>
-                <span className={`pill ${providerKeys[provider].hasKey ? 'pill-success' : 'pill-subtle'}`}>
-                  {providerKeys[provider].hasKey ? 'Saved' : 'Required'}
-                </span>
               </div>
 
               <div className="field-block">
@@ -95,8 +96,28 @@ export function ModelsPage() {
                 <input
                   type="password"
                   autoComplete="new-password"
-                  value={draftKeys[provider]}
-                  onChange={(event) => setDraftKeys((current) => ({ ...current, [provider]: event.target.value }))}
+                  value={
+                    draftKeys[provider] ||
+                    (providerKeys[provider].hasKey && editingProvider !== provider ? hiddenKeyMask : '')
+                  }
+                  onFocus={() => {
+                    if (providerKeys[provider].hasKey && draftKeys[provider].length === 0) {
+                      setEditingProvider(provider);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (draftKeys[provider].length === 0 && editingProvider === provider) {
+                      setEditingProvider(null);
+                    }
+                  }}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setEditingProvider(provider);
+                    setDraftKeys((current) => ({
+                      ...current,
+                      [provider]: nextValue === hiddenKeyMask ? '' : nextValue,
+                    }));
+                  }}
                   placeholder={`Enter your ${getProviderLabel(provider)} API key`}
                 />
               </div>
@@ -124,6 +145,10 @@ export function ModelsPage() {
           ))}
         </section>
 
+        <div className="section-header-inline">
+          <h3>Available Models:</h3>
+        </div>
+
         {providerModels.map(({ provider, models: modelsForProvider }) =>
           modelsForProvider.map((model) => (
             <article key={model.id} className="surface-card model-card">
@@ -136,7 +161,6 @@ export function ModelsPage() {
                   />
                   <div>
                     <h3>{model.name}</h3>
-                    <p>Provider: {getProviderLabel(model.provider)}</p>
                   </div>
                 </div>
                 <span className={`pill ${providerKeys[provider].hasKey ? 'pill-success' : 'pill-subtle'}`}>
