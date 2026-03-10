@@ -79,6 +79,11 @@ body {
   margin-bottom: 0.05rem;
 }
 
+.auth-brand-icon svg {
+  width: 8.5rem;
+  height: 8.5rem;
+}
+
 .auth-card {
   width: min(520px, 100%);
   display: grid;
