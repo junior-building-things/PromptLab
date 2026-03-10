@@ -26,7 +26,6 @@ export function ModelsPage() {
     xai: '',
   });
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
-  const [pageMessage, setPageMessage] = useState('');
 
   const providerModels = useMemo(
     () =>
@@ -42,10 +41,7 @@ export function ModelsPage() {
       await saveProviderKey(provider, draftKeys[provider]);
       setDraftKeys((current) => ({ ...current, [provider]: '' }));
       setEditingProvider(null);
-      setPageMessage(`${getProviderLabel(provider)} API key saved.`);
-    } catch (error) {
-      setPageMessage(error instanceof Error ? error.message : 'Failed to save API key.');
-    }
+    } catch {}
   }
 
   async function handleRemove(provider: Provider) {
@@ -53,10 +49,7 @@ export function ModelsPage() {
       await removeProviderKey(provider);
       setDraftKeys((current) => ({ ...current, [provider]: '' }));
       setEditingProvider(null);
-      setPageMessage(`${getProviderLabel(provider)} API key removed.`);
-    } catch (error) {
-      setPageMessage(error instanceof Error ? error.message : 'Failed to remove API key.');
-    }
+    } catch {}
   }
 
   return (
@@ -68,13 +61,6 @@ export function ModelsPage() {
         </div>
       </header>
 
-      {pageMessage ? (
-        <article className="surface-card stat-card">
-          <h3>Update</h3>
-          <p>{pageMessage}</p>
-        </article>
-      ) : null}
-
       <div className="stack-list">
         <section className="settings-grid provider-key-grid">
           {providerModels.map(({ provider, models: modelsForProvider }) => (
@@ -83,7 +69,6 @@ export function ModelsPage() {
                 <div>
                   <div>
                     <h3>{providerCardTitle[provider]}</h3>
-                    {!providerKeys[provider].hasKey ? <p>No API key saved yet.</p> : null}
                   </div>
                 </div>
               </div>
