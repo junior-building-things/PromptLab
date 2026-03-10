@@ -710,7 +710,7 @@ p {
 
 .asset-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -792,6 +792,10 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.model-section-heading {
+  margin-top: 0.85rem;
 }
 
 .prompt-card h3,
@@ -1248,8 +1252,13 @@ textarea:disabled {
 
 .empty-card {
   place-items: center;
+  align-content: center;
   text-align: center;
   min-height: 300px;
+}
+
+.asset-empty-state {
+  min-height: 360px;
 }
 
 .sr-only {
@@ -1298,6 +1307,10 @@ textarea:disabled {
 
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .asset-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1353,6 +1366,10 @@ textarea:disabled {
   .history-shell-header {
     flex-direction: column;
     gap: 0;
+  }
+
+  .asset-grid {
+    grid-template-columns: 1fr;
   }
 
   .history-card-menu {

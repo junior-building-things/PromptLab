@@ -227,7 +227,7 @@ export function AssetsPage() {
             })}
           </div>
         ) : (
-          <article className="surface-card empty-card">
+          <article className="surface-card empty-card asset-empty-state">
             <div className="icon-pill icon-pill-muted">
               <Upload size={22} />
             </div>

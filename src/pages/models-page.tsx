@@ -56,7 +56,7 @@ export function ModelsPage() {
     <section className="page-stack">
       <header className="hero-card">
         <div>
-          <h2>Models</h2>
+          <h2>Model Management</h2>
           <p>Add your provider API keys, then prepare model presets before batch tests hit the network.</p>
         </div>
       </header>
@@ -130,7 +130,7 @@ export function ModelsPage() {
           ))}
         </section>
 
-        <div className="section-header-inline">
+        <div className="section-header-inline model-section-heading">
           <h3>Available Models:</h3>
         </div>
 
