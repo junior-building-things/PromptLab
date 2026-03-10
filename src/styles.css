@@ -568,9 +568,9 @@ p {
 }
 
 .model-logo {
-  width: 2.5rem;
-  min-width: 2.5rem;
-  height: 2.5rem;
+  width: 1.875rem;
+  min-width: 1.875rem;
+  height: 1.875rem;
   display: block;
   flex-shrink: 0;
   aspect-ratio: 1 / 1;
@@ -584,8 +584,8 @@ p {
 .provider-logo {
   display: block;
   flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
 }
 
