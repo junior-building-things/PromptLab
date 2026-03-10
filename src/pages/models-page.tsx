@@ -63,7 +63,7 @@ export function ModelsPage() {
 
       <div className="stack-list">
         <section className="settings-grid provider-key-grid">
-          {providerModels.map(({ provider }) => (
+          {providerModels.map(({ provider, models: modelsForProvider }) => (
             <article key={provider} className="surface-card model-card provider-key-card">
               <div className="model-card-header">
                 <div className="model-identity">
@@ -131,35 +131,20 @@ export function ModelsPage() {
                   Remove Key
                 </button>
               </div>
+
+              <div className="field-block provider-models-block">
+                <span className="field-block-label">Available Models</span>
+                <div className="provider-model-list">
+                  {modelsForProvider.map((model) => (
+                    <div key={model.id} className="provider-model-row">
+                      <span>{model.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </article>
           ))}
         </section>
-
-        <div className="section-header-inline model-section-heading">
-          <h3>Available Models:</h3>
-        </div>
-
-        {providerModels.map(({ provider, models: modelsForProvider }) =>
-          modelsForProvider.map((model) => (
-            <article key={model.id} className="surface-card model-card">
-              <div className="model-card-header">
-                <div className="model-identity">
-                  <img
-                    className="model-logo"
-                    src={getProviderIconSrc(model.provider)}
-                    alt={getProviderLabel(model.provider)}
-                  />
-                  <div>
-                    <h3>{model.name}</h3>
-                  </div>
-                </div>
-                <span className={`pill ${providerKeys[provider].hasKey ? 'pill-success' : 'pill-subtle'}`}>
-                  {providerKeys[provider].hasKey ? 'Ready' : 'API Key Required'}
-                </span>
-              </div>
-            </article>
-          )),
-        )}
       </div>
     </section>
   );

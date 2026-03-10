@@ -567,6 +567,24 @@ p {
   align-content: start;
 }
 
+.provider-models-block {
+  margin-top: 0.2rem;
+}
+
+.provider-model-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.provider-model-row {
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--surface-ink);
+  font-weight: 600;
+}
+
 .model-logo {
   width: 1.875rem;
   min-width: 1.875rem;
