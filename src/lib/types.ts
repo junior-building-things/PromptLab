@@ -1,5 +1,12 @@
 export type Provider = 'openai' | 'gemini' | 'xai';
 
+export type ProviderKeyStatus = {
+  hasKey: boolean;
+  updatedAt?: string | null;
+};
+
+export type ProviderKeyMap = Record<Provider, ProviderKeyStatus>;
+
 export type PromptProject = {
   id: string;
   name: string;
@@ -73,4 +80,12 @@ export type BatchRun = {
   errorMessage?: string;
   scenario: BatchScenario;
   results: TestResult[];
+};
+
+export type AppStatePayload = {
+  promptProjects: PromptProject[];
+  promptVersions: PromptVersion[];
+  assets: AssetRecord[];
+  models: ModelRecord[];
+  history: BatchRun[];
 };

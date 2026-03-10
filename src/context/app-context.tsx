@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
@@ -15,16 +16,26 @@ import {
   initialPromptVersions,
 } from '../data/seed';
 import type {
+  AppStatePayload,
   AssetRecord,
   BatchRun,
   ModelRecord,
   PromptProject,
   PromptVersion,
+  Provider,
+  ProviderKeyMap,
 } from '../lib/types';
 
 const LEGACY_STORAGE_KEY = 'promptlab-state-v2';
 const LEGACY_STORAGE_KEY_V1 = 'promptlab-state-v1';
 const USER_STORAGE_PREFIX = 'promptlab-state-user:';
+const SAVE_DEBOUNCE_MS = 350;
+
+const defaultProviderKeys: ProviderKeyMap = {
+  openai: { hasKey: false, updatedAt: null },
+  gemini: { hasKey: false, updatedAt: null },
+  xai: { hasKey: false, updatedAt: null },
+};
 
 type PromptProjectDraft = {
   name: string;
@@ -35,13 +46,7 @@ type PromptVersionDraft = Omit<PromptVersion, 'id' | 'projectId' | 'version' | '
 type AssetDraft = Omit<AssetRecord, 'id' | 'updatedAt'>;
 type ModelDraft = Omit<ModelRecord, 'id'>;
 
-type AppState = {
-  promptProjects: PromptProject[];
-  promptVersions: PromptVersion[];
-  assets: AssetRecord[];
-  models: ModelRecord[];
-  history: BatchRun[];
-};
+type AppState = AppStatePayload;
 
 type LegacyPromptRecord = {
   id: string;
@@ -60,7 +65,17 @@ type LegacyState = {
   history?: BatchRun[];
 };
 
+type UserStateResponse = {
+  state: AppState | null;
+  providerKeys?: Partial<ProviderKeyMap>;
+  error?: string;
+};
+
 type AppContextValue = AppState & {
+  providerKeys: ProviderKeyMap;
+  storageReady: boolean;
+  storageError: string;
+  savingProvider: Provider | null;
   createPromptProject: (draft?: Partial<PromptProjectDraft>) => { project: PromptProject; version: PromptVersion };
   createPromptVersion: (projectId: string, systemPrompt?: string) => PromptVersion | null;
   updatePromptProject: (projectId: string, updates: Partial<Pick<PromptProject, 'name'>>) => void;
@@ -71,6 +86,8 @@ type AppContextValue = AppState & {
   removeAsset: (id: string) => void;
   updateAsset: (id: string, draft: AssetDraft) => void;
   updateModel: (id: string, draft: Partial<ModelDraft>) => void;
+  saveProviderKey: (provider: Provider, apiKey: string) => Promise<void>;
+  removeProviderKey: (provider: Provider) => Promise<void>;
   removeRun: (id: string) => void;
   createRun: (run: Omit<BatchRun, 'id' | 'createdAt'>) => BatchRun;
   updateRun: (
@@ -159,12 +176,30 @@ function normalizeHistory(history?: BatchRun[]): BatchRun[] {
   }));
 }
 
-function normalizeState(state: AppState): AppState {
+function normalizeState(state: AppState | null | undefined): AppState {
   return {
-    ...state,
-    assets: (state.assets ?? initialAssets).map(normalizeAsset),
-    models: normalizeModels(state.models),
-    history: normalizeHistory(state.history),
+    promptProjects: state?.promptProjects ?? initialPromptProjects,
+    promptVersions: state?.promptVersions ?? initialPromptVersions,
+    assets: (state?.assets ?? initialAssets).map(normalizeAsset),
+    models: normalizeModels(state?.models),
+    history: normalizeHistory(state?.history),
+  };
+}
+
+function normalizeProviderKeys(value?: Partial<ProviderKeyMap>): ProviderKeyMap {
+  return {
+    openai: {
+      hasKey: Boolean(value?.openai?.hasKey),
+      updatedAt: value?.openai?.updatedAt ?? null,
+    },
+    gemini: {
+      hasKey: Boolean(value?.gemini?.hasKey),
+      updatedAt: value?.gemini?.updatedAt ?? null,
+    },
+    xai: {
+      hasKey: Boolean(value?.xai?.hasKey),
+      updatedAt: value?.xai?.updatedAt ?? null,
+    },
   };
 }
 
@@ -271,7 +306,13 @@ type AppProviderProps = PropsWithChildren<{
 }>;
 
 export function AppProvider({ children, storageKey }: AppProviderProps) {
-  const [state, setState] = useState<AppState>(() => loadState(storageKey));
+  const initialLocalState = useMemo(() => loadState(storageKey), [storageKey]);
+  const [state, setState] = useState<AppState>(initialLocalState);
+  const [providerKeys, setProviderKeys] = useState<ProviderKeyMap>(defaultProviderKeys);
+  const [storageReady, setStorageReady] = useState(false);
+  const [storageError, setStorageError] = useState('');
+  const [savingProvider, setSavingProvider] = useState<Provider | null>(null);
+  const lastSavedSnapshot = useRef(JSON.stringify(initialLocalState));
 
   useEffect(() => {
     try {
@@ -281,9 +322,106 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         window.localStorage.removeItem(LEGACY_STORAGE_KEY_V1);
       }
     } catch (error) {
-      console.error('Failed to persist PromptLab state.', error);
+      console.error('Failed to persist PromptLab state locally.', error);
     }
   }, [state, storageKey]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function hydrate() {
+      try {
+        const response = await fetch('/api/user-state', {
+          credentials: 'include',
+        });
+        const payload = (await response.json()) as UserStateResponse;
+
+        if (!response.ok) {
+          throw new Error(payload.error || 'Failed to load PromptLab workspace state.');
+        }
+
+        if (!active) {
+          return;
+        }
+
+        const remoteState = payload.state ? normalizeState(payload.state) : null;
+        setProviderKeys(normalizeProviderKeys(payload.providerKeys));
+
+        if (remoteState) {
+          setState(remoteState);
+          lastSavedSnapshot.current = JSON.stringify(remoteState);
+        } else {
+          setState(initialLocalState);
+          lastSavedSnapshot.current = '';
+        }
+
+        setStorageError('');
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setState(initialLocalState);
+        setProviderKeys(defaultProviderKeys);
+        setStorageError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to load your saved PromptLab workspace. Using local fallback state.',
+        );
+        lastSavedSnapshot.current = '';
+      } finally {
+        if (active) {
+          setStorageReady(true);
+        }
+      }
+    }
+
+    void hydrate();
+
+    return () => {
+      active = false;
+    };
+  }, [initialLocalState]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return undefined;
+    }
+
+    const snapshot = JSON.stringify(state);
+    if (snapshot === lastSavedSnapshot.current) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/user-state', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ state }),
+        });
+
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          throw new Error(payload.error || 'Failed to save PromptLab workspace state.');
+        }
+
+        lastSavedSnapshot.current = snapshot;
+        setStorageError('');
+      } catch (error) {
+        setStorageError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to save PromptLab workspace state.',
+        );
+      }
+    }, SAVE_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [state, storageReady]);
 
   const createPromptProject = useCallback((draft?: Partial<PromptProjectDraft>) => {
     const projectId = makeId('project');
@@ -459,6 +597,61 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
     }));
   }, []);
 
+  const saveProviderKey = useCallback(async (provider: Provider, apiKey: string) => {
+    const trimmed = apiKey.trim();
+    if (!trimmed) {
+      throw new Error('Enter an API key before saving.');
+    }
+
+    setSavingProvider(provider);
+
+    try {
+      const response = await fetch('/api/provider-keys', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ provider, apiKey: trimmed }),
+      });
+      const payload = (await response.json()) as { providerKeys?: Partial<ProviderKeyMap>; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to save the provider API key.');
+      }
+
+      setProviderKeys(normalizeProviderKeys(payload.providerKeys));
+      setStorageError('');
+    } finally {
+      setSavingProvider(null);
+    }
+  }, []);
+
+  const removeProviderKey = useCallback(async (provider: Provider) => {
+    setSavingProvider(provider);
+
+    try {
+      const response = await fetch('/api/provider-keys', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ provider, apiKey: '' }),
+      });
+      const payload = (await response.json()) as { providerKeys?: Partial<ProviderKeyMap>; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to remove the provider API key.');
+      }
+
+      setProviderKeys(normalizeProviderKeys(payload.providerKeys));
+      setStorageError('');
+    } finally {
+      setSavingProvider(null);
+    }
+  }, []);
+
   const removeRun = useCallback((id: string) => {
     setState((current) => ({
       ...current,
@@ -527,6 +720,10 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   const value = useMemo(
     () => ({
       ...state,
+      providerKeys,
+      storageReady,
+      storageError,
+      savingProvider,
       createPromptProject,
       createPromptVersion,
       updatePromptProject,
@@ -537,6 +734,8 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       removeAsset,
       updateAsset,
       updateModel,
+      saveProviderKey,
+      removeProviderKey,
       removeRun,
       createRun,
       updateRun,
@@ -546,11 +745,17 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       createPromptProject,
       createPromptVersion,
       createRun,
-      removePromptVersion,
-      removePromptProject,
+      providerKeys,
       removeAsset,
+      removePromptProject,
+      removePromptVersion,
+      removeProviderKey,
       removeRun,
+      saveProviderKey,
+      savingProvider,
       state,
+      storageError,
+      storageReady,
       updateAsset,
       updateModel,
       updatePromptProject,
@@ -558,6 +763,17 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       updateRun,
     ],
   );
+
+  if (!storageReady) {
+    return (
+      <div className="auth-shell">
+        <section className="auth-card loading-card">
+          <h2>Loading Workspace</h2>
+          <p>Fetching your saved prompts, assets, models, and batch history.</p>
+        </section>
+      </div>
+    );
+  }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

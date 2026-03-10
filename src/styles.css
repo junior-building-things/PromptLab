@@ -96,6 +96,11 @@ body {
   backdrop-filter: blur(12px);
 }
 
+.loading-card {
+  place-items: center;
+  text-align: center;
+}
+
 .auth-feature-list {
   display: grid;
   gap: 1.2rem;
@@ -552,6 +557,14 @@ p {
   display: flex;
   align-items: center;
   gap: 0.85rem;
+}
+
+.provider-key-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.provider-key-card {
+  align-content: start;
 }
 
 .model-logo {

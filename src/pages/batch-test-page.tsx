@@ -228,7 +228,7 @@ function MultiSelectDropdown({
 }
 
 export function BatchTestPage() {
-  const { history, promptProjects, promptVersions, assets, models, removeRun, createRun, updateRun } =
+  const { history, promptProjects, promptVersions, assets, models, providerKeys, removeRun, createRun, updateRun } =
     useAppContext();
   const [composerOpen, setComposerOpen] = useState(false);
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
@@ -242,9 +242,7 @@ export function BatchTestPage() {
       ? [assets.find((asset) => asset.kind === 'text-inputs')!.id]
       : [],
   );
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>(
-    models.filter((model) => model.status === 'ready').slice(0, 2).map((model) => model.id),
-  );
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -265,7 +263,10 @@ export function BatchTestPage() {
   }, [openRunMenuId]);
 
   const counters = useMemo(() => history.reduce((sum, run) => sum + run.results.length, 0), [history]);
-  const readyModels = useMemo(() => models.filter((model) => model.status === 'ready'), [models]);
+  const readyModels = useMemo(
+    () => models.filter((model) => model.status === 'ready' && providerKeys[model.provider]?.hasKey),
+    [models, providerKeys],
+  );
   const versionOptions = useMemo(
     () =>
       promptVersions
@@ -342,6 +343,10 @@ export function BatchTestPage() {
       })),
     [readyModels],
   );
+
+  useEffect(() => {
+    setSelectedModelIds((current) => current.filter((id) => readyModels.some((model) => model.id === id)));
+  }, [readyModels]);
 
   function toggleExpand(id: string) {
     setExpandedTests((current) => {
@@ -535,7 +540,11 @@ export function BatchTestPage() {
       .flatMap((asset) => parseTextInputs(asset.source));
 
     if (selectedPrompts.length === 0 || selectedModels.length === 0 || selectedUserInputs.length === 0) {
-      setErrorMessage('Select at least one system prompt, text input, and model before running.');
+      setErrorMessage(
+        readyModels.length === 0
+          ? 'Add at least one provider API key in the Models view before running a batch test.'
+          : 'Select at least one system prompt, text input, and model before running.',
+      );
       return;
     }
 

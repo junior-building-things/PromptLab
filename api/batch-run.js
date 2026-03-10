@@ -1,4 +1,5 @@
 import { readSession } from './_lib/auth.js';
+import { getProviderApiKey } from './_lib/store.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -123,9 +124,9 @@ function collectCandidateImage(value) {
   return undefined;
 }
 
-async function callOpenAI({ prompt, userInput, asset, model }) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('Missing OPENAI_API_KEY for OpenAI model execution.');
+async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
+  if (!apiKey) {
+    throw new Error('Missing OpenAI API key. Add it in the Models view before running a batch test.');
   }
 
   const content = [
@@ -147,7 +148,7 @@ async function callOpenAI({ prompt, userInput, asset, model }) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: model.apiModel,
@@ -180,9 +181,9 @@ async function callOpenAI({ prompt, userInput, asset, model }) {
   };
 }
 
-async function callGemini({ prompt, userInput, asset, model }) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('Missing GEMINI_API_KEY for Gemini model execution.');
+async function callGemini({ prompt, userInput, asset, model, apiKey }) {
+  if (!apiKey) {
+    throw new Error('Missing Gemini API key. Add it in the Models view before running a batch test.');
   }
 
   const userParts = [
@@ -202,7 +203,7 @@ async function callGemini({ prompt, userInput, asset, model }) {
   }
 
   const started = Date.now();
-  const response = await fetch(`${GEMINI_URL}/${model.apiModel}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+  const response = await fetch(`${GEMINI_URL}/${model.apiModel}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -240,9 +241,9 @@ async function callGemini({ prompt, userInput, asset, model }) {
   };
 }
 
-async function callXAI({ prompt, userInput, asset, model }) {
-  if (!process.env.XAI_API_KEY) {
-    throw new Error('Missing XAI_API_KEY for xAI model execution.');
+async function callXAI({ prompt, userInput, asset, model, apiKey }) {
+  if (!apiKey) {
+    throw new Error('Missing xAI API key. Add it in the Models view before running a batch test.');
   }
 
   const content = [
@@ -266,7 +267,7 @@ async function callXAI({ prompt, userInput, asset, model }) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: model.apiModel,
@@ -304,7 +305,8 @@ export default async function handler(req, res) {
     return json(res, 405, { error: 'Method not allowed' });
   }
 
-  if (!readSession(req)) {
+  const user = readSession(req);
+  if (!user) {
     return json(res, 401, { error: 'Authentication required.' });
   }
 
@@ -320,12 +322,13 @@ export default async function handler(req, res) {
       models.map(async (model) => {
         try {
           let execution;
+          const apiKey = await getProviderApiKey(user, model.provider);
           if (model.provider === 'openai') {
-            execution = await callOpenAI({ prompt, userInput, asset, model });
+            execution = await callOpenAI({ prompt, userInput, asset, model, apiKey });
           } else if (model.provider === 'gemini') {
-            execution = await callGemini({ prompt, userInput, asset, model });
+            execution = await callGemini({ prompt, userInput, asset, model, apiKey });
           } else {
-            execution = await callXAI({ prompt, userInput, asset, model });
+            execution = await callXAI({ prompt, userInput, asset, model, apiKey });
           }
 
           return {
