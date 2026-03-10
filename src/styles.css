@@ -584,8 +584,8 @@ p {
 .provider-logo {
   display: block;
   flex-shrink: 0;
-  width: 96px;
-  height: 96px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
 }
 

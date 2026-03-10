@@ -143,8 +143,15 @@ export function ModelsPage() {
           modelsForProvider.map((model) => (
             <article key={model.id} className="surface-card model-card">
               <div className="model-card-header">
-                <div>
-                  <h3>{model.name}</h3>
+                <div className="model-identity">
+                  <img
+                    className="model-logo"
+                    src={getProviderIconSrc(model.provider)}
+                    alt={getProviderLabel(model.provider)}
+                  />
+                  <div>
+                    <h3>{model.name}</h3>
+                  </div>
                 </div>
                 <span className={`pill ${providerKeys[provider].hasKey ? 'pill-success' : 'pill-subtle'}`}>
                   {providerKeys[provider].hasKey ? 'Ready' : 'API Key Required'}
