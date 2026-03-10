@@ -204,11 +204,7 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
     imageData ? 'Reference image attached below.' : undefined,
     !imageData ? `Asset context:\n${buildAssetContext(asset) || 'None provided.'}` : undefined,
   ].filter(Boolean);
-  const userParts = [
-    {
-      text: instructionLines.join('\n\n'),
-    },
-  ];
+  const userParts = [{ text: instructionLines.join('\n\n') }];
 
   if (imageData) {
     userParts.push({
@@ -228,18 +224,9 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
     body: JSON.stringify({
       contents: [
         {
-          role: 'user',
           parts: userParts,
         },
       ],
-      generationConfig: {
-        temperature: model.temperature,
-        maxOutputTokens: model.maxTokens,
-        responseModalities: ['IMAGE'],
-        imageConfig: {
-          aspectRatio: '1:1',
-        },
-      },
     }),
   });
 
