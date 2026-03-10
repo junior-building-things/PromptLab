@@ -63,10 +63,15 @@ export function ModelsPage() {
 
       <div className="stack-list">
         <section className="settings-grid provider-key-grid">
-          {providerModels.map(({ provider, models: modelsForProvider }) => (
+          {providerModels.map(({ provider }) => (
             <article key={provider} className="surface-card model-card provider-key-card">
               <div className="model-card-header">
-                <div>
+                <div className="model-identity">
+                  <img
+                    className="model-logo"
+                    src={getProviderIconSrc(provider)}
+                    alt={providerCardTitle[provider]}
+                  />
                   <div>
                     <h3>{providerCardTitle[provider]}</h3>
                   </div>
@@ -138,15 +143,8 @@ export function ModelsPage() {
           modelsForProvider.map((model) => (
             <article key={model.id} className="surface-card model-card">
               <div className="model-card-header">
-                <div className="model-identity">
-                  <img
-                    className="model-logo"
-                    src={getProviderIconSrc(model.provider)}
-                    alt={getProviderLabel(model.provider)}
-                  />
-                  <div>
-                    <h3>{model.name}</h3>
-                  </div>
+                <div>
+                  <h3>{model.name}</h3>
                 </div>
                 <span className={`pill ${providerKeys[provider].hasKey ? 'pill-success' : 'pill-subtle'}`}>
                   {providerKeys[provider].hasKey ? 'Ready' : 'API Key Required'}
