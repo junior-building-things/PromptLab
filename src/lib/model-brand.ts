@@ -7,9 +7,9 @@ export const providerLabel: Record<Provider, string> = {
 };
 
 const providerIconSrc: Record<Provider, string> = {
-  openai: '/openai.png?v=3',
-  gemini: '/gemini.png?v=3',
-  xai: '/xai.png?v=3',
+  openai: '/openai.png?v=4',
+  gemini: '/gemini.png?v=4',
+  xai: '/xai.png?v=4',
 };
 
 export function getProviderLabel(provider: Provider) {

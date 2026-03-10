@@ -822,7 +822,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
     return (
       <div className="auth-shell">
         <section className="auth-card loading-card">
-          <h2>Loading Workspace</h2>
+          <h2>Loading Workspace...</h2>
         </section>
       </div>
     );

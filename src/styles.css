@@ -582,15 +582,8 @@ p {
 }
 
 .provider-logo {
-  width: 96px;
-  height: 96px;
   display: block;
   flex-shrink: 0;
-  object-fit: fill;
-  image-rendering: auto;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
 }
 
 .multi-dropdown {
