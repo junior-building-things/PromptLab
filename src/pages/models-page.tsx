@@ -68,7 +68,7 @@ export function ModelsPage() {
               <div className="model-card-header">
                 <div className="model-identity">
                   <img
-                    className="model-logo"
+                    className="provider-logo"
                     src={getProviderIconSrc(provider)}
                     alt={providerCardTitle[provider]}
                   />
