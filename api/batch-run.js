@@ -1,5 +1,3 @@
-import { readSession } from './_lib/auth.js';
-
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
@@ -302,10 +300,6 @@ async function callXAI({ prompt, userInput, asset, model }) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return json(res, 405, { error: 'Method not allowed' });
-  }
-
-  if (!readSession(req)) {
-    return json(res, 401, { error: 'Authentication required.' });
   }
 
   try {

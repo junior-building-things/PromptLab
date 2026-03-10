@@ -22,9 +22,7 @@ import type {
   PromptVersion,
 } from '../lib/types';
 
-const LEGACY_STORAGE_KEY = 'promptlab-state-v2';
-const LEGACY_STORAGE_KEY_V1 = 'promptlab-state-v1';
-const USER_STORAGE_PREFIX = 'promptlab-state-user:';
+const STORAGE_KEY = 'promptlab-state-v2';
 
 type PromptProjectDraft = {
   name: string;
@@ -195,12 +193,12 @@ function migrateLegacyState(legacy: LegacyState): AppState {
   };
 }
 
-function loadState(storageKey: string): AppState {
+function loadState(): AppState {
   if (typeof window === 'undefined') {
     return defaultState;
   }
 
-  const stored = window.localStorage.getItem(storageKey);
+  const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored) {
     try {
       return normalizeState(JSON.parse(stored) as AppState);
@@ -209,17 +207,7 @@ function loadState(storageKey: string): AppState {
     }
   }
 
-  const scopedKey = storageKey.startsWith(USER_STORAGE_PREFIX);
-  const legacyCurrent = scopedKey ? window.localStorage.getItem(LEGACY_STORAGE_KEY) : null;
-  if (legacyCurrent) {
-    try {
-      return normalizeState(JSON.parse(legacyCurrent) as AppState);
-    } catch {
-      return defaultState;
-    }
-  }
-
-  const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY_V1);
+  const legacy = window.localStorage.getItem('promptlab-state-v1');
   if (legacy) {
     try {
       return migrateLegacyState(JSON.parse(legacy) as LegacyState);
@@ -266,24 +254,16 @@ function applyCompletedRun(current: AppState, run: BatchRun): AppState {
   };
 }
 
-type AppProviderProps = PropsWithChildren<{
-  storageKey: string;
-}>;
-
-export function AppProvider({ children, storageKey }: AppProviderProps) {
-  const [state, setState] = useState<AppState>(() => loadState(storageKey));
+export function AppProvider({ children }: PropsWithChildren) {
+  const [state, setState] = useState<AppState>(loadState);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(state));
-      if (storageKey.startsWith(USER_STORAGE_PREFIX)) {
-        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
-        window.localStorage.removeItem(LEGACY_STORAGE_KEY_V1);
-      }
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
       console.error('Failed to persist PromptLab state.', error);
     }
-  }, [state, storageKey]);
+  }, [state]);
 
   const createPromptProject = useCallback((draft?: Partial<PromptProjectDraft>) => {
     const projectId = makeId('project');
