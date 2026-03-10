@@ -54,10 +54,6 @@ export function LoginScreen({ loading, errorMessage, onLogin }: LoginScreenProps
           </button>
 
           {errorMessage ? <div className="auth-inline-error">{errorMessage}</div> : null}
-
-          <p className="auth-legal">
-            By signing in, you agree to our Terms of Service and Privacy Policy.
-          </p>
         </div>
       </section>
     </div>
