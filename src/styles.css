@@ -582,11 +582,11 @@ p {
 }
 
 .provider-logo {
-  width: 3rem;
-  height: 3rem;
+  width: 96px;
+  height: 96px;
   display: block;
   flex-shrink: 0;
-  object-fit: contain;
+  object-fit: fill;
   image-rendering: auto;
   border-radius: 0;
   background: transparent;

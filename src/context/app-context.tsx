@@ -823,7 +823,6 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       <div className="auth-shell">
         <section className="auth-card loading-card">
           <h2>Loading Workspace</h2>
-          <p>Fetching your saved prompts, assets, models, and batch history.</p>
         </section>
       </div>
     );
