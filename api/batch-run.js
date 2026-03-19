@@ -4,6 +4,7 @@ import { getProviderApiKey } from './_lib/store.js';
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
+const BRIA_REMOVE_BG_URL = 'https://engine.prod.bria-api.com/v2/image/edit/remove_background';
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -44,6 +45,23 @@ function parseImageDataUrl(source) {
   };
 }
 
+function normalizeBriaImageInput(source) {
+  if (!source) {
+    return null;
+  }
+
+  const dataUrl = parseImageDataUrl(source);
+  if (dataUrl) {
+    return dataUrl.data;
+  }
+
+  if (/^https?:\/\//.test(source)) {
+    return source;
+  }
+
+  return null;
+}
+
 function scoreOutput(text) {
   const lengthScore = Math.min(24, Math.round(text.length / 36));
   return Math.max(72, Math.min(98, 72 + lengthScore));
@@ -55,6 +73,68 @@ function toDataUrl(mimeType, data) {
   }
 
   return `data:${mimeType};base64,${data}`;
+}
+
+async function fetchImageAsDataUrl(source) {
+  const response = await fetch(source);
+  if (!response.ok) {
+    throw new Error('Failed to download Bria background-removal result.');
+  }
+
+  const contentType = response.headers.get('content-type') || 'image/png';
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return toDataUrl(contentType, buffer.toString('base64'));
+}
+
+async function removeBackgroundWithBria(source) {
+  const apiToken = process.env.BRIA_API_TOKEN?.trim();
+  const image = normalizeBriaImageInput(source);
+
+  if (!apiToken || !image) {
+    return source;
+  }
+
+  const response = await fetch(BRIA_REMOVE_BG_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      api_token: apiToken,
+    },
+    body: JSON.stringify({
+      image,
+      preserve_alpha: true,
+      sync: true,
+    }),
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error?.message || payload.message || 'Bria background removal failed.');
+  }
+
+  const imageUrl = payload.result?.image_url;
+  if (!imageUrl) {
+    throw new Error('Bria returned no processed image URL.');
+  }
+
+  return fetchImageAsDataUrl(imageUrl);
+}
+
+async function postProcessOutputImage(execution) {
+  if (!execution?.outputImage) {
+    return execution;
+  }
+
+  try {
+    const cleanedImage = await removeBackgroundWithBria(execution.outputImage);
+    return {
+      ...execution,
+      outputImage: cleanedImage || execution.outputImage,
+    };
+  } catch (error) {
+    console.error('Background removal failed.', error);
+    return execution;
+  }
 }
 
 function collectCandidateImage(value) {
@@ -335,6 +415,8 @@ export default async function handler(req, res) {
           } else {
             execution = await callXAI({ prompt, userInput, asset, model, apiKey });
           }
+
+          execution = await postProcessOutputImage(execution);
 
           return {
             ok: true,
