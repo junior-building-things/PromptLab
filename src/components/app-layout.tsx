@@ -11,6 +11,7 @@ const navItems = [
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const firstName = user?.name?.trim().split(/\s+/)[0] || user?.name || 'User';
 
   return (
     <div className="app-shell">
@@ -52,7 +53,7 @@ export function AppLayout() {
             )}
 
             <div className="sidebar-user-copy">
-              <strong>{user?.name}</strong>
+              <strong>{firstName}</strong>
               <span>{user?.email || 'Signed In With Google'}</span>
             </div>
           </div>
