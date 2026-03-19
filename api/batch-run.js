@@ -90,6 +90,12 @@ function buildOutlineOffsets(radius) {
   return offsets;
 }
 
+function createPngWithData(width, height, pixelData) {
+  const png = new PNG({ width, height });
+  png.data = Buffer.from(pixelData);
+  return png;
+}
+
 function addPaddingToPng(image, padding) {
   if (padding <= 0) {
     return image;
@@ -110,11 +116,7 @@ function addPaddingToPng(image, padding) {
     }
   }
 
-  return new PNG({
-    width: paddedWidth,
-    height: paddedHeight,
-    data: paddedData,
-  });
+  return createPngWithData(paddedWidth, paddedHeight, paddedData);
 }
 
 function buildExternalBackgroundMask(solidMask, width, height) {
@@ -228,13 +230,7 @@ function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
     outlinedData[offset + 3] = data[offset + 3];
   }
 
-  return PNG.sync.write(
-    new PNG({
-      width,
-      height,
-      data: outlinedData,
-    }),
-  );
+  return PNG.sync.write(createPngWithData(width, height, outlinedData));
 }
 
 async function fetchImageAsDataUrl(source) {
