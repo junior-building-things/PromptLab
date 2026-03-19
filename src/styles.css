@@ -383,7 +383,7 @@ p {
 
 .sidebar-user-copy span {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
