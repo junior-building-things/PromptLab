@@ -1,10 +1,13 @@
 import { readSession } from './_lib/auth.js';
 import { getProviderApiKey } from './_lib/store.js';
+import { PNG } from 'pngjs';
 
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 const BRIA_REMOVE_BG_URL = 'https://engine.prod.bria-api.com/v2/image/edit/remove_background';
+const OUTLINE_RADIUS = 6;
+const OUTLINE_ALPHA_THRESHOLD = 16;
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -75,6 +78,165 @@ function toDataUrl(mimeType, data) {
   return `data:${mimeType};base64,${data}`;
 }
 
+function buildOutlineOffsets(radius) {
+  const offsets = [];
+  for (let y = -radius; y <= radius; y += 1) {
+    for (let x = -radius; x <= radius; x += 1) {
+      if (x * x + y * y <= radius * radius) {
+        offsets.push([x, y]);
+      }
+    }
+  }
+  return offsets;
+}
+
+function addPaddingToPng(image, padding) {
+  if (padding <= 0) {
+    return image;
+  }
+
+  const paddedWidth = image.width + padding * 2;
+  const paddedHeight = image.height + padding * 2;
+  const paddedData = Buffer.alloc(paddedWidth * paddedHeight * 4, 0);
+
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const sourceOffset = (y * image.width + x) * 4;
+      const targetOffset = ((y + padding) * paddedWidth + (x + padding)) * 4;
+      paddedData[targetOffset] = image.data[sourceOffset];
+      paddedData[targetOffset + 1] = image.data[sourceOffset + 1];
+      paddedData[targetOffset + 2] = image.data[sourceOffset + 2];
+      paddedData[targetOffset + 3] = image.data[sourceOffset + 3];
+    }
+  }
+
+  return new PNG({
+    width: paddedWidth,
+    height: paddedHeight,
+    data: paddedData,
+  });
+}
+
+function buildExternalBackgroundMask(solidMask, width, height) {
+  const externalMask = new Uint8Array(width * height);
+  const queue = [];
+  let queueIndex = 0;
+
+  function enqueue(x, y) {
+    if (x < 0 || x >= width || y < 0 || y >= height) {
+      return;
+    }
+
+    const index = y * width + x;
+    if (solidMask[index] === 1 || externalMask[index] === 1) {
+      return;
+    }
+
+    externalMask[index] = 1;
+    queue.push(index);
+  }
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, height - 1);
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    enqueue(0, y);
+    enqueue(width - 1, y);
+  }
+
+  while (queueIndex < queue.length) {
+    const index = queue[queueIndex];
+    queueIndex += 1;
+
+    const x = index % width;
+    const y = Math.floor(index / width);
+
+    enqueue(x + 1, y);
+    enqueue(x - 1, y);
+    enqueue(x, y + 1);
+    enqueue(x, y - 1);
+  }
+
+  return externalMask;
+}
+
+function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
+  const originalImage = PNG.sync.read(buffer);
+  const paddedImage = addPaddingToPng(originalImage, radius);
+  const { width, height, data } = paddedImage;
+  const pixelCount = width * height;
+  const solidMask = new Uint8Array(pixelCount);
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    if (data[index * 4 + 3] >= OUTLINE_ALPHA_THRESHOLD) {
+      solidMask[index] = 1;
+    }
+  }
+
+  const externalMask = buildExternalBackgroundMask(solidMask, width, height);
+  const outlineMask = new Uint8Array(pixelCount);
+  const offsets = buildOutlineOffsets(radius);
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    if (solidMask[index] !== 1) {
+      continue;
+    }
+
+    const x = index % width;
+    const y = Math.floor(index / width);
+
+    for (const [offsetX, offsetY] of offsets) {
+      const neighborX = x + offsetX;
+      const neighborY = y + offsetY;
+
+      if (neighborX < 0 || neighborX >= width || neighborY < 0 || neighborY >= height) {
+        continue;
+      }
+
+      const neighborIndex = neighborY * width + neighborX;
+      if (externalMask[neighborIndex] === 1) {
+        outlineMask[neighborIndex] = 1;
+      }
+    }
+  }
+
+  const outlinedData = Buffer.from(data);
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    if (outlineMask[index] !== 1 || solidMask[index] === 1) {
+      continue;
+    }
+
+    const offset = index * 4;
+    outlinedData[offset] = 255;
+    outlinedData[offset + 1] = 255;
+    outlinedData[offset + 2] = 255;
+    outlinedData[offset + 3] = 255;
+  }
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    const offset = index * 4;
+    if (data[offset + 3] === 0) {
+      continue;
+    }
+
+    outlinedData[offset] = data[offset];
+    outlinedData[offset + 1] = data[offset + 1];
+    outlinedData[offset + 2] = data[offset + 2];
+    outlinedData[offset + 3] = data[offset + 3];
+  }
+
+  return PNG.sync.write(
+    new PNG({
+      width,
+      height,
+      data: outlinedData,
+    }),
+  );
+}
+
 async function fetchImageAsDataUrl(source) {
   const response = await fetch(source);
   if (!response.ok) {
@@ -82,8 +244,11 @@ async function fetchImageAsDataUrl(source) {
   }
 
   const contentType = response.headers.get('content-type') || 'image/png';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return toDataUrl(contentType, buffer.toString('base64'));
+  const originalBuffer = Buffer.from(await response.arrayBuffer());
+  const processedBuffer =
+    contentType.startsWith('image/png') ? addWhiteOutlineToPng(originalBuffer) : originalBuffer;
+
+  return toDataUrl(contentType, processedBuffer.toString('base64'));
 }
 
 async function removeBackgroundWithBria(source) {
