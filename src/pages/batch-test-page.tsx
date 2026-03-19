@@ -63,6 +63,157 @@ function parseTextInputs(source: string) {
     .filter(Boolean);
 }
 
+function loadImageElement(source: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Failed to load generated image.'));
+    image.src = source;
+  });
+}
+
+function getPixelOffset(x: number, y: number, width: number) {
+  return (y * width + x) * 4;
+}
+
+async function removeBackgroundFromGeneratedImage(source?: string) {
+  if (!source || typeof document === 'undefined' || !/^data:image\/|^https?:\/\//.test(source)) {
+    return source;
+  }
+
+  try {
+    const image = await loadImageElement(source);
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+
+    if (!width || !height) {
+      return source;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+      return source;
+    }
+
+    context.drawImage(image, 0, 0, width, height);
+
+    let imageData: ImageData;
+    try {
+      imageData = context.getImageData(0, 0, width, height);
+    } catch {
+      return source;
+    }
+
+    const { data } = imageData;
+    const inset = Math.max(2, Math.round(Math.min(width, height) * 0.04));
+    const sampleSize = Math.max(2, Math.round(Math.min(width, height) * 0.025));
+    const sampleCenters = [
+      [inset, inset],
+      [Math.max(inset, width - inset - 1), inset],
+      [inset, Math.max(inset, height - inset - 1)],
+      [Math.max(inset, width - inset - 1), Math.max(inset, height - inset - 1)],
+    ];
+
+    let sampleCount = 0;
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+
+    for (const [centerX, centerY] of sampleCenters) {
+      for (let y = Math.max(0, centerY - sampleSize); y <= Math.min(height - 1, centerY + sampleSize); y += 1) {
+        for (let x = Math.max(0, centerX - sampleSize); x <= Math.min(width - 1, centerX + sampleSize); x += 1) {
+          const offset = getPixelOffset(x, y, width);
+          const alpha = data[offset + 3];
+          if (alpha < 20) {
+            continue;
+          }
+          red += data[offset];
+          green += data[offset + 1];
+          blue += data[offset + 2];
+          sampleCount += 1;
+        }
+      }
+    }
+
+    if (sampleCount === 0) {
+      return source;
+    }
+
+    const background = {
+      red: red / sampleCount,
+      green: green / sampleCount,
+      blue: blue / sampleCount,
+    };
+
+    const tolerance = 72;
+    const visited = new Uint8Array(width * height);
+    const queue: number[] = [];
+
+    function shouldRemovePixel(x: number, y: number) {
+      const offset = getPixelOffset(x, y, width);
+      const alpha = data[offset + 3];
+      if (alpha < 20) {
+        return true;
+      }
+
+      const distance = Math.sqrt(
+        (data[offset] - background.red) ** 2 +
+          (data[offset + 1] - background.green) ** 2 +
+          (data[offset + 2] - background.blue) ** 2,
+      );
+
+      return distance <= tolerance;
+    }
+
+    function enqueue(x: number, y: number) {
+      if (x < 0 || x >= width || y < 0 || y >= height) {
+        return;
+      }
+
+      const index = y * width + x;
+      if (visited[index] === 1 || !shouldRemovePixel(x, y)) {
+        return;
+      }
+
+      visited[index] = 1;
+      queue.push(index);
+    }
+
+    for (let x = 0; x < width; x += 1) {
+      enqueue(x, 0);
+      enqueue(x, height - 1);
+    }
+
+    for (let y = 0; y < height; y += 1) {
+      enqueue(0, y);
+      enqueue(width - 1, y);
+    }
+
+    for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+      const index = queue[queueIndex];
+      const x = index % width;
+      const y = Math.floor(index / width);
+      const offset = getPixelOffset(x, y, width);
+      data[offset + 3] = 0;
+
+      enqueue(x + 1, y);
+      enqueue(x - 1, y);
+      enqueue(x, y + 1);
+      enqueue(x, y - 1);
+    }
+
+    context.putImageData(imageData, 0, 0);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return source;
+  }
+}
+
 function toggleSelection(values: string[], value: string) {
   return values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];
 }
@@ -622,17 +773,19 @@ export function BatchTestPage() {
           try {
             const apiPayload = await executeScenario(prompt, selectedModels, imageReference, userInput);
 
-            const nextResults = apiPayload.results.map((result, index) => ({
-              id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
-              promptId: prompt.id,
-              modelId: result.modelId,
-              assetId: imageReference?.id,
-              userInput,
-              output: result.output,
-              outputImage: result.outputImage,
-              latencyMs: result.latencyMs,
-              score: result.score,
-            }));
+            const nextResults = await Promise.all(
+              apiPayload.results.map(async (result, index) => ({
+                id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
+                promptId: prompt.id,
+                modelId: result.modelId,
+                assetId: imageReference?.id,
+                userInput,
+                output: result.output,
+                outputImage: await removeBackgroundFromGeneratedImage(result.outputImage),
+                latencyMs: result.latencyMs,
+                score: result.score,
+              })),
+            );
 
             results.push(...nextResults);
 
