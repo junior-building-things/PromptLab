@@ -6,7 +6,7 @@ const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 const BRIA_REMOVE_BG_URL = 'https://engine.prod.bria-api.com/v2/image/edit/remove_background';
-const OUTLINE_RADIUS = 15;
+const OUTLINE_RADIUS = 20;
 const OUTLINE_ALPHA_THRESHOLD = 16;
 
 function json(res, status, body) {
