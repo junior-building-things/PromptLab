@@ -4,6 +4,7 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronRight,
+  Download,
   Cpu,
   CircleAlert,
   FileText,
@@ -80,6 +81,36 @@ function isImageOutput(value?: string) {
   return Boolean(value && (/^data:image\//.test(value) || /^https?:\/\//.test(value)));
 }
 
+function getImageExtension(value?: string) {
+  if (!value) {
+    return 'png';
+  }
+
+  const dataUrlMatch = /^data:image\/([a-zA-Z0-9.+-]+);base64,/.exec(value);
+  if (dataUrlMatch) {
+    const extension = dataUrlMatch[1].toLowerCase();
+    if (extension === 'jpeg') return 'jpg';
+    return extension;
+  }
+
+  try {
+    const url = new URL(value);
+    const pathname = url.pathname.toLowerCase();
+    if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) return 'jpg';
+    if (pathname.endsWith('.webp')) return 'webp';
+    if (pathname.endsWith('.gif')) return 'gif';
+    if (pathname.endsWith('.png')) return 'png';
+  } catch {
+    return 'png';
+  }
+
+  return 'png';
+}
+
+function getResultDownloadName(result: TestResult) {
+  return `promptlab-sticker-${result.id}.${getImageExtension(result.outputImage)}`;
+}
+
 function buildCellKey(rowId: string, columnId: string) {
   return `${rowId}::${columnId}`;
 }
@@ -122,11 +153,22 @@ function BatchResultCell({
       {results.map((result) => (
         <div key={result.id} className="batch-table-result">
           {isImageOutput(result.outputImage) ? (
-            <img
-              className="batch-table-output-image"
-              src={result.outputImage}
-              alt="Generated output"
-            />
+            <div className="batch-table-image-wrap">
+              <a
+                className="batch-table-download-link"
+                href={result.outputImage}
+                download={getResultDownloadName(result)}
+                aria-label="Download generated sticker"
+                title="Download"
+              >
+                <Download size={16} />
+              </a>
+              <img
+                className="batch-table-output-image"
+                src={result.outputImage}
+                alt="Generated output"
+              />
+            </div>
           ) : (
             <div className="batch-table-output-fallback">
               <p>{result.output || 'No image output returned.'}</p>

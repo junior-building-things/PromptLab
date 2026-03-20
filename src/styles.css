@@ -1281,6 +1281,11 @@ p {
   justify-items: start;
 }
 
+.batch-table-image-wrap {
+  position: relative;
+  width: 220px;
+}
+
 .batch-table-output-image {
   width: 220px;
   max-height: 220px;
@@ -1290,6 +1295,39 @@ p {
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: #0f0f10;
+}
+
+.batch-table-download-link {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 12, 13, 0.82);
+  color: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+  backdrop-filter: blur(12px);
+}
+
+.batch-table-image-wrap:hover .batch-table-download-link,
+.batch-table-image-wrap:focus-within .batch-table-download-link {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.batch-table-download-link:hover,
+.batch-table-download-link:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  outline: none;
 }
 
 .batch-table-output-fallback {
