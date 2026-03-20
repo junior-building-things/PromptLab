@@ -334,6 +334,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   const [storageError, setStorageError] = useState('');
   const [savingProvider, setSavingProvider] = useState<Provider | null>(null);
   const lastSavedSnapshot = useRef(JSON.stringify(initialLocalState));
+  const persistQueueRef = useRef(Promise.resolve());
 
   useEffect(() => {
     try {
@@ -405,31 +406,44 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   }, [initialLocalState]);
 
   const persistStateNow = useCallback(async (nextState: AppState) => {
-    try {
-      const response = await fetch('/api/user-state', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ state: nextState }),
-      });
+    const snapshot = JSON.stringify(nextState);
 
-      const payload = await readApiPayload<ApiErrorPayload>(response);
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to save PromptLab workspace state.');
+    const runPersist = async () => {
+      try {
+        const response = await fetch('/api/user-state', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ state: nextState }),
+        });
+
+        const payload = await readApiPayload<ApiErrorPayload>(response);
+        if (!response.ok) {
+          throw new Error(payload.error || 'Failed to save PromptLab workspace state.');
+        }
+
+        setStorageError('');
+        lastSavedSnapshot.current = snapshot;
+        return true;
+      } catch (error) {
+        setStorageError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to save PromptLab workspace state.',
+        );
+        return false;
       }
+    };
 
-      setStorageError('');
-      return true;
-    } catch (error) {
-      setStorageError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to save PromptLab workspace state.',
-      );
-      return false;
-    }
+    const scheduled = persistQueueRef.current.then(runPersist, runPersist);
+    persistQueueRef.current = scheduled.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    return scheduled;
   }, []);
 
   useEffect(() => {
@@ -442,11 +456,8 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       return undefined;
     }
 
-    const timeoutId = window.setTimeout(async () => {
-      const saved = await persistStateNow(state);
-      if (saved) {
-        lastSavedSnapshot.current = snapshot;
-      }
+    const timeoutId = window.setTimeout(() => {
+      void persistStateNow(state);
     }, SAVE_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
@@ -745,6 +756,8 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       id: string,
       updates: Partial<Pick<BatchRun, 'status' | 'errorMessage' | 'results' | 'scenario' | 'name'>>,
     ) => {
+      let nextState: AppState | null = null;
+
       setState((current) => {
         const existing = current.history.find((run) => run.id === id);
         if (!existing) {
@@ -756,7 +769,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
           ...updates,
         };
 
-        const nextState = {
+        nextState = {
           ...current,
           history: current.history.map((run) => (run.id === id ? nextRun : run)),
         };
@@ -765,10 +778,15 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
           return nextState;
         }
 
-        return applyCompletedRun(nextState, nextRun);
+        nextState = applyCompletedRun(nextState, nextRun);
+        return nextState;
       });
+
+      if (storageReady && nextState && (updates.status === 'completed' || updates.status === 'failed')) {
+        void persistStateNow(nextState);
+      }
     },
-    [],
+    [persistStateNow, storageReady],
   );
 
   const value = useMemo(
