@@ -8,6 +8,7 @@ const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 const BRIA_REMOVE_BG_URL = 'https://engine.prod.bria-api.com/v2/image/edit/remove_background';
 const OUTLINE_RADIUS = 20;
 const OUTLINE_ALPHA_THRESHOLD = 16;
+const EDGE_WHITE_ALPHA_LIMIT = 252;
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -164,6 +165,47 @@ function buildExternalBackgroundMask(solidMask, width, height) {
   return externalMask;
 }
 
+function buildExteriorEdgeMask(pixelData, externalMask, width, height) {
+  const edgeMask = new Uint8Array(width * height);
+
+  for (let index = 0; index < width * height; index += 1) {
+    const alpha = pixelData[index * 4 + 3];
+    if (alpha <= 0 || alpha >= EDGE_WHITE_ALPHA_LIMIT) {
+      continue;
+    }
+
+    const x = index % width;
+    const y = Math.floor(index / width);
+    let touchesExternalBackground = false;
+
+    for (let offsetY = -1; offsetY <= 1 && !touchesExternalBackground; offsetY += 1) {
+      for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+        if (offsetX === 0 && offsetY === 0) {
+          continue;
+        }
+
+        const neighborX = x + offsetX;
+        const neighborY = y + offsetY;
+        if (neighborX < 0 || neighborX >= width || neighborY < 0 || neighborY >= height) {
+          continue;
+        }
+
+        const neighborIndex = neighborY * width + neighborX;
+        if (externalMask[neighborIndex] === 1) {
+          touchesExternalBackground = true;
+          break;
+        }
+      }
+    }
+
+    if (touchesExternalBackground) {
+      edgeMask[index] = 1;
+    }
+  }
+
+  return edgeMask;
+}
+
 function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
   const originalImage = PNG.sync.read(buffer);
   const paddedImage = addPaddingToPng(originalImage, radius);
@@ -178,6 +220,7 @@ function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
   }
 
   const externalMask = buildExternalBackgroundMask(solidMask, width, height);
+  const exteriorEdgeMask = buildExteriorEdgeMask(data, externalMask, width, height);
   const outlineMask = new Uint8Array(pixelCount);
   const offsets = buildOutlineOffsets(radius);
 
@@ -204,6 +247,18 @@ function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
     }
   }
 
+  const softenedData = Buffer.from(data);
+  for (let index = 0; index < pixelCount; index += 1) {
+    if (exteriorEdgeMask[index] !== 1) {
+      continue;
+    }
+
+    const offset = index * 4;
+    softenedData[offset] = 255;
+    softenedData[offset + 1] = 255;
+    softenedData[offset + 2] = 255;
+  }
+
   const outlinedData = Buffer.from(data);
 
   for (let index = 0; index < pixelCount; index += 1) {
@@ -220,14 +275,14 @@ function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
 
   for (let index = 0; index < pixelCount; index += 1) {
     const offset = index * 4;
-    if (data[offset + 3] === 0) {
+    if (softenedData[offset + 3] === 0) {
       continue;
     }
 
-    outlinedData[offset] = data[offset];
-    outlinedData[offset + 1] = data[offset + 1];
-    outlinedData[offset + 2] = data[offset + 2];
-    outlinedData[offset + 3] = data[offset + 3];
+    outlinedData[offset] = softenedData[offset];
+    outlinedData[offset + 1] = softenedData[offset + 1];
+    outlinedData[offset + 2] = softenedData[offset + 2];
+    outlinedData[offset + 3] = softenedData[offset + 3];
   }
 
   return PNG.sync.write(createPngWithData(width, height, outlinedData));
