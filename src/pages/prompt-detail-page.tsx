@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { ChevronLeft, FileText, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
 
@@ -10,12 +10,20 @@ type ComposerState = {
   systemPrompt: string;
 };
 
+type PromptChangeSummaryResponse = {
+  summaries?: Array<{
+    versionId: string;
+    bullets: string[];
+  }>;
+};
+
 export function PromptDetailPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const {
     promptProjects,
     promptVersions,
+    providerKeys,
     createPromptVersion,
     removePromptProject,
     removePromptVersion,
@@ -23,11 +31,80 @@ export function PromptDetailPage() {
   const [menuVersionId, setMenuVersionId] = useState<string | null>(null);
   const [menuProjectOpen, setMenuProjectOpen] = useState(false);
   const [composer, setComposer] = useState<ComposerState | null>(null);
+  const [changeSummaryByVersionId, setChangeSummaryByVersionId] = useState<Record<string, string[]>>({});
 
   const project = promptProjects.find((entry) => entry.id === projectId);
-  const versions = promptVersions
-    .filter((entry) => entry.projectId === projectId)
-    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+  const projectVersions = promptVersions.filter((entry) => entry.projectId === projectId);
+  const versions = [...projectVersions].sort(
+    (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  );
+  const versionSequence = useMemo(
+    () => [...projectVersions].sort((left, right) => right.version - left.version),
+    [projectVersions],
+  );
+  const summaryComparisons = useMemo(
+    () =>
+      versionSequence.length > 2
+        ? versionSequence.slice(0, -1).map((version, index) => ({
+            versionId: version.id,
+            currentPrompt: version.systemPrompt,
+            previousPrompt: versionSequence[index + 1]?.systemPrompt || '',
+          }))
+        : [],
+    [versionSequence],
+  );
+  const summaryComparisonSignature = summaryComparisons
+    .map(({ versionId, currentPrompt, previousPrompt }) => `${versionId}:${currentPrompt}:${previousPrompt}`)
+    .join('\n---\n');
+  const canGenerateChangeSummary = providerKeys.gemini.hasKey || providerKeys.openai.hasKey;
+
+  useEffect(() => {
+    if (!canGenerateChangeSummary || summaryComparisons.length === 0) {
+      setChangeSummaryByVersionId({});
+      return;
+    }
+
+    let active = true;
+
+    async function loadChangeSummaries() {
+      try {
+        const response = await fetch('/api/prompt-diff-summary', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            comparisons: summaryComparisons,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate prompt change summaries.');
+        }
+
+        const payload = (await response.json()) as PromptChangeSummaryResponse;
+        if (!active) {
+          return;
+        }
+
+        const nextSummaries = Object.fromEntries(
+          (payload.summaries ?? []).map((entry) => [entry.versionId, entry.bullets]),
+        );
+        setChangeSummaryByVersionId(nextSummaries);
+      } catch {
+        if (active) {
+          setChangeSummaryByVersionId({});
+        }
+      }
+    }
+
+    void loadChangeSummaries();
+
+    return () => {
+      active = false;
+    };
+  }, [canGenerateChangeSummary, summaryComparisonSignature]);
 
   if (!project || versions.length === 0) {
     return (
@@ -181,6 +258,17 @@ export function PromptDetailPage() {
                       {tag}
                     </span>
                   ))}
+                </div>
+              ) : null}
+
+              {versions.length > 2 && changeSummaryByVersionId[version.id]?.length ? (
+                <div className="prompt-change-summary">
+                  <strong>What changed:</strong>
+                  <ul className="prompt-change-list">
+                    {changeSummaryByVersionId[version.id].map((bullet, index) => (
+                      <li key={`${version.id}-${index}`}>{bullet.replace(/^-\s*/, '')}</li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
 

@@ -933,6 +933,25 @@ p {
   font-size: 1.2rem;
 }
 
+.prompt-change-summary {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.prompt-change-summary strong {
+  color: var(--surface-ink);
+}
+
+.prompt-change-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+}
+
+.prompt-change-list li + li {
+  margin-top: 0.35rem;
+}
+
 .tag-chip {
   display: inline-flex;
   padding: 0.42rem 0.7rem;
