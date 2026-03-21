@@ -953,11 +953,6 @@ export function BatchTestPage() {
                 emptyLabel="Select Text Inputs"
               />
 
-              <p className="muted-copy">
-                If you leave text inputs empty, PromptLab will use the system prompt as the
-                generation prompt.
-              </p>
-
               <MultiSelectDropdown
                 label="Models"
                 labelIcon={<Cpu size={15} />}
