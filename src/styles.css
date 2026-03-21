@@ -118,6 +118,12 @@ body::after {
   text-align: center;
 }
 
+.loading-dots {
+  display: inline-block;
+  width: 3ch;
+  text-align: left;
+}
+
 .auth-feature-list {
   display: grid;
   gap: 1.2rem;
