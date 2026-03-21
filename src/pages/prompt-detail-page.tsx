@@ -43,7 +43,7 @@ export function PromptDetailPage() {
   );
   const summaryComparisons = useMemo(
     () =>
-      versionSequence.length > 2
+      versionSequence.length > 1
         ? versionSequence.slice(0, -1).map((version, index) => ({
             versionId: version.id,
             currentPrompt: version.systemPrompt,
@@ -259,7 +259,7 @@ export function PromptDetailPage() {
                 </div>
               ) : null}
 
-              {versions.length > 2 && changeSummaryByVersionId[version.id]?.length ? (
+              {versions.length > 1 && changeSummaryByVersionId[version.id]?.length ? (
                 <div className="prompt-change-summary">
                   <strong>What changed:</strong>
                   <ul className="prompt-change-list">
