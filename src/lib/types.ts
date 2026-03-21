@@ -56,6 +56,7 @@ export type BatchScenario = {
   assetId?: string;
   modelIds: string[];
   userInput?: string;
+  stickerize?: boolean;
 };
 
 export type TestResult = {

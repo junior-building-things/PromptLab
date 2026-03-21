@@ -1,9 +1,14 @@
+import { PNG } from 'pngjs';
 import { readSession } from './_lib/auth.js';
 import { getProviderApiKey } from './_lib/store.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
+const BRIA_REMOVE_BG_URL = 'https://engine.prod.bria-api.com/v2/image/edit/remove_background';
+const OUTLINE_RADIUS = 20;
+const OUTLINE_ALPHA_THRESHOLD = 16;
+const EDGE_WHITE_ALPHA_LIMIT = 252;
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -44,6 +49,23 @@ function parseImageDataUrl(source) {
   };
 }
 
+function normalizeBriaImageInput(source) {
+  if (!source) {
+    return null;
+  }
+
+  const dataUrl = parseImageDataUrl(source);
+  if (dataUrl) {
+    return dataUrl.data;
+  }
+
+  if (/^https?:\/\//.test(source)) {
+    return source;
+  }
+
+  return null;
+}
+
 function scoreOutput(text) {
   const lengthScore = Math.min(24, Math.round(text.length / 36));
   return Math.max(72, Math.min(98, 72 + lengthScore));
@@ -55,6 +77,280 @@ function toDataUrl(mimeType, data) {
   }
 
   return `data:${mimeType};base64,${data}`;
+}
+
+function buildOutlineOffsets(radius) {
+  const offsets = [];
+  for (let y = -radius; y <= radius; y += 1) {
+    for (let x = -radius; x <= radius; x += 1) {
+      if (x * x + y * y <= radius * radius) {
+        offsets.push([x, y]);
+      }
+    }
+  }
+  return offsets;
+}
+
+function createPngWithData(width, height, pixelData) {
+  const png = new PNG({ width, height });
+  png.data = Buffer.from(pixelData);
+  return png;
+}
+
+function addPaddingToPng(image, padding) {
+  if (padding <= 0) {
+    return image;
+  }
+
+  const paddedWidth = image.width + padding * 2;
+  const paddedHeight = image.height + padding * 2;
+  const paddedData = Buffer.alloc(paddedWidth * paddedHeight * 4, 0);
+
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const sourceOffset = (y * image.width + x) * 4;
+      const targetOffset = ((y + padding) * paddedWidth + (x + padding)) * 4;
+      paddedData[targetOffset] = image.data[sourceOffset];
+      paddedData[targetOffset + 1] = image.data[sourceOffset + 1];
+      paddedData[targetOffset + 2] = image.data[sourceOffset + 2];
+      paddedData[targetOffset + 3] = image.data[sourceOffset + 3];
+    }
+  }
+
+  return createPngWithData(paddedWidth, paddedHeight, paddedData);
+}
+
+function buildExternalBackgroundMask(solidMask, width, height) {
+  const externalMask = new Uint8Array(width * height);
+  const queue = [];
+  let queueIndex = 0;
+
+  function enqueue(x, y) {
+    if (x < 0 || x >= width || y < 0 || y >= height) {
+      return;
+    }
+
+    const index = y * width + x;
+    if (solidMask[index] === 1 || externalMask[index] === 1) {
+      return;
+    }
+
+    externalMask[index] = 1;
+    queue.push(index);
+  }
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, height - 1);
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    enqueue(0, y);
+    enqueue(width - 1, y);
+  }
+
+  while (queueIndex < queue.length) {
+    const index = queue[queueIndex];
+    queueIndex += 1;
+
+    const x = index % width;
+    const y = Math.floor(index / width);
+
+    enqueue(x + 1, y);
+    enqueue(x - 1, y);
+    enqueue(x, y + 1);
+    enqueue(x, y - 1);
+  }
+
+  return externalMask;
+}
+
+function buildExteriorEdgeMask(pixelData, externalMask, width, height) {
+  const edgeMask = new Uint8Array(width * height);
+
+  for (let index = 0; index < width * height; index += 1) {
+    const alpha = pixelData[index * 4 + 3];
+    if (alpha <= 0 || alpha >= EDGE_WHITE_ALPHA_LIMIT) {
+      continue;
+    }
+
+    const x = index % width;
+    const y = Math.floor(index / width);
+    let touchesExternalBackground = false;
+
+    for (let offsetY = -1; offsetY <= 1 && !touchesExternalBackground; offsetY += 1) {
+      for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+        if (offsetX === 0 && offsetY === 0) {
+          continue;
+        }
+
+        const neighborX = x + offsetX;
+        const neighborY = y + offsetY;
+        if (neighborX < 0 || neighborX >= width || neighborY < 0 || neighborY >= height) {
+          continue;
+        }
+
+        const neighborIndex = neighborY * width + neighborX;
+        if (externalMask[neighborIndex] === 1) {
+          touchesExternalBackground = true;
+          break;
+        }
+      }
+    }
+
+    if (touchesExternalBackground) {
+      edgeMask[index] = 1;
+    }
+  }
+
+  return edgeMask;
+}
+
+function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
+  const originalImage = PNG.sync.read(buffer);
+  const paddedImage = addPaddingToPng(originalImage, radius);
+  const { width, height, data } = paddedImage;
+  const pixelCount = width * height;
+  const solidMask = new Uint8Array(pixelCount);
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    if (data[index * 4 + 3] >= OUTLINE_ALPHA_THRESHOLD) {
+      solidMask[index] = 1;
+    }
+  }
+
+  const externalMask = buildExternalBackgroundMask(solidMask, width, height);
+  const exteriorEdgeMask = buildExteriorEdgeMask(data, externalMask, width, height);
+  const outlineMask = new Uint8Array(pixelCount);
+  const offsets = buildOutlineOffsets(radius);
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    if (solidMask[index] !== 1) {
+      continue;
+    }
+
+    const x = index % width;
+    const y = Math.floor(index / width);
+
+    for (const [offsetX, offsetY] of offsets) {
+      const neighborX = x + offsetX;
+      const neighborY = y + offsetY;
+
+      if (neighborX < 0 || neighborX >= width || neighborY < 0 || neighborY >= height) {
+        continue;
+      }
+
+      const neighborIndex = neighborY * width + neighborX;
+      if (externalMask[neighborIndex] === 1) {
+        outlineMask[neighborIndex] = 1;
+      }
+    }
+  }
+
+  const softenedData = Buffer.from(data);
+  for (let index = 0; index < pixelCount; index += 1) {
+    if (exteriorEdgeMask[index] !== 1) {
+      continue;
+    }
+
+    const offset = index * 4;
+    softenedData[offset] = 255;
+    softenedData[offset + 1] = 255;
+    softenedData[offset + 2] = 255;
+  }
+
+  const outlinedData = Buffer.from(data);
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    if (outlineMask[index] !== 1 || solidMask[index] === 1) {
+      continue;
+    }
+
+    const offset = index * 4;
+    outlinedData[offset] = 255;
+    outlinedData[offset + 1] = 255;
+    outlinedData[offset + 2] = 255;
+    outlinedData[offset + 3] = 255;
+  }
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    const offset = index * 4;
+    if (softenedData[offset + 3] === 0) {
+      continue;
+    }
+
+    outlinedData[offset] = softenedData[offset];
+    outlinedData[offset + 1] = softenedData[offset + 1];
+    outlinedData[offset + 2] = softenedData[offset + 2];
+    outlinedData[offset + 3] = softenedData[offset + 3];
+  }
+
+  return PNG.sync.write(createPngWithData(width, height, outlinedData));
+}
+
+async function fetchImageAsDataUrl(source) {
+  const response = await fetch(source);
+  if (!response.ok) {
+    throw new Error('Failed to download Bria background-removal result.');
+  }
+
+  const contentType = response.headers.get('content-type') || 'image/png';
+  const originalBuffer = Buffer.from(await response.arrayBuffer());
+  const processedBuffer =
+    contentType.startsWith('image/png') ? addWhiteOutlineToPng(originalBuffer) : originalBuffer;
+
+  return toDataUrl(contentType, processedBuffer.toString('base64'));
+}
+
+async function removeBackgroundWithBria(source) {
+  const apiToken = process.env.BRIA_API_TOKEN?.trim();
+  const image = normalizeBriaImageInput(source);
+
+  if (!apiToken || !image) {
+    return source;
+  }
+
+  const response = await fetch(BRIA_REMOVE_BG_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      api_token: apiToken,
+    },
+    body: JSON.stringify({
+      image,
+      preserve_alpha: true,
+      sync: true,
+    }),
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error?.message || payload.message || 'Bria background removal failed.');
+  }
+
+  const imageUrl = payload.result?.image_url;
+  if (!imageUrl) {
+    throw new Error('Bria returned no processed image URL.');
+  }
+
+  return fetchImageAsDataUrl(imageUrl);
+}
+
+async function postProcessOutputImage(execution, { stickerize } = { stickerize: true }) {
+  if (!stickerize || !execution?.outputImage) {
+    return execution;
+  }
+
+  try {
+    const cleanedImage = await removeBackgroundWithBria(execution.outputImage);
+    return {
+      ...execution,
+      outputImage: cleanedImage || execution.outputImage,
+    };
+  } catch (error) {
+    console.error('Background removal failed.', error);
+    return execution;
+  }
 }
 
 function collectCandidateImage(value) {
@@ -132,18 +428,27 @@ function normalizeUserInput(userInput) {
   return typeof userInput === 'string' ? userInput.trim() : '';
 }
 
+function resolveGenerationTask(prompt, userInput) {
+  const normalizedUserInput = normalizeUserInput(userInput);
+  if (normalizedUserInput) {
+    return normalizedUserInput;
+  }
+
+  return typeof prompt?.systemPrompt === 'string' ? prompt.systemPrompt.trim() : '';
+}
+
 function canAttachImageReference(asset) {
   return Boolean(
     asset?.kind === 'image-reference' && /^(https?:\/\/|data:image\/)/.test(asset.source),
   );
 }
 
-function buildUserText({ userInput, asset }) {
+function buildUserText({ prompt, userInput, asset }) {
   const sections = [];
-  const normalizedUserInput = normalizeUserInput(userInput);
+  const generationTask = resolveGenerationTask(prompt, userInput);
 
-  if (normalizedUserInput) {
-    sections.push(`User task:\n${normalizedUserInput}`);
+  if (generationTask) {
+    sections.push(`User task:\n${generationTask}`);
   }
 
   if (asset && asset.kind !== 'image-reference') {
@@ -160,7 +465,7 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
 
   const content = [];
   const imageReferenceAttached = canAttachImageReference(asset);
-  const userText = buildUserText({ userInput, asset: imageReferenceAttached ? undefined : asset });
+  const userText = buildUserText({ prompt, userInput, asset: imageReferenceAttached ? undefined : asset });
 
   if (imageReferenceAttached) {
     content.unshift({
@@ -226,7 +531,13 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
   }
 
   const outputImage = collectCandidateImage(payload);
-  const output = payload.output_text || payload.output?.flatMap((item) => item.content || []).map((item) => item.text || '').join('\n').trim();
+  const output =
+    payload.output_text ||
+    payload.output
+      ?.flatMap((item) => item.content || [])
+      .map((item) => item.text || '')
+      .join('\n')
+      .trim();
   return {
     output: output || (outputImage ? 'OpenAI returned image output.' : 'OpenAI returned no text output.'),
     outputImage,
@@ -240,7 +551,7 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
   }
 
   const imageData = asset?.kind === 'image-reference' ? parseImageDataUrl(asset.source) : null;
-  const userText = buildUserText({ userInput, asset: imageData ? undefined : asset });
+  const userText = buildUserText({ prompt, userInput, asset: imageData ? undefined : asset });
   const userParts = [];
 
   if (userText) {
@@ -257,7 +568,6 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
   }
 
   if (userParts.length === 0) {
-    // Gemini requires at least one content part even when the system prompt carries the full task.
     userParts.push({ text: ' ' });
   }
 
@@ -302,7 +612,7 @@ async function callXAI({ prompt, userInput, asset, model, apiKey }) {
 
   const content = [];
   const imageReferenceAttached = canAttachImageReference(asset);
-  const userText = buildUserText({ userInput, asset: imageReferenceAttached ? undefined : asset });
+  const userText = buildUserText({ prompt, userInput, asset: imageReferenceAttached ? undefined : asset });
 
   if (imageReferenceAttached) {
     content.unshift({
@@ -385,6 +695,7 @@ export default async function handler(req, res) {
     const body = normalizeBody(req);
     const { prompt, asset, models, userInput } = body || {};
     const normalizedUserInput = normalizeUserInput(userInput);
+    const stickerize = body?.stickerize !== false;
 
     if (!prompt?.systemPrompt || !Array.isArray(models) || models.length === 0) {
       return json(res, 400, { error: 'Missing prompt or models in request body.' });
@@ -402,6 +713,8 @@ export default async function handler(req, res) {
           } else {
             execution = await callXAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey });
           }
+
+          execution = await postProcessOutputImage(execution, { stickerize });
 
           return {
             ok: true,

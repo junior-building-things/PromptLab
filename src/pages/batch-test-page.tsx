@@ -276,6 +276,7 @@ export function BatchTestPage() {
       : [],
   );
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+  const [stickerize, setStickerize] = useState(true);
   const [running, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -525,6 +526,7 @@ export function BatchTestPage() {
     selectedModels: typeof models,
     asset: AssetRecord | undefined,
     userInput?: string,
+    shouldStickerize = true,
   ) {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), BATCH_REQUEST_TIMEOUT_MS);
@@ -540,6 +542,7 @@ export function BatchTestPage() {
           asset,
           models: selectedModels,
           userInput: userInput?.trim() ? userInput : undefined,
+          stickerize: shouldStickerize,
         }),
         signal: controller.signal,
       });
@@ -593,6 +596,7 @@ export function BatchTestPage() {
       userInputAssetIds: selectedTextInputAssetIds.length > 0 ? selectedTextInputAssetIds : undefined,
       modelIds: selectedModelIds,
       userInput: selectedUserInputs.length > 0 ? selectedUserInputs.join(' | ') : undefined,
+      stickerize,
     };
     const draftRun = createRun({
       name:
@@ -627,7 +631,13 @@ export function BatchTestPage() {
       await Promise.all(
         scenarioQueue.map(async ({ prompt, imageReference, userInput }) => {
           try {
-            const apiPayload = await executeScenario(prompt, selectedModels, imageReference, userInput);
+            const apiPayload = await executeScenario(
+              prompt,
+              selectedModels,
+              imageReference,
+              userInput,
+              stickerize,
+            );
 
             const nextResults = apiPayload.results.map((result, index) => ({
               id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
@@ -901,6 +911,11 @@ export function BatchTestPage() {
                 emptyLabel="Select Text Inputs"
               />
 
+              <p className="muted-copy">
+                If you leave text inputs empty, PromptLab will use the system prompt as the
+                generation prompt.
+              </p>
+
               <MultiSelectDropdown
                 label="Models"
                 labelIcon={<Cpu size={15} />}
@@ -909,6 +924,20 @@ export function BatchTestPage() {
                 onToggle={(id) => setSelectedModelIds((current) => toggleSelection(current, id))}
                 emptyLabel="Select Models"
               />
+
+              <label className="checkbox-card">
+                <input
+                  type="checkbox"
+                  checked={stickerize}
+                  onChange={(event) => setStickerize(event.target.checked)}
+                />
+                <div>
+                  <strong>Stickerize</strong>
+                  <p className="muted-copy">
+                    Remove the background and add the white outline to generated image outputs.
+                  </p>
+                </div>
+              </label>
 
               {errorMessage ? (
                 <article className="surface-card stat-card error-card">
