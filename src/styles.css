@@ -987,14 +987,21 @@ p {
   gap: 0.65rem;
 }
 
-.prompt-detail-hero-leading {
-  display: flex;
-  align-items: center;
+.prompt-detail-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 1rem;
 }
 
-.prompt-detail-hero-leading > div {
-  min-width: 0;
+.prompt-detail-back-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.prompt-detail-back-button {
+  width: 100%;
 }
 
 .card-actions-corner {
@@ -1610,9 +1617,8 @@ textarea:disabled {
     align-items: stretch;
   }
 
-  .prompt-detail-hero-leading {
-    align-items: flex-start;
-    flex-direction: column;
+  .prompt-detail-header {
+    grid-template-columns: 1fr;
   }
 
   .composer-sheet-header {

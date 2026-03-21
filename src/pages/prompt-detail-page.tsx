@@ -88,28 +88,30 @@ export function PromptDetailPage() {
   return (
     <>
       <section className="page-stack">
-        <header className="hero-card prompt-detail-hero">
-          <div className="prompt-detail-hero-leading">
-            <button className="button button-secondary button-small" onClick={() => navigate('/')}>
+        <div className="prompt-detail-header">
+          <div className="surface-card prompt-detail-back-card">
+            <button className="button button-secondary button-small prompt-detail-back-button" onClick={() => navigate('/')}>
               <ChevronLeft size={16} />
               Back
             </button>
+          </div>
+          <header className="hero-card prompt-detail-hero">
             <div>
               <h2>{activeProject.name}</h2>
               <p>All prompts under this project, sorted by latest first.</p>
             </div>
-          </div>
-          <div className="button-row-inline">
-            <button className="button button-secondary" onClick={handleRemoveProject}>
-              <Trash2 size={16} />
-              Remove Project
-            </button>
-            <button className="button button-primary" onClick={openPromptComposer}>
-              <Plus size={16} />
-              New Prompt
-            </button>
-          </div>
-        </header>
+            <div className="button-row-inline">
+              <button className="button button-secondary" onClick={handleRemoveProject}>
+                <Trash2 size={16} />
+                Remove Project
+              </button>
+              <button className="button button-primary" onClick={openPromptComposer}>
+                <Plus size={16} />
+                New Prompt
+              </button>
+            </div>
+          </header>
+        </div>
 
         <div className="stack-list">
           {versions.map((version) => (
