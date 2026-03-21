@@ -1,7 +1,7 @@
 import { formatDistanceToNow } from 'date-fns';
 import { FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
 
 type ComposerState =
@@ -16,7 +16,6 @@ export function PromptsPage() {
     createPromptVersion,
     removePromptProject,
   } = useAppContext();
-  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [composer, setComposer] = useState<ComposerState | null>(null);
   const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
@@ -135,19 +134,7 @@ export function PromptsPage() {
 
         <div className="card-grid card-grid-prompts">
           {cards.map(({ project, versions, latestVersion }) => (
-            <article
-              key={project.id}
-              className="surface-card prompt-card prompt-project-card"
-              onClick={() => navigate(`/prompts/${project.id}?version=${latestVersion.id}`)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate(`/prompts/${project.id}?version=${latestVersion.id}`);
-                }
-              }}
-            >
+            <article key={project.id} className="surface-card prompt-card prompt-project-card">
               <div className="prompt-card-header">
                 <div className="project-version-meta">
                   <span className="pill">v{latestVersion.version}</span>
@@ -194,7 +181,14 @@ export function PromptsPage() {
               </div>
 
               <div>
-                <h3>{project.name}</h3>
+                <h3>
+                  <Link
+                    to={`/prompts/${project.id}?version=${latestVersion.id}`}
+                    className="prompt-project-title-link"
+                  >
+                    {project.name}
+                  </Link>
+                </h3>
                 {latestVersion.summary ? <p>{latestVersion.summary}</p> : null}
               </div>
 
@@ -208,7 +202,7 @@ export function PromptsPage() {
                 </div>
               ) : null}
 
-              <pre className="code-snippet">{latestVersion.systemPrompt}</pre>
+              <pre className="code-snippet prompt-project-snippet">{latestVersion.systemPrompt}</pre>
             </article>
           ))}
         </div>

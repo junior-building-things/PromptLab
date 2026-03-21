@@ -620,10 +620,6 @@ p {
   grid-template-columns: 1fr;
 }
 
-.prompt-project-card {
-  cursor: pointer;
-}
-
 .prompt-card-header {
   display: flex;
   align-items: flex-start;
@@ -933,6 +929,22 @@ p {
   font-size: 1.2rem;
 }
 
+.prompt-project-title-link {
+  color: inherit;
+  text-decoration: none;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.16em;
+}
+
+.prompt-project-title-link:hover {
+  text-decoration: underline;
+}
+
+.prompt-project-title-link:focus-visible {
+  outline: none;
+  text-decoration: underline;
+}
+
 .prompt-change-summary {
   display: grid;
   gap: 0.45rem;
@@ -977,6 +989,12 @@ p {
 
 .code-snippet-tight {
   overflow-wrap: anywhere;
+}
+
+.prompt-project-snippet {
+  max-height: 14rem;
+  overflow: auto;
+  align-content: start;
 }
 
 .inline-link {
