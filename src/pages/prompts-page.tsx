@@ -249,7 +249,7 @@ export function PromptsPage() {
                 </div>
               ) : null}
 
-              <div className="prompt-version-label">Latest version: v{latestVersion.version}</div>
+              <div className="prompt-version-label">v{latestVersion.version}</div>
               <pre className="code-snippet prompt-project-snippet">{latestVersion.systemPrompt}</pre>
 
               {isExpanded ? (
