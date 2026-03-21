@@ -89,12 +89,14 @@ export function PromptDetailPage() {
     <>
       <section className="page-stack">
         <div className="prompt-detail-header">
-          <div className="surface-card prompt-detail-back-card">
-            <button className="button button-secondary button-small prompt-detail-back-button" onClick={() => navigate('/')}>
-              <ChevronLeft size={16} />
-              Back
-            </button>
-          </div>
+          <button
+            type="button"
+            className="surface-card prompt-detail-back-card"
+            onClick={() => navigate('/')}
+            aria-label="Back to prompts"
+          >
+            <ChevronLeft size={24} />
+          </button>
           <header className="hero-card prompt-detail-hero">
             <div>
               <h2>{activeProject.name}</h2>

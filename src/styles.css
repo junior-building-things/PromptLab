@@ -989,11 +989,22 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 4.5rem;
+  min-width: 4.5rem;
   padding: 1rem;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
 }
 
-.prompt-detail-back-button {
-  width: 100%;
+.prompt-detail-back-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.16);
+}
+
+.prompt-detail-back-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .card-actions-corner {
