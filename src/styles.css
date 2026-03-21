@@ -123,6 +123,18 @@ body::after {
   text-align: center;
 }
 
+.loading-workspace-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.loading-workspace-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: 0 0 auto;
+}
+
 .loading-dots {
   display: inline-block;
   width: 3ch;

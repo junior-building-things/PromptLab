@@ -8,6 +8,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
+import { Bot } from 'lucide-react';
 import {
   initialAssets,
   initialHistory,
@@ -1107,12 +1108,17 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
     return (
       <div className="auth-shell">
         <section className="auth-card loading-card">
-          <h2>
-            Loading Workspace
-            <span className="loading-dots" aria-hidden="true">
-              {loadingDots}
-            </span>
-          </h2>
+          <div className="loading-workspace-row">
+            <div className="brand-icon loading-workspace-icon">
+              <Bot size={24} />
+            </div>
+            <h2>
+              Loading Workspace
+              <span className="loading-dots" aria-hidden="true">
+                {loadingDots}
+              </span>
+            </h2>
+          </div>
         </section>
       </div>
     );
