@@ -129,10 +129,12 @@ function BatchResultCell({
   results,
   isRunning,
   placeholderCount,
+  stickerize,
 }: {
   results: TestResult[];
   isRunning: boolean;
   placeholderCount: number;
+  stickerize: boolean;
 }) {
   if (results.length === 0) {
     if (isRunning) {
@@ -155,7 +157,7 @@ function BatchResultCell({
       {results.map((result) => (
         <div key={result.id} className="batch-table-result">
           {isImageOutput(result.outputImage) ? (
-            <div className="batch-table-image-wrap">
+            <div className={`batch-table-image-wrap${stickerize ? ' is-stickerized' : ''}`}>
               <a
                 className="batch-table-download-link"
                 href={result.outputImage}
@@ -883,6 +885,7 @@ export function BatchTestPage() {
                                                 ? run.scenario.assetIds.length
                                                 : 1
                                             }
+                                            stickerize={Boolean(run.scenario.stickerize)}
                                           />
                                         </td>
                                       );

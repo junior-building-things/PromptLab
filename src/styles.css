@@ -1346,6 +1346,10 @@ p {
   background: #f8fafc;
 }
 
+.batch-table-image-wrap.is-stickerized .batch-table-output-image {
+  background: #e6e6e6;
+}
+
 .batch-table-download-link {
   position: absolute;
   top: 0.7rem;
