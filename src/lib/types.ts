@@ -55,7 +55,7 @@ export type BatchScenario = {
   userInputAssetIds?: string[];
   assetId?: string;
   modelIds: string[];
-  userInput: string;
+  userInput?: string;
 };
 
 export type TestResult = {

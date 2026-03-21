@@ -128,22 +128,73 @@ function collectCandidateImage(value) {
   return undefined;
 }
 
+function normalizeUserInput(userInput) {
+  return typeof userInput === 'string' ? userInput.trim() : '';
+}
+
+function canAttachImageReference(asset) {
+  return Boolean(
+    asset?.kind === 'image-reference' && /^(https?:\/\/|data:image\/)/.test(asset.source),
+  );
+}
+
+function buildUserText({ userInput, asset }) {
+  const sections = [];
+  const normalizedUserInput = normalizeUserInput(userInput);
+
+  if (normalizedUserInput) {
+    sections.push(`User task:\n${normalizedUserInput}`);
+  }
+
+  if (asset && asset.kind !== 'image-reference') {
+    sections.push(`Asset context:\n${buildAssetContext(asset)}`);
+  }
+
+  return sections.join('\n\n');
+}
+
 async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
   if (!apiKey) {
     throw new Error('Missing OpenAI API key. Add it in the Models view before running a batch test.');
   }
 
-  const content = [
-    {
-      type: 'input_text',
-      text: `User task:\n${userInput}\n\nAsset context:\n${buildAssetContext(asset) || 'None provided.'}`,
-    },
-  ];
+  const content = [];
+  const imageReferenceAttached = canAttachImageReference(asset);
+  const userText = buildUserText({ userInput, asset: imageReferenceAttached ? undefined : asset });
 
-  if (asset?.kind === 'image-reference' && /^(https?:\/\/|data:image\/)/.test(asset.source)) {
+  if (imageReferenceAttached) {
     content.unshift({
       type: 'input_image',
       image_url: asset.source,
+    });
+  } else if (asset) {
+    const assetContext = buildAssetContext(asset);
+    if (assetContext && !userText) {
+      content.push({
+        type: 'input_text',
+        text: `Asset context:\n${assetContext}`,
+      });
+    }
+  }
+
+  if (userText) {
+    content.push({
+      type: 'input_text',
+      text: userText,
+    });
+  }
+
+  const input = [
+    {
+      role: 'system',
+      content: [{ type: 'input_text', text: prompt.systemPrompt }],
+    },
+  ];
+
+  if (content.length > 0) {
+    input.push({
+      role: 'user',
+      content,
     });
   }
 
@@ -165,16 +216,7 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
         },
       ],
       tool_choice: { type: 'image_generation' },
-      input: [
-        {
-          role: 'system',
-          content: [{ type: 'input_text', text: prompt.systemPrompt }],
-        },
-        {
-          role: 'user',
-          content,
-        },
-      ],
+      input,
     }),
   });
 
@@ -198,13 +240,12 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
   }
 
   const imageData = asset?.kind === 'image-reference' ? parseImageDataUrl(asset.source) : null;
-  const instructionLines = [
-    prompt.systemPrompt.trim(),
-    `User task:\n${userInput}`,
-    imageData ? 'Reference image attached below.' : undefined,
-    !imageData ? `Asset context:\n${buildAssetContext(asset) || 'None provided.'}` : undefined,
-  ].filter(Boolean);
-  const userParts = [{ text: instructionLines.join('\n\n') }];
+  const userText = buildUserText({ userInput, asset: imageData ? undefined : asset });
+  const userParts = [];
+
+  if (userText) {
+    userParts.push({ text: userText });
+  }
 
   if (imageData) {
     userParts.push({
@@ -215,6 +256,11 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
     });
   }
 
+  if (userParts.length === 0) {
+    // Gemini requires at least one content part even when the system prompt carries the full task.
+    userParts.push({ text: ' ' });
+  }
+
   const started = Date.now();
   const response = await fetch(`${GEMINI_URL}/${model.apiModel}:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -222,6 +268,9 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      system_instruction: {
+        parts: [{ text: prompt.systemPrompt.trim() }],
+      },
       contents: [
         {
           parts: userParts,
@@ -251,19 +300,45 @@ async function callXAI({ prompt, userInput, asset, model, apiKey }) {
     throw new Error('Missing xAI API key. Add it in the Models view before running a batch test.');
   }
 
-  const content = [
-    {
-      type: 'text',
-      text: `User task:\n${userInput}\n\nAsset context:\n${buildAssetContext(asset) || 'None provided.'}`,
-    },
-  ];
+  const content = [];
+  const imageReferenceAttached = canAttachImageReference(asset);
+  const userText = buildUserText({ userInput, asset: imageReferenceAttached ? undefined : asset });
 
-  if (asset?.kind === 'image-reference' && /^(https?:\/\/|data:image\/)/.test(asset.source)) {
+  if (imageReferenceAttached) {
     content.unshift({
       type: 'image_url',
       image_url: {
         url: asset.source,
       },
+    });
+  } else if (asset) {
+    const assetContext = buildAssetContext(asset);
+    if (assetContext && !userText) {
+      content.push({
+        type: 'text',
+        text: `Asset context:\n${assetContext}`,
+      });
+    }
+  }
+
+  if (userText) {
+    content.push({
+      type: 'text',
+      text: userText,
+    });
+  }
+
+  const messages = [
+    {
+      role: 'system',
+      content: prompt.systemPrompt,
+    },
+  ];
+
+  if (content.length > 0) {
+    messages.push({
+      role: 'user',
+      content,
     });
   }
 
@@ -278,16 +353,7 @@ async function callXAI({ prompt, userInput, asset, model, apiKey }) {
       model: model.apiModel,
       temperature: model.temperature,
       max_tokens: model.maxTokens,
-      messages: [
-        {
-          role: 'system',
-          content: prompt.systemPrompt,
-        },
-        {
-          role: 'user',
-          content,
-        },
-      ],
+      messages,
     }),
   });
 
@@ -318,9 +384,10 @@ export default async function handler(req, res) {
   try {
     const body = normalizeBody(req);
     const { prompt, asset, models, userInput } = body || {};
+    const normalizedUserInput = normalizeUserInput(userInput);
 
-    if (!prompt?.systemPrompt || !Array.isArray(models) || models.length === 0 || !userInput) {
-      return json(res, 400, { error: 'Missing prompt, models, or userInput in request body.' });
+    if (!prompt?.systemPrompt || !Array.isArray(models) || models.length === 0) {
+      return json(res, 400, { error: 'Missing prompt or models in request body.' });
     }
 
     const executions = await Promise.all(
@@ -329,11 +396,11 @@ export default async function handler(req, res) {
           let execution;
           const apiKey = await getProviderApiKey(user, model.provider);
           if (model.provider === 'openai') {
-            execution = await callOpenAI({ prompt, userInput, asset, model, apiKey });
+            execution = await callOpenAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey });
           } else if (model.provider === 'gemini') {
-            execution = await callGemini({ prompt, userInput, asset, model, apiKey });
+            execution = await callGemini({ prompt, userInput: normalizedUserInput, asset, model, apiKey });
           } else {
-            execution = await callXAI({ prompt, userInput, asset, model, apiKey });
+            execution = await callXAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey });
           }
 
           return {
