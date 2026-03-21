@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { FileText, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, FileText, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
@@ -89,9 +89,15 @@ export function PromptDetailPage() {
     <>
       <section className="page-stack">
         <header className="hero-card prompt-detail-hero">
-          <div>
-            <h2>{activeProject.name}</h2>
-            <p>All prompts under this project, sorted by latest first.</p>
+          <div className="prompt-detail-hero-leading">
+            <button className="button button-secondary button-small" onClick={() => navigate('/')}>
+              <ChevronLeft size={16} />
+              Back
+            </button>
+            <div>
+              <h2>{activeProject.name}</h2>
+              <p>All prompts under this project, sorted by latest first.</p>
+            </div>
           </div>
           <div className="button-row-inline">
             <button className="button button-secondary" onClick={handleRemoveProject}>

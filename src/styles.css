@@ -979,6 +979,16 @@ p {
   gap: 0.65rem;
 }
 
+.prompt-detail-hero-leading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.prompt-detail-hero-leading > div {
+  min-width: 0;
+}
+
 .card-actions-corner {
   position: relative;
   justify-content: flex-end;
@@ -1571,6 +1581,11 @@ textarea:disabled {
 
   .toolbar-card {
     align-items: stretch;
+  }
+
+  .prompt-detail-hero-leading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .composer-sheet-header {
