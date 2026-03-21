@@ -1,5 +1,5 @@
 import { format, formatDistanceToNow } from 'date-fns';
-import { ChevronDown, ChevronRight, FileText, FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
 
@@ -14,12 +14,10 @@ export function PromptsPage() {
     createPromptProject,
     createPromptVersion,
     removePromptProject,
-    removePromptVersion,
   } = useAppContext();
   const [query, setQuery] = useState('');
   const [composer, setComposer] = useState<ComposerState | null>(null);
   const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
-  const [menuVersionId, setMenuVersionId] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   const cards = useMemo(() => {
@@ -103,15 +101,6 @@ export function PromptsPage() {
 
     removePromptProject(projectId);
     setMenuProjectId(null);
-  }
-
-  function handleRemovePrompt(versionId: string, versionNumber: number) {
-    if (!window.confirm(`Remove Prompt v${versionNumber}?`)) {
-      return;
-    }
-
-    removePromptVersion(versionId);
-    setMenuVersionId(null);
   }
 
   function toggleProjectExpand(projectId: string) {
@@ -240,58 +229,10 @@ export function PromptsPage() {
 
               {isExpanded ? (
                 <div id={`prompt-project-${project.id}`} className="prompt-project-expanded">
-                  {versions.map((version) => (
+                  {versions.slice(1).map((version) => (
                     <article key={version.id} className="surface-card project-prompt-card">
-                      <div className="project-prompt-card-header">
-                        <div className="list-card-topline">
-                          <div className="icon-pill icon-pill-muted">
-                            <FileText size={18} />
-                          </div>
-                          <div>
-                            <h3>Prompt</h3>
-                            <p>
-                              Updated {format(new Date(version.updatedAt), 'MMM d, yyyy HH:mm')} · {version.runCount} runs
-                            </p>
-                          </div>
-                        </div>
-                        <div className="card-menu-wrap">
-                          <button
-                            className="icon-action-button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setMenuVersionId((current) => (current === version.id ? null : version.id));
-                            }}
-                            aria-label="Prompt Actions"
-                          >
-                            <MoreHorizontal size={18} />
-                          </button>
-                          {menuVersionId === version.id ? (
-                            <div className="card-menu-sheet" onClick={(event) => event.stopPropagation()}>
-                              <button
-                                className="menu-sheet-action menu-sheet-danger"
-                                onClick={() => handleRemovePrompt(version.id, version.version)}
-                              >
-                                <Trash2 size={15} />
-                                Remove
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {version.summary ? <p>{version.summary}</p> : null}
-
-                      {version.tags.length > 0 ? (
-                        <div className="tag-row">
-                          {version.tags.map((tag) => (
-                            <span className="tag-chip" key={tag}>
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {versions.length > 1 && version.changeSummary?.length ? (
+                      <div className="prompt-version-label">v{version.version}</div>
+                      {version.changeSummary?.length ? (
                         <div className="prompt-change-summary">
                           <strong>What changed:</strong>
                           <ul className="prompt-change-list">
@@ -301,8 +242,6 @@ export function PromptsPage() {
                           </ul>
                         </div>
                       ) : null}
-
-                      <div className="prompt-version-label">Version: v{version.version}</div>
                       <pre className="code-snippet">{version.systemPrompt}</pre>
                     </article>
                   ))}
