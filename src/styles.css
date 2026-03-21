@@ -118,14 +118,6 @@ body::after {
   text-align: center;
 }
 
-.loading-ellipsis {
-  display: inline-block;
-  width: 1ch;
-  overflow: hidden;
-  vertical-align: bottom;
-  animation: loading-ellipsis 1.2s steps(1, end) infinite;
-}
-
 .auth-feature-list {
   display: grid;
   gap: 1.2rem;
@@ -1536,24 +1528,6 @@ textarea:disabled {
   }
 }
 
-@keyframes loading-ellipsis {
-  0%,
-  24% {
-    width: 1ch;
-  }
-  25%,
-  49% {
-    width: 2ch;
-  }
-  50%,
-  74% {
-    width: 3ch;
-  }
-  75%,
-  100% {
-    width: 1ch;
-  }
-}
 
 @media (max-width: 980px) {
   .app-shell {

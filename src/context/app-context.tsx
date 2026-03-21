@@ -333,8 +333,26 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   const [storageReady, setStorageReady] = useState(false);
   const [storageError, setStorageError] = useState('');
   const [savingProvider, setSavingProvider] = useState<Provider | null>(null);
+  const [loadingDots, setLoadingDots] = useState('.');
   const lastSavedSnapshot = useRef(JSON.stringify(initialLocalState));
   const persistQueueRef = useRef(Promise.resolve());
+
+  useEffect(() => {
+    if (storageReady) {
+      return undefined;
+    }
+
+    const dotStates = ['.', '..', '...'];
+    const intervalId = window.setInterval(() => {
+      setLoadingDots((current) => {
+        const currentIndex = dotStates.indexOf(current);
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % dotStates.length;
+        return dotStates[nextIndex];
+      });
+    }, 400);
+
+    return () => window.clearInterval(intervalId);
+  }, [storageReady]);
 
   useEffect(() => {
     try {
@@ -840,12 +858,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
     return (
       <div className="auth-shell">
         <section className="auth-card loading-card">
-          <h2>
-            Loading Workspace
-            <span className="loading-ellipsis" aria-hidden="true">
-              ...
-            </span>
-          </h2>
+          <h2>{`Loading Workspace${loadingDots}`}</h2>
         </section>
       </div>
     );
