@@ -40,7 +40,10 @@ export function ModelsPage() {
       await saveProviderKey(provider, draftKeys[provider]);
       setDraftKeys((current) => ({ ...current, [provider]: '' }));
       setEditingProvider(null);
-    } catch {}
+    } catch {
+      setDraftKeys((current) => ({ ...current, [provider]: '' }));
+      setEditingProvider(provider);
+    }
   }
 
   return (

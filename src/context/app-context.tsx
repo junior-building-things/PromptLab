@@ -95,6 +95,14 @@ type PromptChangeSummaryComparison = {
   signature: string;
 };
 
+type ToastTone = 'success' | 'error';
+
+type AppToast = {
+  id: string;
+  message: string;
+  tone: ToastTone;
+};
+
 type AppContextValue = AppState & {
   providerKeys: ProviderKeyMap;
   storageReady: boolean;
@@ -469,10 +477,42 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   const [storageReady, setStorageReady] = useState(false);
   const [storageError, setStorageError] = useState('');
   const [savingProvider, setSavingProvider] = useState<Provider | null>(null);
+  const [toasts, setToasts] = useState<AppToast[]>([]);
   const [loadingDots, setLoadingDots] = useState('.');
   const lastSavedSnapshot = useRef(JSON.stringify(initialLocalState));
   const persistQueueRef = useRef(Promise.resolve());
   const summaryRequestsRef = useRef(new Set<string>());
+  const toastTimeoutsRef = useRef(new Map<string, number>());
+
+  const dismissToast = useCallback((toastId: string) => {
+    const timeoutId = toastTimeoutsRef.current.get(toastId);
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+      toastTimeoutsRef.current.delete(toastId);
+    }
+
+    setToasts((current) => current.filter((toast) => toast.id !== toastId));
+  }, []);
+
+  const pushToast = useCallback((message: string, tone: ToastTone) => {
+    const toastId = makeId('toast');
+
+    setToasts((current) => [...current.slice(-2), { id: toastId, message, tone }]);
+
+    const timeoutId = window.setTimeout(() => {
+      dismissToast(toastId);
+    }, 3200);
+
+    toastTimeoutsRef.current.set(toastId, timeoutId);
+  }, [dismissToast]);
+
+  useEffect(
+    () => () => {
+      toastTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      toastTimeoutsRef.current.clear();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (storageReady) {
@@ -756,11 +796,14 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       promptVersions: [version, ...current.promptVersions],
     }));
 
+    pushToast(`Created ${project.name}.`, 'success');
+
     return { project, version };
-  }, []);
+  }, [pushToast]);
 
   const createPromptVersion = useCallback((projectId: string, systemPrompt?: string) => {
     let created: PromptVersion | null = null;
+    let createdVersionNumber: number | null = null;
 
     setState((current) => {
       const latest = latestVersionForProject(current.promptVersions, projectId);
@@ -780,6 +823,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         updatedAt: timestamp,
         runCount: 0,
       };
+      createdVersionNumber = latest.version + 1;
 
       return {
         ...current,
@@ -790,8 +834,12 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       };
     });
 
+    if (createdVersionNumber !== null) {
+      pushToast(`Created Prompt v${createdVersionNumber}.`, 'success');
+    }
+
     return created;
-  }, []);
+  }, [pushToast]);
 
   const updatePromptProject = useCallback((projectId: string, updates: Partial<Pick<PromptProject, 'name'>>) => {
     setState((current) => ({
@@ -802,7 +850,8 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
           : project,
       ),
     }));
-  }, []);
+    pushToast('Project updated.', 'success');
+  }, [pushToast]);
 
   const updatePromptVersion = useCallback((versionId: string, draft: PromptVersionDraft) => {
     const timestamp = new Date().toISOString();
@@ -824,9 +873,12 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         ),
       };
     });
-  }, []);
+    pushToast('Prompt updated.', 'success');
+  }, [pushToast]);
 
   const removePromptProject = useCallback((projectId: string) => {
+    const removedProject = state.promptProjects.find((project) => project.id === projectId);
+
     setState((current) => {
       const versionIds = new Set(
         current.promptVersions
@@ -843,9 +895,12 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         ),
       };
     });
-  }, []);
+    pushToast(`Removed ${removedProject?.name || 'project'}.`, 'success');
+  }, [pushToast, state.promptProjects]);
 
   const removePromptVersion = useCallback((versionId: string) => {
+    const removedVersion = state.promptVersions.find((version) => version.id === versionId);
+
     setState((current) => {
       const target = current.promptVersions.find((version) => version.id === versionId);
       if (!target) {
@@ -866,7 +921,11 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         ),
       };
     });
-  }, []);
+    pushToast(
+      removedVersion ? `Removed Prompt v${removedVersion.version}.` : 'Removed prompt.',
+      'success',
+    );
+  }, [pushToast, state.promptVersions]);
 
   const createAsset = useCallback((draft: AssetDraft) => {
     setState((current) => ({
@@ -880,14 +939,18 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         ...current.assets,
       ],
     }));
-  }, []);
+    pushToast(`Added ${draft.name}.`, 'success');
+  }, [pushToast]);
 
   const removeAsset = useCallback((id: string) => {
+    const removedAsset = state.assets.find((asset) => asset.id === id);
+
     setState((current) => ({
       ...current,
       assets: current.assets.filter((asset) => asset.id !== id),
     }));
-  }, []);
+    pushToast(`Removed ${removedAsset?.name || 'asset'}.`, 'success');
+  }, [pushToast, state.assets]);
 
   const updateAsset = useCallback((id: string, draft: AssetDraft) => {
     setState((current) => ({
@@ -896,7 +959,8 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         asset.id === id ? { ...asset, ...draft, updatedAt: new Date().toISOString() } : asset,
       ),
     }));
-  }, []);
+    pushToast('Asset updated.', 'success');
+  }, [pushToast]);
 
   const updateModel = useCallback((id: string, draft: Partial<ModelDraft>) => {
     setState((current) => ({
@@ -933,10 +997,14 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
 
       setProviderKeys(normalizeProviderKeys(payload.providerKeys));
       setStorageError('');
+      pushToast('API key validated.', 'success');
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : 'API key validation failed.', 'error');
+      throw error;
     } finally {
       setSavingProvider(null);
     }
-  }, []);
+  }, [pushToast]);
 
   const removeProviderKey = useCallback(async (provider: Provider) => {
     setSavingProvider(provider);
@@ -961,13 +1029,18 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
 
       setProviderKeys(normalizeProviderKeys(payload.providerKeys));
       setStorageError('');
+      pushToast('API key removed.', 'success');
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : 'Failed to remove the API key.', 'error');
+      throw error;
     } finally {
       setSavingProvider(null);
     }
-  }, []);
+  }, [pushToast]);
 
   const removeRun = useCallback((id: string) => {
     let nextState: AppState | null = null;
+    const removedRun = state.history.find((run) => run.id === id);
 
     setState((current) => {
       nextState = {
@@ -990,7 +1063,8 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       }
       void persistStateNow(nextState);
     }
-  }, [persistStateNow, storageReady]);
+    pushToast(`Removed ${removedRun?.name || 'batch test'}.`, 'success');
+  }, [persistStateNow, pushToast, state.history, storageReady]);
 
   const createRun = useCallback((run: Omit<BatchRun, 'id' | 'createdAt'>) => {
     const createdRun: BatchRun = {
@@ -1016,8 +1090,10 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       );
     });
 
+    pushToast(`${createdRun.name} started.`, 'success');
+
     return createdRun;
-  }, []);
+  }, [pushToast]);
 
   const updateRun = useCallback(
     (
@@ -1025,6 +1101,8 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
       updates: Partial<Pick<BatchRun, 'status' | 'errorMessage' | 'results' | 'scenario' | 'name'>>,
     ) => {
       let nextState: AppState | null = null;
+      let statusToastMessage = '';
+      let statusToastTone: ToastTone | null = null;
 
       setState((current) => {
         const existing = current.history.find((run) => run.id === id);
@@ -1043,18 +1121,28 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         };
 
         if (existing.status === 'completed' || nextRun.status !== 'completed') {
+          if (existing.status !== 'failed' && nextRun.status === 'failed') {
+            statusToastMessage = nextRun.errorMessage || `${nextRun.name} failed.`;
+            statusToastTone = 'error';
+          }
           return nextState;
         }
 
         nextState = applyCompletedRun(nextState, nextRun);
+        statusToastMessage = `${nextRun.name} completed.`;
+        statusToastTone = 'success';
         return nextState;
       });
 
       if (storageReady && nextState && (updates.status === 'completed' || updates.status === 'failed')) {
         void persistStateNow(nextState);
       }
+
+      if (statusToastTone !== null && statusToastMessage) {
+        pushToast(statusToastMessage, statusToastTone);
+      }
     },
-    [persistStateNow, storageReady],
+    [persistStateNow, pushToast, storageReady],
   );
 
   const value = useMemo(
@@ -1124,7 +1212,18 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
     );
   }
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      <div className="toast-stack" aria-live="polite" aria-atomic="true">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast-banner toast-${toast.tone}`}>
+            {toast.message}
+          </div>
+        ))}
+      </div>
+    </AppContext.Provider>
+  );
 }
 
 export function useAppContext() {
