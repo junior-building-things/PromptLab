@@ -56,6 +56,8 @@ type BatchTable = {
 };
 
 const BATCH_REQUEST_TIMEOUT_MS = 90000;
+const SYSTEM_PROMPT_ONLY_ROW_ID = '__system-prompt-only__';
+const SYSTEM_PROMPT_ONLY_ROW_LABEL = 'System Prompt Only';
 
 function parseTextInputs(source: string) {
   return source
@@ -316,6 +318,7 @@ export function BatchTestPage() {
       : [],
   );
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+  const [stickerize, setStickerize] = useState(true);
   const [running, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -475,6 +478,10 @@ export function BatchTestPage() {
       });
     }
 
+    if (labels.size === 0) {
+      return [{ id: SYSTEM_PROMPT_ONLY_ROW_ID, label: SYSTEM_PROMPT_ONLY_ROW_LABEL }];
+    }
+
     return [...labels.entries()].map(([id, label]) => ({ id, label }));
   }
 
@@ -519,7 +526,7 @@ export function BatchTestPage() {
       run.results
         .filter((result) => (config.scopeModelId ? result.modelId === config.scopeModelId : true))
         .forEach((result) => {
-          const rowId = result.userInput ?? 'default';
+          const rowId = result.userInput?.trim() ? result.userInput : SYSTEM_PROMPT_ONLY_ROW_ID;
           const columnId = usePromptColumns ? result.promptId : result.modelId;
           const key = buildCellKey(rowId, columnId);
           const existing = cells.get(key);
@@ -560,7 +567,8 @@ export function BatchTestPage() {
     prompt: PromptVersion,
     selectedModels: typeof models,
     asset: AssetRecord | undefined,
-    userInput: string,
+    userInput?: string,
+    shouldStickerize = true,
   ) {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), BATCH_REQUEST_TIMEOUT_MS);
@@ -575,7 +583,8 @@ export function BatchTestPage() {
           prompt,
           asset,
           models: selectedModels,
-          userInput,
+          userInput: userInput?.trim() ? userInput : undefined,
+          stickerize: shouldStickerize,
         }),
         signal: controller.signal,
       });
@@ -610,12 +619,13 @@ export function BatchTestPage() {
     const selectedUserInputs = textInputAssets
       .filter((asset) => selectedTextInputAssetIds.includes(asset.id))
       .flatMap((asset) => parseTextInputs(asset.source));
+    const scenarioUserInputs = selectedUserInputs.length > 0 ? selectedUserInputs : [undefined];
 
-    if (selectedPrompts.length === 0 || selectedModels.length === 0 || selectedUserInputs.length === 0) {
+    if (selectedPrompts.length === 0 || selectedModels.length === 0) {
       setErrorMessage(
         readyModels.length === 0
           ? 'Add at least one provider API key in the Models view before running a batch test.'
-          : 'Select at least one system prompt, text input, and model before running.',
+          : 'Select at least one system prompt and model before running.',
       );
       return;
     }
@@ -625,9 +635,10 @@ export function BatchTestPage() {
       promptIds: selectedPrompts.map((prompt) => prompt.id),
       assetIds: selectedImageReferenceIds.length > 0 ? selectedImageReferenceIds : undefined,
       assetId: selectedImageReferenceIds[0],
-      userInputAssetIds: selectedTextInputAssetIds,
+      userInputAssetIds: selectedTextInputAssetIds.length > 0 ? selectedTextInputAssetIds : undefined,
       modelIds: selectedModelIds,
-      userInput: selectedUserInputs.join(' | '),
+      userInput: selectedUserInputs.length > 0 ? selectedUserInputs.join(' | ') : undefined,
+      stickerize,
     };
     const draftRun = createRun({
       name:
@@ -649,7 +660,7 @@ export function BatchTestPage() {
       const imageReferenceScenarios = selectedImageReferences.length > 0 ? selectedImageReferences : [undefined];
       const scenarioQueue = selectedPrompts.flatMap((prompt) =>
         imageReferenceScenarios.flatMap((imageReference) =>
-          selectedUserInputs.map((userInput) => ({
+          scenarioUserInputs.map((userInput) => ({
             prompt,
             imageReference,
             userInput,
@@ -662,7 +673,13 @@ export function BatchTestPage() {
       await Promise.all(
         scenarioQueue.map(async ({ prompt, imageReference, userInput }) => {
           try {
-            const apiPayload = await executeScenario(prompt, selectedModels, imageReference, userInput);
+            const apiPayload = await executeScenario(
+              prompt,
+              selectedModels,
+              imageReference,
+              userInput,
+              stickerize,
+            );
 
             const nextResults = apiPayload.results.map((result, index) => ({
               id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
@@ -754,7 +771,7 @@ export function BatchTestPage() {
             <div className="surface-card empty-card">
               <HistoryIcon size={44} />
               <h3>No Batch Tests Yet</h3>
-              <p>Create a batch test to compare prompts, image references, text inputs, and models.</p>
+              <p>Create a batch test to compare prompts, image references, optional text inputs, and models.</p>
             </div>
           ) : (
             <>
@@ -926,7 +943,7 @@ export function BatchTestPage() {
               />
 
               <MultiSelectDropdown
-                label="Text Inputs"
+                label="Text Inputs (Optional)"
                 labelIcon={<FileText size={15} />}
                 options={textInputDropdownOptions}
                 selectedIds={selectedTextInputAssetIds}
@@ -936,6 +953,11 @@ export function BatchTestPage() {
                 emptyLabel="Select Text Inputs"
               />
 
+              <p className="muted-copy">
+                If you leave text inputs empty, PromptLab will use the system prompt as the
+                generation prompt.
+              </p>
+
               <MultiSelectDropdown
                 label="Models"
                 labelIcon={<Cpu size={15} />}
@@ -944,6 +966,20 @@ export function BatchTestPage() {
                 onToggle={(id) => setSelectedModelIds((current) => toggleSelection(current, id))}
                 emptyLabel="Select Models"
               />
+
+              <label className="checkbox-card">
+                <input
+                  type="checkbox"
+                  checked={stickerize}
+                  onChange={(event) => setStickerize(event.target.checked)}
+                />
+                <div>
+                  <strong>Stickerize</strong>
+                  <p className="muted-copy">
+                    Remove the background and add the white outline to generated image outputs.
+                  </p>
+                </div>
+              </label>
 
               {errorMessage ? (
                 <article className="surface-card stat-card error-card">
