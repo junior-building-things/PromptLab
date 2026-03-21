@@ -1092,6 +1092,13 @@ p {
   margin-top: -0.15rem;
 }
 
+.prompt-project-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
 .prompt-project-expanded {
   display: grid;
   gap: 1rem;

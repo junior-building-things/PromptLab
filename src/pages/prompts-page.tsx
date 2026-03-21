@@ -1,4 +1,4 @@
-import { format, formatDistanceToNow } from 'date-fns';
+import { differenceInDays, differenceInHours, differenceInMinutes, differenceInMonths, differenceInYears, format } from 'date-fns';
 import { ChevronDown, ChevronRight, FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
@@ -6,6 +6,33 @@ import { useAppContext } from '../context/app-context';
 type ComposerState =
   | { mode: 'project'; projectId: null; projectName: string; systemPrompt: string }
   | { mode: 'prompt'; projectId: string; projectName: string; systemPrompt: string };
+
+function formatCompactUpdatedAt(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const years = differenceInYears(now, date);
+  if (years >= 1) {
+    return `Updated ${years}y ago`;
+  }
+
+  const months = differenceInMonths(now, date);
+  if (months >= 1) {
+    return `Updated ${months}mo ago`;
+  }
+
+  const days = differenceInDays(now, date);
+  if (days >= 1) {
+    return `Updated ${days}d ago`;
+  }
+
+  const hours = differenceInHours(now, date);
+  if (hours >= 1) {
+    return `Updated ${hours}h ago`;
+  }
+
+  const minutes = Math.max(1, differenceInMinutes(now, date));
+  return `Updated ${minutes}m ago`;
+}
 
 export function PromptsPage() {
   const {
@@ -162,13 +189,11 @@ export function PromptsPage() {
                     <div className="icon-pill icon-pill-muted">
                       {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                     </div>
-                    <div>
+                    <div className="prompt-project-title-row">
                       <h3>{project.name}</h3>
                       <div className="project-version-meta">
                         <span className="pill pill-subtle">{versions.length} prompts</span>
-                        <span className="meta-text">
-                          Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
-                        </span>
+                        <span className="meta-text">{formatCompactUpdatedAt(project.updatedAt)}</span>
                       </div>
                     </div>
                   </div>
