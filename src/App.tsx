@@ -6,7 +6,6 @@ import { AuthProvider, useAuth } from './context/auth-context';
 import { AssetsPage } from './pages/assets-page';
 import { BatchTestPage } from './pages/batch-test-page';
 import { ModelsPage } from './pages/models-page';
-import { PromptDetailPage } from './pages/prompt-detail-page';
 import { PromptsPage } from './pages/prompts-page';
 
 function AuthenticatedApp() {
@@ -21,7 +20,7 @@ function AuthenticatedApp() {
       <Routes>
         <Route path="/" element={<AppLayout />}>
           <Route index element={<PromptsPage />} />
-          <Route path="prompts/:projectId" element={<PromptDetailPage />} />
+          <Route path="prompts/:projectId" element={<Navigate to="/" replace />} />
           <Route path="assets" element={<AssetsPage />} />
           <Route path="models" element={<ModelsPage />} />
           <Route path="batch-test" element={<BatchTestPage />} />

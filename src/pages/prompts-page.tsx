@@ -1,7 +1,6 @@
-import { formatDistanceToNow } from 'date-fns';
-import { FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { ChevronDown, ChevronRight, FileText, FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/app-context';
 
 type ComposerState =
@@ -15,10 +14,13 @@ export function PromptsPage() {
     createPromptProject,
     createPromptVersion,
     removePromptProject,
+    removePromptVersion,
   } = useAppContext();
   const [query, setQuery] = useState('');
   const [composer, setComposer] = useState<ComposerState | null>(null);
   const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
+  const [menuVersionId, setMenuVersionId] = useState<string | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   const cards = useMemo(() => {
     return promptProjects
@@ -103,6 +105,27 @@ export function PromptsPage() {
     setMenuProjectId(null);
   }
 
+  function handleRemovePrompt(versionId: string, versionNumber: number) {
+    if (!window.confirm(`Remove Prompt v${versionNumber}?`)) {
+      return;
+    }
+
+    removePromptVersion(versionId);
+    setMenuVersionId(null);
+  }
+
+  function toggleProjectExpand(projectId: string) {
+    setExpandedProjects((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  }
+
   return (
     <>
       <section className="page-stack">
@@ -133,16 +156,35 @@ export function PromptsPage() {
         </div>
 
         <div className="card-grid card-grid-prompts">
-          {cards.map(({ project, versions, latestVersion }) => (
-            <article key={project.id} className="surface-card prompt-card prompt-project-card">
-              <div className="prompt-card-header">
-                <div className="project-version-meta">
-                  <span className="pill">v{latestVersion.version}</span>
-                  <span className="pill pill-subtle">{versions.length} prompts</span>
-                  <span className="meta-text">
-                    Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
-                  </span>
-                </div>
+          {cards.map(({ project, versions, latestVersion }) => {
+            const isExpanded = expandedProjects.has(project.id);
+
+            return (
+            <article key={project.id} className="surface-card prompt-card prompt-project-card prompt-project-shell">
+              <div className="prompt-project-header">
+                <button
+                  type="button"
+                  className="prompt-project-toggle"
+                  onClick={() => toggleProjectExpand(project.id)}
+                  aria-expanded={isExpanded}
+                  aria-controls={`prompt-project-${project.id}`}
+                >
+                  <div className="list-card-topline">
+                    <div className="icon-pill icon-pill-muted">
+                      {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                    </div>
+                    <div>
+                      <h3>{project.name}</h3>
+                      <div className="project-version-meta">
+                        <span className="pill">v{latestVersion.version}</span>
+                        <span className="pill pill-subtle">{versions.length} prompts</span>
+                        <span className="meta-text">
+                          Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
                 <div className="button-row-inline card-actions-corner">
                   <button
                     className="button button-secondary button-small"
@@ -180,15 +222,7 @@ export function PromptsPage() {
                 </div>
               </div>
 
-              <div>
-                <h3>
-                  <Link
-                    to={`/prompts/${project.id}?version=${latestVersion.id}`}
-                    className="prompt-project-title-link"
-                  >
-                    {project.name}
-                  </Link>
-                </h3>
+              <div className="prompt-project-preview">
                 {latestVersion.summary ? <p>{latestVersion.summary}</p> : null}
               </div>
 
@@ -203,8 +237,79 @@ export function PromptsPage() {
               ) : null}
 
               <pre className="code-snippet prompt-project-snippet">{latestVersion.systemPrompt}</pre>
+
+              {isExpanded ? (
+                <div id={`prompt-project-${project.id}`} className="prompt-project-expanded">
+                  {versions.map((version) => (
+                    <article key={version.id} className="surface-card project-prompt-card">
+                      <div className="project-prompt-card-header">
+                        <div className="list-card-topline">
+                          <div className="icon-pill icon-pill-muted">
+                            <FileText size={18} />
+                          </div>
+                          <div>
+                            <h3>Prompt v{version.version}</h3>
+                            <p>
+                              Updated {format(new Date(version.updatedAt), 'MMM d, yyyy HH:mm')} · {version.runCount} runs
+                            </p>
+                          </div>
+                        </div>
+                        <div className="card-menu-wrap">
+                          <button
+                            className="icon-action-button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setMenuVersionId((current) => (current === version.id ? null : version.id));
+                            }}
+                            aria-label="Prompt Actions"
+                          >
+                            <MoreHorizontal size={18} />
+                          </button>
+                          {menuVersionId === version.id ? (
+                            <div className="card-menu-sheet" onClick={(event) => event.stopPropagation()}>
+                              <button
+                                className="menu-sheet-action menu-sheet-danger"
+                                onClick={() => handleRemovePrompt(version.id, version.version)}
+                              >
+                                <Trash2 size={15} />
+                                Remove
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {version.summary ? <p>{version.summary}</p> : null}
+
+                      {version.tags.length > 0 ? (
+                        <div className="tag-row">
+                          {version.tags.map((tag) => (
+                            <span className="tag-chip" key={tag}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {versions.length > 1 && version.changeSummary?.length ? (
+                        <div className="prompt-change-summary">
+                          <strong>What changed:</strong>
+                          <ul className="prompt-change-list">
+                            {version.changeSummary.map((bullet, index) => (
+                              <li key={`${version.id}-${index}`}>{bullet.replace(/^-\s*/, '')}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      <pre className="code-snippet">{version.systemPrompt}</pre>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </article>
-          ))}
+            );
+          })}
         </div>
       </section>
 
