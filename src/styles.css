@@ -989,6 +989,8 @@ p {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 1rem;
+  position: relative;
+  z-index: 10;
 }
 
 .prompt-detail-back-card {
@@ -1163,6 +1165,7 @@ p {
 
 .card-menu-wrap {
   position: relative;
+  z-index: 5;
 }
 
 .icon-action-button {
@@ -1187,7 +1190,7 @@ p {
   border: 1px solid var(--border);
   background: #ffffff;
   box-shadow: var(--shadow);
-  z-index: 20;
+  z-index: 50;
 }
 
 .menu-sheet-action {
