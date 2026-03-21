@@ -23,7 +23,6 @@ export function PromptDetailPage() {
   const {
     promptProjects,
     promptVersions,
-    providerKeys,
     createPromptVersion,
     removePromptProject,
     removePromptVersion,
@@ -56,10 +55,9 @@ export function PromptDetailPage() {
   const summaryComparisonSignature = summaryComparisons
     .map(({ versionId, currentPrompt, previousPrompt }) => `${versionId}:${currentPrompt}:${previousPrompt}`)
     .join('\n---\n');
-  const canGenerateChangeSummary = providerKeys.gemini.hasKey || providerKeys.openai.hasKey;
 
   useEffect(() => {
-    if (!canGenerateChangeSummary || summaryComparisons.length === 0) {
+    if (summaryComparisons.length === 0) {
       setChangeSummaryByVersionId({});
       return;
     }
@@ -104,7 +102,7 @@ export function PromptDetailPage() {
     return () => {
       active = false;
     };
-  }, [canGenerateChangeSummary, summaryComparisonSignature]);
+  }, [summaryComparisonSignature]);
 
   if (!project || versions.length === 0) {
     return (
