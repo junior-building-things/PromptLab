@@ -1030,6 +1030,14 @@ p {
   padding-top: 0.2rem;
 }
 
+.prompt-version-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .prompt-change-summary {
   display: grid;
   gap: 0.45rem;

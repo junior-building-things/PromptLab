@@ -176,7 +176,6 @@ export function PromptsPage() {
                     <div>
                       <h3>{project.name}</h3>
                       <div className="project-version-meta">
-                        <span className="pill">v{latestVersion.version}</span>
                         <span className="pill pill-subtle">{versions.length} prompts</span>
                         <span className="meta-text">
                           Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
@@ -236,6 +235,7 @@ export function PromptsPage() {
                 </div>
               ) : null}
 
+              <div className="prompt-version-label">Latest version: v{latestVersion.version}</div>
               <pre className="code-snippet prompt-project-snippet">{latestVersion.systemPrompt}</pre>
 
               {isExpanded ? (
@@ -248,7 +248,7 @@ export function PromptsPage() {
                             <FileText size={18} />
                           </div>
                           <div>
-                            <h3>Prompt v{version.version}</h3>
+                            <h3>Prompt</h3>
                             <p>
                               Updated {format(new Date(version.updatedAt), 'MMM d, yyyy HH:mm')} · {version.runCount} runs
                             </p>
@@ -302,6 +302,7 @@ export function PromptsPage() {
                         </div>
                       ) : null}
 
+                      <div className="prompt-version-label">Version: v{version.version}</div>
                       <pre className="code-snippet">{version.systemPrompt}</pre>
                     </article>
                   ))}
