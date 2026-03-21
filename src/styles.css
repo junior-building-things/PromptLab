@@ -659,6 +659,10 @@ p {
   align-content: start;
 }
 
+.provider-key-actions {
+  justify-content: flex-end;
+}
+
 .provider-models-block {
   margin-top: 0.2rem;
 }

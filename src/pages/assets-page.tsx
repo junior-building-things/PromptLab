@@ -1,4 +1,3 @@
-import { formatDistanceToNow } from 'date-fns';
 import { FileImage, FileText, MoreHorizontal, Plus, Trash2, Upload } from 'lucide-react';
 import {
   type ChangeEvent,
@@ -156,7 +155,7 @@ export function AssetsPage() {
         <header className="hero-card">
           <div>
             <h2>Assets</h2>
-            <p>Store reusable text inputs and image references for prompt testing.</p>
+            <p>Store reusable text inputs and image references for batch testing.</p>
           </div>
           <button className="button button-primary" onClick={openComposer}>
             <Plus size={16} />
@@ -217,11 +216,6 @@ export function AssetsPage() {
                     )}
                   </div>
 
-                  <footer className="card-footer">
-                    <span className="meta-text">
-                      Updated {formatDistanceToNow(new Date(asset.updatedAt), { addSuffix: true })}
-                    </span>
-                  </footer>
                 </article>
               );
             })}

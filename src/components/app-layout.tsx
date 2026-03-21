@@ -4,8 +4,8 @@ import { useAuth } from '../context/auth-context';
 
 const navItems = [
   { to: '/', label: 'Prompts', icon: Sparkles },
-  { to: '/assets', label: 'Assets', icon: ImageIcon },
   { to: '/models', label: 'Models', icon: Cpu },
+  { to: '/assets', label: 'Assets', icon: ImageIcon },
   { to: '/batch-test', label: 'Batch Test', icon: PlaySquare },
 ];
 

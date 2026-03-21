@@ -112,23 +112,23 @@ export function ModelsPage() {
                 />
               </div>
 
-              <div className="button-row-inline">
+              <div className="button-row-inline provider-key-actions">
                 <button
                   type="button"
                   className="button button-primary"
                   onClick={() => void handleSave(provider)}
                   disabled={savingProvider === provider || draftKeys[provider].trim().length === 0}
                 >
-                  {savingProvider === provider ? 'Saving...' : 'Save Key'}
+                  {savingProvider === provider ? 'Saving...' : 'Save'}
                 </button>
                 <button
                   type="button"
                   className="button button-secondary"
                   onClick={() => void handleRemove(provider)}
                   disabled={savingProvider === provider || !providerKeys[provider].hasKey}
+                  aria-label={`Remove ${getProviderLabel(provider)} API key`}
                 >
                   <Trash2 size={15} />
-                  Remove Key
                 </button>
               </div>
 
