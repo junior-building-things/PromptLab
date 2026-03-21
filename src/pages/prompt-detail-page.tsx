@@ -21,6 +21,7 @@ export function PromptDetailPage() {
     removePromptVersion,
   } = useAppContext();
   const [menuVersionId, setMenuVersionId] = useState<string | null>(null);
+  const [menuProjectOpen, setMenuProjectOpen] = useState(false);
   const [composer, setComposer] = useState<ComposerState | null>(null);
 
   const project = promptProjects.find((entry) => entry.id === projectId);
@@ -67,6 +68,7 @@ export function PromptDetailPage() {
       return;
     }
 
+    setMenuProjectOpen(false);
     removePromptProject(activeProject.id);
     navigate('/');
   }
@@ -102,15 +104,31 @@ export function PromptDetailPage() {
               <h2>{activeProject.name}</h2>
               <p>All prompts under this project, sorted by latest first.</p>
             </div>
-            <div className="button-row-inline">
-              <button className="button button-secondary" onClick={handleRemoveProject}>
-                <Trash2 size={16} />
-                Remove Project
-              </button>
-              <button className="button button-primary" onClick={openPromptComposer}>
+            <div className="button-row-inline card-actions-corner">
+              <button className="button button-secondary button-small" onClick={openPromptComposer}>
                 <Plus size={16} />
                 New Prompt
               </button>
+              <div className="card-menu-wrap">
+                <button
+                  className="icon-action-button"
+                  onClick={() => setMenuProjectOpen((current) => !current)}
+                  aria-label="Project actions"
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+                {menuProjectOpen ? (
+                  <div className="card-menu-sheet">
+                    <button
+                      className="menu-sheet-action menu-sheet-danger"
+                      onClick={handleRemoveProject}
+                    >
+                      <Trash2 size={15} />
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </header>
         </div>
