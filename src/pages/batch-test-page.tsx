@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   Play,
   Trash2,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -130,11 +131,13 @@ function BatchResultCell({
   isRunning,
   placeholderCount,
   stickerize,
+  onPreviewImage,
 }: {
   results: TestResult[];
   isRunning: boolean;
   placeholderCount: number;
   stickerize: boolean;
+  onPreviewImage: (imageSrc: string) => void;
 }) {
   if (results.length === 0) {
     if (isRunning) {
@@ -167,11 +170,18 @@ function BatchResultCell({
               >
                 <Download size={16} />
               </a>
-              <img
-                className="batch-table-output-image"
-                src={result.outputImage}
-                alt="Generated output"
-              />
+              <button
+                type="button"
+                className="batch-table-image-preview-button"
+                onClick={() => onPreviewImage(result.outputImage!)}
+                aria-label="Preview generated image"
+              >
+                <img
+                  className="batch-table-output-image"
+                  src={result.outputImage}
+                  alt="Generated output"
+                />
+              </button>
             </div>
           ) : (
             <div className="batch-table-output-fallback">
@@ -323,6 +333,7 @@ export function BatchTestPage() {
   const [stickerize, setStickerize] = useState(true);
   const [running, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!openRunMenuId) return;
@@ -339,6 +350,19 @@ export function BatchTestPage() {
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [openRunMenuId]);
+
+  useEffect(() => {
+    if (!previewImageSrc) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setPreviewImageSrc(null);
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [previewImageSrc]);
 
   const readyModels = useMemo(
     () => models.filter((model) => model.status === 'ready' && providerKeys[model.provider]?.hasKey),
@@ -886,6 +910,7 @@ export function BatchTestPage() {
                                                 : 1
                                             }
                                             stickerize={Boolean(run.scenario.stickerize)}
+                                            onPreviewImage={setPreviewImageSrc}
                                           />
                                         </td>
                                       );
@@ -991,6 +1016,29 @@ export function BatchTestPage() {
                 </article>
               ) : null}
             </div>
+          </section>
+        </div>
+      ) : null}
+
+      {previewImageSrc ? (
+        <div className="composer-backdrop" onClick={() => setPreviewImageSrc(null)}>
+          <section
+            className="surface-card image-preview-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="image-preview-close"
+              onClick={() => setPreviewImageSrc(null)}
+              aria-label="Close image preview"
+            >
+              <X size={18} />
+            </button>
+            <img
+              className="image-preview-sheet-image"
+              src={previewImageSrc}
+              alt="Generated output preview"
+            />
           </section>
         </div>
       ) : null}

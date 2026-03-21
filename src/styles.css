@@ -1582,6 +1582,15 @@ p {
   width: 220px;
 }
 
+.batch-table-image-preview-button {
+  display: block;
+  width: 220px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
 .batch-table-output-image {
   width: 220px;
   max-height: 220px;
@@ -1595,6 +1604,12 @@ p {
 
 .batch-table-image-wrap.is-stickerized .batch-table-output-image {
   background: #e6e6e6;
+}
+
+.batch-table-image-preview-button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.55);
+  outline-offset: 4px;
+  border-radius: 22px;
 }
 
 .batch-table-download-link {
@@ -1692,6 +1707,47 @@ p {
   display: grid;
   gap: 1.2rem;
   padding: 1.4rem;
+}
+
+.image-preview-sheet {
+  position: relative;
+  width: min(920px, calc(100vw - 2.5rem));
+  max-height: calc(100vh - 2.5rem);
+  padding: 1rem;
+  display: grid;
+  place-items: center;
+}
+
+.image-preview-sheet-image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 4.5rem);
+  border-radius: 22px;
+  object-fit: contain;
+  background: #f8fafc;
+}
+
+.image-preview-close {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--surface-ink);
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.image-preview-close:hover,
+.image-preview-close:focus-visible {
+  background: #ffffff;
+  outline: none;
 }
 
 .composer-sheet-header {
