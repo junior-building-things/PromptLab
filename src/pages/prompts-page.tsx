@@ -230,7 +230,7 @@ export function PromptsPage() {
               {isExpanded ? (
                 <div id={`prompt-project-${project.id}`} className="prompt-project-expanded">
                   {versions.slice(1).map((version) => (
-                    <article key={version.id} className="surface-card project-prompt-card">
+                    <article key={version.id} className="project-prompt-card prompt-project-version">
                       <div className="prompt-version-label">v{version.version}</div>
                       {version.changeSummary?.length ? (
                         <div className="prompt-change-summary">
