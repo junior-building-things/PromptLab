@@ -1,4 +1,4 @@
-import { KeyRound, Trash2 } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
 import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
@@ -17,7 +17,6 @@ export function ModelsPage() {
     models,
     providerKeys,
     saveProviderKey,
-    removeProviderKey,
     savingProvider,
   } = useAppContext();
   const [draftKeys, setDraftKeys] = useState<Record<Provider, string>>({
@@ -39,14 +38,6 @@ export function ModelsPage() {
   async function handleSave(provider: Provider) {
     try {
       await saveProviderKey(provider, draftKeys[provider]);
-      setDraftKeys((current) => ({ ...current, [provider]: '' }));
-      setEditingProvider(null);
-    } catch {}
-  }
-
-  async function handleRemove(provider: Provider) {
-    try {
-      await removeProviderKey(provider);
       setDraftKeys((current) => ({ ...current, [provider]: '' }));
       setEditingProvider(null);
     } catch {}
@@ -120,15 +111,6 @@ export function ModelsPage() {
                   disabled={savingProvider === provider || draftKeys[provider].trim().length === 0}
                 >
                   {savingProvider === provider ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => void handleRemove(provider)}
-                  disabled={savingProvider === provider || !providerKeys[provider].hasKey}
-                  aria-label={`Remove ${getProviderLabel(provider)} API key`}
-                >
-                  <Trash2 size={15} />
                 </button>
               </div>
 
