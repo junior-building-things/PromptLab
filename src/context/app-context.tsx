@@ -42,7 +42,10 @@ type PromptProjectDraft = {
   systemPrompt: string;
 };
 
-type PromptVersionDraft = Omit<PromptVersion, 'id' | 'projectId' | 'version' | 'updatedAt' | 'runCount'>;
+type PromptVersionDraft = Omit<
+  PromptVersion,
+  'id' | 'projectId' | 'version' | 'updatedAt' | 'runCount' | 'changeSummary' | 'changeSummarySignature'
+>;
 type AssetDraft = Omit<AssetRecord, 'id' | 'updatedAt'>;
 type ModelDraft = Omit<ModelRecord, 'id'>;
 
@@ -73,6 +76,22 @@ type UserStateResponse = {
 
 type ApiErrorPayload = {
   error?: string;
+};
+
+type PromptChangeSummaryResponse = {
+  provider?: Provider | null;
+  summaries?: Array<{
+    versionId: string;
+    bullets: string[];
+  }>;
+  error?: string;
+};
+
+type PromptChangeSummaryComparison = {
+  versionId: string;
+  currentPrompt: string;
+  previousPrompt: string;
+  signature: string;
 };
 
 type AppContextValue = AppState & {
@@ -180,10 +199,25 @@ function normalizeHistory(history?: BatchRun[]): BatchRun[] {
   }));
 }
 
+function normalizePromptVersion(version: PromptVersion): PromptVersion {
+  return {
+    ...version,
+    changeSummary: Array.isArray(version.changeSummary)
+      ? version.changeSummary.filter((bullet) => typeof bullet === 'string' && bullet.trim())
+      : undefined,
+    changeSummarySignature:
+      typeof version.changeSummarySignature === 'string' ? version.changeSummarySignature : null,
+  };
+}
+
+function normalizePromptVersions(versions?: PromptVersion[]): PromptVersion[] {
+  return (versions ?? initialPromptVersions).map(normalizePromptVersion);
+}
+
 function normalizeState(state: AppState | null | undefined): AppState {
   return {
     promptProjects: state?.promptProjects ?? initialPromptProjects,
-    promptVersions: state?.promptVersions ?? initialPromptVersions,
+    promptVersions: normalizePromptVersions(state?.promptVersions),
     assets: (state?.assets ?? initialAssets).map(normalizeAsset),
     models: normalizeModels(state?.models),
     history: normalizeHistory(state?.history),
@@ -217,21 +251,122 @@ function migrateLegacyState(legacy: LegacyState): AppState {
       createdAt: prompt.updatedAt,
       updatedAt: prompt.updatedAt,
     })),
-    promptVersions: prompts.map((prompt) => ({
-      id: prompt.id,
-      projectId: `project-${prompt.id}`,
-      version: 1,
-      title: 'Migrated v1',
-      summary: prompt.summary,
-      systemPrompt: prompt.systemPrompt,
-      tags: prompt.tags,
-      updatedAt: prompt.updatedAt,
-      runCount: prompt.runCount,
-    })),
+    promptVersions: normalizePromptVersions(
+      prompts.map((prompt) => ({
+        id: prompt.id,
+        projectId: `project-${prompt.id}`,
+        version: 1,
+        title: 'Migrated v1',
+        summary: prompt.summary,
+        systemPrompt: prompt.systemPrompt,
+        tags: prompt.tags,
+        updatedAt: prompt.updatedAt,
+        runCount: prompt.runCount,
+      })),
+    ),
     assets: (legacy.assets ?? initialAssets).map(normalizeAsset),
     models: normalizeModels(legacy.models),
     history: normalizeHistory(legacy.history),
   };
+}
+
+function buildPromptChangeSummarySignature(currentPrompt: string, previousPrompt: string) {
+  return `${currentPrompt.trim()}\n---\n${previousPrompt.trim()}`;
+}
+
+function arraysEqual(left?: string[], right?: string[]) {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right || left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((entry, index) => entry === right[index]);
+}
+
+function collectPromptChangeSummaryComparisons(
+  promptVersions: PromptVersion[],
+): PromptChangeSummaryComparison[] {
+  const versionsByProject = new Map<string, PromptVersion[]>();
+
+  promptVersions.forEach((version) => {
+    const projectVersions = versionsByProject.get(version.projectId) ?? [];
+    projectVersions.push(version);
+    versionsByProject.set(version.projectId, projectVersions);
+  });
+
+  const comparisons: PromptChangeSummaryComparison[] = [];
+
+  versionsByProject.forEach((versions) => {
+    const versionSequence = [...versions].sort((left, right) => right.version - left.version);
+    if (versionSequence.length < 2) {
+      return;
+    }
+
+    versionSequence.slice(0, -1).forEach((version, index) => {
+      const previousVersion = versionSequence[index + 1];
+      if (!previousVersion) {
+        return;
+      }
+
+      const signature = buildPromptChangeSummarySignature(version.systemPrompt, previousVersion.systemPrompt);
+      if (version.changeSummarySignature === signature && version.changeSummary?.length) {
+        return;
+      }
+
+      comparisons.push({
+        versionId: version.id,
+        currentPrompt: version.systemPrompt,
+        previousPrompt: previousVersion.systemPrompt,
+        signature,
+      });
+    });
+  });
+
+  return comparisons;
+}
+
+function findPromptChangeSummarySignature(promptVersions: PromptVersion[], versionId: string) {
+  const version = promptVersions.find((entry) => entry.id === versionId);
+  if (!version) {
+    return null;
+  }
+
+  const versionSequence = promptVersions
+    .filter((entry) => entry.projectId === version.projectId)
+    .sort((left, right) => right.version - left.version);
+  const versionIndex = versionSequence.findIndex((entry) => entry.id === versionId);
+  const previousVersion = versionIndex >= 0 ? versionSequence[versionIndex + 1] : null;
+
+  if (!previousVersion) {
+    return null;
+  }
+
+  return buildPromptChangeSummarySignature(version.systemPrompt, previousVersion.systemPrompt);
+}
+
+function clearPromptChangeSummariesForProject(promptVersions: PromptVersion[], projectId: string) {
+  return promptVersions.map((version) =>
+    version.projectId === projectId
+      ? {
+          ...version,
+          changeSummary: undefined,
+          changeSummarySignature: null,
+        }
+      : version,
+  );
+}
+
+function chunkComparisons(comparisons: PromptChangeSummaryComparison[], chunkSize: number) {
+  const chunks: PromptChangeSummaryComparison[][] = [];
+
+  for (let index = 0; index < comparisons.length; index += chunkSize) {
+    chunks.push(comparisons.slice(index, index + chunkSize));
+  }
+
+  return chunks;
 }
 
 function loadState(storageKey: string): AppState {
@@ -336,6 +471,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   const [loadingDots, setLoadingDots] = useState('.');
   const lastSavedSnapshot = useRef(JSON.stringify(initialLocalState));
   const persistQueueRef = useRef(Promise.resolve());
+  const summaryRequestsRef = useRef(new Set<string>());
 
   useEffect(() => {
     if (storageReady) {
@@ -481,6 +617,116 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
     return () => window.clearTimeout(timeoutId);
   }, [persistStateNow, state, storageReady]);
 
+  useEffect(() => {
+    if (!storageReady) {
+      return undefined;
+    }
+
+    const comparisons = collectPromptChangeSummaryComparisons(state.promptVersions).filter((comparison) => {
+      const requestKey = `${comparison.versionId}:${comparison.signature}`;
+      return !summaryRequestsRef.current.has(requestKey);
+    });
+
+    if (comparisons.length === 0) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function generateChangeSummaries() {
+      for (const chunk of chunkComparisons(comparisons, 24)) {
+        const requestKeys = chunk.map((comparison) => `${comparison.versionId}:${comparison.signature}`);
+        requestKeys.forEach((key) => summaryRequestsRef.current.add(key));
+
+        try {
+          const response = await fetch('/api/prompt-diff-summary', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              comparisons: chunk,
+            }),
+          });
+
+          const payload = await readApiPayload<PromptChangeSummaryResponse>(response);
+          if (!response.ok || cancelled || !payload.summaries?.length) {
+            continue;
+          }
+
+          const summariesByVersionId = new Map(
+            payload.summaries.map((entry) => [entry.versionId, entry.bullets.filter(Boolean)]),
+          );
+          const requestedSignatures = new Map(
+            chunk.map((comparison) => [comparison.versionId, comparison.signature]),
+          );
+
+          let nextState: AppState | null = null;
+
+          setState((current) => {
+            let changed = false;
+
+            const promptVersions = current.promptVersions.map((version) => {
+              const summaryBullets = summariesByVersionId.get(version.id);
+              const requestedSignature = requestedSignatures.get(version.id);
+              const liveSignature = findPromptChangeSummarySignature(current.promptVersions, version.id);
+
+              if (!summaryBullets || !requestedSignature || liveSignature !== requestedSignature) {
+                return version;
+              }
+
+              if (
+                version.changeSummarySignature === requestedSignature &&
+                arraysEqual(version.changeSummary, summaryBullets)
+              ) {
+                return version;
+              }
+
+              changed = true;
+              return {
+                ...version,
+                changeSummary: summaryBullets,
+                changeSummarySignature: requestedSignature,
+              };
+            });
+
+            if (!changed) {
+              return current;
+            }
+
+            nextState = {
+              ...current,
+              promptVersions,
+            };
+
+            return nextState;
+          });
+
+          if (nextState) {
+            void persistStateNow(nextState);
+          }
+        } finally {
+          requestKeys.forEach((key) => summaryRequestsRef.current.delete(key));
+        }
+      }
+    }
+
+    void generateChangeSummaries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    persistStateNow,
+    providerKeys.gemini.hasKey,
+    providerKeys.gemini.updatedAt,
+    providerKeys.openai.hasKey,
+    providerKeys.openai.updatedAt,
+    state.promptVersions,
+    storageReady,
+  ]);
+
   const createPromptProject = useCallback((draft?: Partial<PromptProjectDraft>) => {
     const projectId = makeId('project');
     const timestamp = new Date().toISOString();
@@ -536,7 +782,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
 
       return {
         ...current,
-        promptVersions: [created, ...current.promptVersions],
+        promptVersions: clearPromptChangeSummariesForProject([created, ...current.promptVersions], projectId),
         promptProjects: current.promptProjects.map((project) =>
           project.id === projectId ? { ...project, updatedAt: timestamp } : project,
         ),
@@ -566,8 +812,11 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
 
       return {
         ...current,
-        promptVersions: current.promptVersions.map((version) =>
-          version.id === versionId ? { ...version, ...draft, updatedAt: timestamp } : version,
+        promptVersions: clearPromptChangeSummariesForProject(
+          current.promptVersions.map((version) =>
+            version.id === versionId ? { ...version, ...draft, updatedAt: timestamp } : version,
+          ),
+          target.projectId,
         ),
         promptProjects: current.promptProjects.map((project) =>
           project.id === target.projectId ? { ...project, updatedAt: timestamp } : project,
@@ -610,7 +859,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
         promptProjects: projectHasVersions
           ? current.promptProjects
           : current.promptProjects.filter((project) => project.id !== target.projectId),
-        promptVersions: remainingVersions,
+        promptVersions: clearPromptChangeSummariesForProject(remainingVersions, target.projectId),
         history: current.history.filter(
           (run) => !run.results.some((result) => result.promptId === versionId),
         ),

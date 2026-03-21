@@ -20,6 +20,8 @@ export type PromptVersion = {
   version: number;
   title: string;
   summary: string;
+  changeSummary?: string[];
+  changeSummarySignature?: string | null;
   systemPrompt: string;
   tags: string[];
   updatedAt: string;
