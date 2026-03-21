@@ -40,7 +40,12 @@ function buildSummaryPrompt(previousPrompt, currentPrompt) {
     'Summarize the key changes from PREVIOUS to CURRENT.',
     'Return only concise bullet points that each start with "- ".',
     'Focus on meaningful additions, removals, tightened constraints, or clarified instructions.',
-    'Use 2 to 4 bullets when possible.',
+    'Each bullet should be one short sentence or phrase.',
+    'Prefer under 12 words when possible.',
+    'State the change directly. Do not explain why it changed or summarize removed details.',
+    'Avoid filler like "which previously", "removing the previous instruction", "previously mandated", or "specified".',
+    'Prefer outputs like "- Strictly require the original outfit at all times." and "- Removed the Background and Composition Rules section."',
+    'Use 1 to 3 bullets when possible.',
     'If there are no meaningful changes, return exactly: "- No major prompt changes identified."',
     '',
     'PREVIOUS PROMPT:',
@@ -59,9 +64,19 @@ function normalizeBulletLines(text) {
 
   const bullets = lines
     .map((line) => line.replace(/^[-*•]\s*/, '').trim())
+    .map((line) =>
+      line
+        .replace(/,\s*(which|that|previously)\b.*$/i, '')
+        .replace(/,\s*(removing|including|covering)\b.*$/i, '')
+        .replace(/^Removed the entire\s+/i, 'Removed ')
+        .trim(),
+    )
     .filter(Boolean)
     .slice(0, 4)
-    .map((line) => `- ${line}`);
+    .map((line) => {
+      const normalizedLine = /[.!?]$/.test(line) ? line : `${line}.`;
+      return `- ${normalizedLine}`;
+    });
 
   if (bullets.length > 0) {
     return bullets;
