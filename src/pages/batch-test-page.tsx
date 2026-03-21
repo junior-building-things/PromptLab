@@ -923,57 +923,61 @@ export function BatchTestPage() {
 
             <div className="stack-list">
               <MultiSelectDropdown
-                label="System Prompts"
+                label="Choose model"
+                labelIcon={<Cpu size={15} />}
+                options={modelDropdownOptions}
+                selectedIds={selectedModelIds}
+                onToggle={(id) => setSelectedModelIds((current) => toggleSelection(current, id))}
+                emptyLabel="Choose model"
+              />
+
+              <MultiSelectDropdown
+                label="Choose system prompt"
                 labelIcon={<FileText size={15} />}
                 options={promptDropdownOptions}
                 selectedIds={selectedPromptIds}
                 onToggle={(id) => setSelectedPromptIds((current) => toggleSelection(current, id))}
-                emptyLabel="Select System Prompts"
+                emptyLabel="Choose system prompt"
               />
 
               <MultiSelectDropdown
-                label="Image References"
+                label="Add image references (optional)"
                 labelIcon={<ImageIcon size={15} />}
                 options={imageReferenceDropdownOptions}
                 selectedIds={selectedImageReferenceIds}
                 onToggle={(id) =>
                   setSelectedImageReferenceIds((current) => toggleSelection(current, id))
                 }
-                emptyLabel="Select Image References"
+                emptyLabel="Add image references (optional)"
               />
 
               <MultiSelectDropdown
-                label="Text Inputs (Optional)"
+                label="Add text inputs (optional)"
                 labelIcon={<FileText size={15} />}
                 options={textInputDropdownOptions}
                 selectedIds={selectedTextInputAssetIds}
                 onToggle={(id) =>
                   setSelectedTextInputAssetIds((current) => toggleSelection(current, id))
                 }
-                emptyLabel="Select Text Inputs"
-              />
-
-              <MultiSelectDropdown
-                label="Models"
-                labelIcon={<Cpu size={15} />}
-                options={modelDropdownOptions}
-                selectedIds={selectedModelIds}
-                onToggle={(id) => setSelectedModelIds((current) => toggleSelection(current, id))}
-                emptyLabel="Select Models"
+                emptyLabel="Add text inputs (optional)"
               />
 
               <label className="checkbox-card">
-                <input
-                  type="checkbox"
-                  checked={stickerize}
-                  onChange={(event) => setStickerize(event.target.checked)}
-                />
-                <div>
+                <div className="checkbox-card-copy">
                   <strong>Stickerize</strong>
                   <p className="muted-copy">
                     Remove the background and add the white outline to generated image outputs.
                   </p>
                 </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={stickerize}
+                  className={`toggle-switch${stickerize ? ' is-active' : ''}`}
+                  onClick={() => setStickerize((current) => !current)}
+                >
+                  <span className="toggle-switch-thumb" />
+                </button>
               </label>
 
               {errorMessage ? (

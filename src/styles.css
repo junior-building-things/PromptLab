@@ -1067,16 +1067,64 @@ p {
 
 .checkbox-card {
   display: flex;
-  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 1rem;
   border-radius: 18px;
   border: 1px solid var(--border);
   background: rgba(15, 23, 42, 0.03);
 }
 
-.checkbox-card input {
-  width: auto;
-  margin-top: 0.2rem;
+.checkbox-card-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.toggle-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 3.1rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+  transition: background 140ms ease;
+}
+
+.toggle-switch:hover {
+  background: rgba(148, 163, 184, 0.48);
+}
+
+.toggle-switch.is-active {
+  background: var(--accent);
+}
+
+.toggle-switch.is-active:hover {
+  background: var(--accent-strong);
+}
+
+.toggle-switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.toggle-switch-thumb {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
+  transition: transform 140ms ease;
+}
+
+.toggle-switch.is-active .toggle-switch-thumb {
+  transform: translateX(1.25rem);
 }
 
 .card-menu-wrap {
