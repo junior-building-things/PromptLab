@@ -101,7 +101,7 @@ export function ModelsPage() {
                         [provider]: nextValue === hiddenKeyMask ? '' : nextValue,
                       }));
                     }}
-                    placeholder={`Enter your ${getProviderLabel(provider)} API key`}
+                    placeholder="Enter key"
                   />
                   <button
                     type="button"
