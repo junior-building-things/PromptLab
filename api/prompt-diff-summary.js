@@ -3,7 +3,7 @@ import { getProviderApiKey } from './_lib/store.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const GEMINI_MODEL = 'gemini-3.1-flash';
+const GEMINI_MODEL = 'gemini-3-flash-preview';
 const OPENAI_MODEL = 'gpt-5-mini';
 
 function json(res, status, body) {
@@ -70,6 +70,21 @@ function normalizeBulletLines(text) {
   return ['- No major prompt changes identified.'];
 }
 
+function extractOpenAIOutputText(payload) {
+  const directOutput = typeof payload?.output_text === 'string' ? payload.output_text : '';
+  if (directOutput.trim()) {
+    return directOutput.trim();
+  }
+
+  const nestedOutput = payload?.output
+    ?.flatMap((item) => item.content || [])
+    .map((item) => item.text || '')
+    .join('\n')
+    .trim();
+
+  return nestedOutput || '';
+}
+
 async function summarizeWithGemini(apiKey, previousPrompt, currentPrompt) {
   const response = await fetch(`${GEMINI_URL}/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -117,7 +132,31 @@ async function summarizeWithOpenAI(apiKey, previousPrompt, currentPrompt) {
     throw new Error(payload.error?.message || 'OpenAI summary request failed.');
   }
 
-  return normalizeBulletLines(payload.output_text || '');
+  return normalizeBulletLines(extractOpenAIOutputText(payload));
+}
+
+async function summarizeComparisons(comparisons, providers) {
+  let lastError = null;
+
+  for (const provider of providers) {
+    try {
+      const summaries = await Promise.all(
+        comparisons.map(async (comparison) => ({
+          versionId: comparison.versionId,
+          bullets: await provider.summarize(comparison),
+        })),
+      );
+
+      return {
+        provider: provider.name,
+        summaries,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Prompt diff summary request failed unexpectedly.');
 }
 
 export default async function handler(req, res) {
@@ -138,26 +177,34 @@ export default async function handler(req, res) {
       return json(res, 200, { provider: null, summaries: [] });
     }
 
-    const geminiApiKey = await getProviderApiKey(user, 'gemini');
-    const openaiApiKey = geminiApiKey ? null : await getProviderApiKey(user, 'openai');
+    const [geminiApiKey, openaiApiKey] = await Promise.all([
+      getProviderApiKey(user, 'gemini'),
+      getProviderApiKey(user, 'openai'),
+    ]);
 
     if (!geminiApiKey && !openaiApiKey) {
       return json(res, 200, { provider: null, summaries: [] });
     }
 
-    const provider = geminiApiKey ? 'gemini' : 'openai';
-    const summarize = geminiApiKey
-      ? (comparison) => summarizeWithGemini(geminiApiKey, comparison.previousPrompt, comparison.currentPrompt)
-      : (comparison) => summarizeWithOpenAI(openaiApiKey, comparison.previousPrompt, comparison.currentPrompt);
+    const providers = [
+      geminiApiKey
+        ? {
+            name: 'gemini',
+            summarize: (comparison) =>
+              summarizeWithGemini(geminiApiKey, comparison.previousPrompt, comparison.currentPrompt),
+          }
+        : null,
+      openaiApiKey
+        ? {
+            name: 'openai',
+            summarize: (comparison) =>
+              summarizeWithOpenAI(openaiApiKey, comparison.previousPrompt, comparison.currentPrompt),
+          }
+        : null,
+    ].filter(Boolean);
 
-    const summaries = await Promise.all(
-      comparisons.map(async (comparison) => ({
-        versionId: comparison.versionId,
-        bullets: await summarize(comparison),
-      })),
-    );
-
-    return json(res, 200, { provider, summaries });
+    const result = await summarizeComparisons(comparisons, providers);
+    return json(res, 200, result);
   } catch (error) {
     return json(res, 500, {
       error: error instanceof Error ? error.message : 'Prompt diff summary request failed unexpectedly.',
