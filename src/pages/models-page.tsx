@@ -74,44 +74,45 @@ export function ModelsPage() {
                   <KeyRound size={15} />
                   API Key
                 </span>
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  value={
-                    draftKeys[provider] ||
-                    (providerKeys[provider].hasKey && editingProvider !== provider ? hiddenKeyMask : '')
-                  }
-                  onFocus={() => {
-                    if (providerKeys[provider].hasKey && draftKeys[provider].length === 0) {
+                <div className="provider-key-input-row">
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    className="provider-key-input"
+                    value={
+                      draftKeys[provider] ||
+                      (providerKeys[provider].hasKey && editingProvider !== provider ? hiddenKeyMask : '')
+                    }
+                    onFocus={() => {
+                      if (providerKeys[provider].hasKey && draftKeys[provider].length === 0) {
+                        setEditingProvider(provider);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (draftKeys[provider].length === 0 && editingProvider === provider) {
+                        setEditingProvider(null);
+                      }
+                    }}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
                       setEditingProvider(provider);
-                    }
-                  }}
-                  onBlur={() => {
-                    if (draftKeys[provider].length === 0 && editingProvider === provider) {
-                      setEditingProvider(null);
-                    }
-                  }}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setEditingProvider(provider);
-                    setDraftKeys((current) => ({
-                      ...current,
-                      [provider]: nextValue === hiddenKeyMask ? '' : nextValue,
-                    }));
-                  }}
-                  placeholder={`Enter your ${getProviderLabel(provider)} API key`}
-                />
-              </div>
-
-              <div className="button-row-inline provider-key-actions">
-                <button
-                  type="button"
-                  className="button button-primary"
-                  onClick={() => void handleSave(provider)}
-                  disabled={savingProvider === provider || draftKeys[provider].trim().length === 0}
-                >
-                  {savingProvider === provider ? 'Saving...' : 'Save'}
-                </button>
+                      setDraftKeys((current) => ({
+                        ...current,
+                        [provider]: nextValue === hiddenKeyMask ? '' : nextValue,
+                      }));
+                    }}
+                    placeholder={`Enter your ${getProviderLabel(provider)} API key`}
+                  />
+                  <button
+                    type="button"
+                    className="button button-primary button-small provider-key-inline-save"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => void handleSave(provider)}
+                    disabled={savingProvider === provider || draftKeys[provider].trim().length === 0}
+                  >
+                    {savingProvider === provider ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
               </div>
 
               <div className="field-block provider-models-block">

@@ -723,6 +723,29 @@ p {
   justify-content: flex-end;
 }
 
+.provider-key-input-row {
+  position: relative;
+}
+
+.provider-key-input {
+  padding-right: 7rem;
+}
+
+.provider-key-inline-save {
+  position: absolute;
+  top: 50%;
+  right: 0.45rem;
+  transform: translateY(-50%);
+  min-width: 5.3rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 12px;
+  z-index: 1;
+}
+
+.provider-key-inline-save:hover {
+  transform: translateY(-50%);
+}
+
 .provider-models-block {
   margin-top: 0.2rem;
 }
