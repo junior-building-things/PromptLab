@@ -44,8 +44,8 @@ export type ModelRecord = {
   provider: Provider;
   apiModel: string;
   endpoint: string;
-  temperature: number;
-  maxTokens: number;
+  temperature?: number;
+  maxTokens?: number;
   status: 'ready' | 'draft';
   envVar: string;
 };
