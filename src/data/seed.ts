@@ -121,6 +121,15 @@ export const initialModels: ModelRecord[] = [
     envVar: 'VITE_OPENAI_API_KEY',
   },
   {
+    id: 'model-openai-gpt-image-2',
+    name: 'gpt-image-2',
+    provider: 'openai',
+    apiModel: 'gpt-image-2',
+    endpoint: 'Image API',
+    status: 'ready',
+    envVar: 'VITE_OPENAI_API_KEY',
+  },
+  {
     id: 'model-gemini-nano-banana',
     name: 'Nano Banana 1',
     provider: 'gemini',
