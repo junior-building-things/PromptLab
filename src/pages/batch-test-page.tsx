@@ -19,6 +19,11 @@ import {
 } from 'lucide-react';
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { setPageChrome } from '../components/app-layout';
+import {
+  MultiSelectDropdown,
+  type DropdownGroup,
+  type DropdownOption as MsdOption,
+} from '../components/multi-select-dropdown';
 import { useAppContext } from '../context/app-context';
 
 // Small inline helper for the topbar button — gives a lucide icon a
@@ -54,12 +59,10 @@ type ApiError = {
   message: string;
 };
 
-type DropdownOption = {
-  id: string;
-  label: string;
-  description?: string;
-  icon?: ReactNode;
-};
+/** Local alias so legacy memo signatures keep using `DropdownOption` —
+ * routed through the new component's exported type so additions like
+ * `searchText` / `group` flow through. */
+type DropdownOption = MsdOption;
 
 type BatchTableCell = {
   rowId: string;
@@ -213,125 +216,11 @@ function BatchResultCell({
   );
 }
 
-function MultiSelectDropdown({
-  label,
-  labelIcon,
-  options,
-  selectedIds,
-  onToggle,
-  emptyLabel,
-}: {
-  label: string;
-  labelIcon: ReactNode;
-  options: DropdownOption[];
-  selectedIds: string[];
-  onToggle: (id: string) => void;
-  emptyLabel: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [opensUpward, setOpensUpward] = useState(false);
-  const [menuMaxHeight, setMenuMaxHeight] = useState<number>(288);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) {
-      setOpensUpward(false);
-      setMenuMaxHeight(288);
-      return;
-    }
-
-    function updateMenuPosition() {
-      const trigger = rootRef.current?.querySelector('.multi-dropdown-trigger');
-      if (!(trigger instanceof HTMLElement)) return;
-
-      const rect = trigger.getBoundingClientRect();
-      const viewportPadding = 20;
-      const preferredHeight = 288;
-      const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - viewportPadding);
-      const spaceAbove = Math.max(0, rect.top - viewportPadding);
-      const shouldOpenUpward = spaceBelow < 240 && spaceAbove > spaceBelow;
-      const availableHeight = shouldOpenUpward ? spaceAbove : spaceBelow;
-
-      setOpensUpward(shouldOpenUpward);
-      setMenuMaxHeight(Math.min(preferredHeight, availableHeight));
-    }
-
-    updateMenuPosition();
-
-    function handlePointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    }
-
-    window.addEventListener('resize', updateMenuPosition);
-    window.addEventListener('scroll', updateMenuPosition, true);
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('resize', updateMenuPosition);
-      window.removeEventListener('scroll', updateMenuPosition, true);
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div className="field-block" ref={rootRef}>
-      <span className="field-block-label">
-        {labelIcon}
-        {label}
-      </span>
-      <div className={`multi-dropdown${open ? ' is-open' : ''}${opensUpward ? ' opens-upward' : ''}`}>
-        <button
-          type="button"
-          className="multi-dropdown-trigger"
-          onClick={() => setOpen((current) => !current)}
-        >
-          <div className="multi-dropdown-trigger-copy">
-            <strong>{buildSummary(selectedIds, options, emptyLabel)}</strong>
-          </div>
-          <ChevronDown size={16} />
-        </button>
-        {open ? (
-          <div
-            className="multi-dropdown-menu"
-            style={{ maxHeight: `${menuMaxHeight}px` }}
-          >
-            {options.map((option) => {
-              const checked = selectedIds.includes(option.id);
-
-              return (
-                <label
-                  key={option.id}
-                  className={`multi-dropdown-option${checked ? ' is-selected' : ''}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onToggle(option.id)}
-                  />
-                  {option.icon ? <span className="multi-dropdown-option-icon">{option.icon}</span> : null}
-                  <div className="multi-dropdown-option-copy">
-                    <strong>{option.label}</strong>
-                    {option.description ? <p>{option.description}</p> : null}
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
+// The custom MultiSelectDropdown was lifted to
+// `src/components/multi-select-dropdown.tsx` so the visual matches the
+// Claude Design PromptLab.html exactly — sticky search input, mono
+// group headers, checkbox marks. Same external API (options +
+// selectedIds + onToggle) so the call sites below didn't change shape.
 
 export function BatchTestPage() {
   const { history, promptProjects, promptVersions, assets, models, providerKeys, removeRun, createRun, updateRun } =
@@ -409,14 +298,30 @@ export function BatchTestPage() {
     [assets],
   );
 
+  // Prompt dropdown options — grouped by project name. The design uses
+  // mono uppercase project names as section headers; we lowercase to
+  // match the design's `dropdown-group-head` styling rule.
   const promptDropdownOptions = useMemo<DropdownOption[]>(
     () =>
       versionOptions.map((prompt) => ({
         id: prompt.id,
-        label: `${prompt.projectName} · v${prompt.version}`,
-        description: prompt.title,
-        icon: <TextIcon Icon={FileText} />,
+        label: `v${prompt.version} · ${prompt.systemPrompt.slice(0, 64)}${
+          prompt.systemPrompt.length > 64 ? '…' : ''
+        }`,
+        searchText: `${prompt.projectName.toLowerCase()} v${prompt.version} ${prompt.systemPrompt.toLowerCase()}`,
+        group: prompt.projectId,
       })),
+    [versionOptions],
+  );
+
+  // Project-name groups for the prompt dropdown.
+  const promptGroups = useMemo<DropdownGroup[]>(
+    () =>
+      versionOptions
+        .map((v) => ({ key: v.projectId, label: v.projectName }))
+        .filter(
+          (g, i, arr) => arr.findIndex((x) => x.key === g.key) === i,
+        ),
     [versionOptions],
   );
 
@@ -425,13 +330,7 @@ export function BatchTestPage() {
       imageReferenceAssets.map((asset) => ({
         id: asset.id,
         label: asset.name,
-        icon: (
-          <img
-            src={asset.source}
-            alt={asset.name}
-            className="multi-dropdown-option-thumb"
-          />
-        ),
+        searchText: asset.name.toLowerCase(),
       })),
     [imageReferenceAssets],
   );
@@ -441,26 +340,37 @@ export function BatchTestPage() {
       textInputAssets.map((asset) => ({
         id: asset.id,
         label: asset.name,
-        description: `${parseTextInputs(asset.source).length} inputs`,
-        icon: <TextIcon Icon={FileText} />,
+        searchText: asset.name.toLowerCase(),
       })),
     [textInputAssets],
   );
 
+  // Model dropdown options — grouped by inferred type (text / image /
+  // video). Type is inferred from the API model id since the catalog
+  // doesn't carry an explicit `type` field.
   const modelDropdownOptions = useMemo<DropdownOption[]>(
     () =>
-      readyModels.map((model) => ({
-        id: model.id,
-        label: model.name,
-        description: getProviderLabel(model.provider),
-        icon: (
-          <img
-            src={getProviderIconSrc(model.provider)}
-            alt={getProviderLabel(model.provider)}
-            className="model-logo"
-          />
-        ),
-      })),
+      readyModels.map((model) => {
+        const id = model.apiModel.toLowerCase();
+        const type = id.includes('image')
+          ? 'image'
+          : id.includes('sora') || id.includes('veo') || id.includes('video')
+            ? 'video'
+            : 'text';
+        return {
+          id: model.id,
+          label: model.name,
+          searchText: `${model.name.toLowerCase()} ${getProviderLabel(model.provider).toLowerCase()}`,
+          group: type,
+          icon: (
+            <img
+              src={getProviderIconSrc(model.provider)}
+              alt={getProviderLabel(model.provider)}
+              style={{ width: 12, height: 12, display: 'block' }}
+            />
+          ),
+        };
+      }),
     [readyModels],
   );
 
@@ -989,12 +899,16 @@ export function BatchTestPage() {
                 Model<span className="req">*</span>
               </label>
               <MultiSelectDropdown
-                label=""
-                labelIcon={null}
                 options={modelDropdownOptions}
                 selectedIds={selectedModelIds}
                 onToggle={(id) => setSelectedModelIds((current) => toggleSelection(current, id))}
                 emptyLabel="Select models…"
+                searchPlaceholder="Search models…"
+                groups={[
+                  { key: 'text', label: 'Text' },
+                  { key: 'image', label: 'Image' },
+                  { key: 'video', label: 'Video' },
+                ]}
               />
             </div>
 
@@ -1004,12 +918,12 @@ export function BatchTestPage() {
                 System prompt<span className="req">*</span>
               </label>
               <MultiSelectDropdown
-                label=""
-                labelIcon={null}
                 options={promptDropdownOptions}
                 selectedIds={selectedPromptIds}
                 onToggle={(id) => setSelectedPromptIds((current) => toggleSelection(current, id))}
                 emptyLabel="Select prompts…"
+                searchPlaceholder="Search prompts…"
+                groups={promptGroups}
               />
             </div>
 
@@ -1019,14 +933,13 @@ export function BatchTestPage() {
                 Image reference
               </label>
               <MultiSelectDropdown
-                label=""
-                labelIcon={null}
                 options={imageReferenceDropdownOptions}
                 selectedIds={selectedImageReferenceIds}
                 onToggle={(id) =>
                   setSelectedImageReferenceIds((current) => toggleSelection(current, id))
                 }
                 emptyLabel="Select images…"
+                searchPlaceholder="Search images…"
               />
             </div>
 
@@ -1036,14 +949,13 @@ export function BatchTestPage() {
                 Text input
               </label>
               <MultiSelectDropdown
-                label=""
-                labelIcon={null}
                 options={textInputDropdownOptions}
                 selectedIds={selectedTextInputAssetIds}
                 onToggle={(id) =>
                   setSelectedTextInputAssetIds((current) => toggleSelection(current, id))
                 }
                 emptyLabel="Select text inputs…"
+                searchPlaceholder="Search text inputs…"
               />
             </div>
 

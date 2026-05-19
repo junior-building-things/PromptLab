@@ -1,28 +1,32 @@
+import { useEffect, useState } from 'react';
+
 /**
- * Login screen — re-skinned to match the Claude Design PromptLab.html
- * aesthetic: dotted radial background, frosted dark card, violet AI
- * accent. The brand mark up top gets the same 3.2 s breathing glow as
- * the sidebar's `.brand-mark` so the auth screen feels like part of the
- * app rather than a separate Google-OAuth landing page.
+ * Sign-in page — exact port of the second Claude Design bundle
+ * (api.anthropic.com/v1/design/h/IhEzCST7k5UGoxLLcN_uOw).
+ *
+ *   .na-page
+ *     .na-grid       (subtle backdrop grid + radial vignette mask)
+ *     .na-glow       (violet glow centered above the card)
+ *     .na-main
+ *       .na-card
+ *         .lk-eyebrow      "— SINGLE SIGN-ON —"
+ *         .na-title         "Sign in to <PromptLab>" (kbd-style pill)
+ *         .na-lede           workspace pitch
+ *         .lk-btn            white "Continue with Lark" button
+ *         .lk-foot           "Access restricted to ByteDance users."
+ *
+ * Once the button is clicked, the idle state is replaced with a
+ * three-step progress indicator (Opening Lark → Verifying identity →
+ * Granting access) while the OAuth redirect fires — matching the
+ * design's `loginProgress` element. We can't observe Lark's internal
+ * stages from our side, so the timing is interpolated client-side.
  */
 
-function LarkMark() {
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" style={{ width: 22, height: 22 }}>
-      <defs>
-        <linearGradient id="lark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#00D6B9" />
-          <stop offset="100%" stopColor="#00B0FF" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="7" fill="url(#lark-gradient)" />
-      <path
-        d="M9.5 8h2.6v13.2c0 .35.28.6.62.6h9.78v2.6H12.6c-1.71 0-3.1-1.4-3.1-3.1V8Z"
-        fill="#ffffff"
-      />
-    </svg>
-  );
-}
+const PROGRESS_STEPS = [
+  { key: 'connect', label: 'Opening Lark' },
+  { key: 'verify', label: 'Verifying identity' },
+  { key: 'grant', label: 'Granting access' },
+] as const;
 
 type LoginScreenProps = {
   loading: boolean;
@@ -31,123 +35,97 @@ type LoginScreenProps = {
 };
 
 export function LoginScreen({ loading, errorMessage, onLogin }: LoginScreenProps) {
-  return (
-    <>
-      <div className="app-bg" />
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          minHeight: '100vh',
-          display: 'grid',
-          placeItems: 'center',
-          padding: '40px',
-        }}
-      >
-        <div
-          style={{
-            width: 'min(420px, 100%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 20,
-          }}
-        >
-          <div
-            className="brand-mark"
-            style={{ width: 56, height: 56, borderRadius: 14 }}
-          >
-            <img
-              src="/assets/app-icon.png"
-              alt="PromptLab"
-              style={{ width: '100%', height: '100%', borderRadius: 11, display: 'block' }}
-            />
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 600,
-                letterSpacing: '-0.02em',
-                color: 'var(--text)',
-              }}
-            >
-              PromptLab
-            </div>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--text-dim)',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                marginTop: 4,
-              }}
-            >
-              v2.2 · Prompt management
-            </div>
-          </div>
+  // Once the user clicks "Continue with Lark", we redirect to Lark's
+  // authorize endpoint. The redirect is near-instant, but we briefly
+  // show the progress UI so the click feels acknowledged. The real
+  // post-redirect flow runs server-side; by the time control returns
+  // to the SPA the user is either signed in or back here with an
+  // `auth_error=` query param.
+  const [redirecting, setRedirecting] = useState(false);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [fill, setFill] = useState(0);
 
-          <div
-            className="modal"
-            style={{
-              width: '100%',
-              background: 'var(--panel)',
-              backdropFilter: 'blur(20px) saturate(140%)',
-              padding: 24,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-              borderRadius: 'var(--r-xl)',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--text-dim)',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                textAlign: 'center',
-              }}
-            >
-              Sign in to continue
+  useEffect(() => {
+    if (!redirecting) return;
+    // Step the progress indicator forward in three beats. The actual
+    // browser redirect is fired immediately by `onLogin`; this is
+    // purely cosmetic.
+    const step1 = window.setTimeout(() => {
+      setStepIndex(1);
+      setFill(45);
+    }, 400);
+    const step2 = window.setTimeout(() => {
+      setStepIndex(2);
+      setFill(85);
+    }, 1100);
+    return () => {
+      window.clearTimeout(step1);
+      window.clearTimeout(step2);
+    };
+  }, [redirecting]);
+
+  const handleClick = () => {
+    if (loading || redirecting) return;
+    setRedirecting(true);
+    setFill(15);
+    onLogin();
+  };
+
+  return (
+    <div className="na-page">
+      <div className="na-grid" />
+      <div className="na-glow" />
+      <main className="na-main">
+        <div className="na-card">
+          <div className="na-card-body">
+            <div className="lk-eyebrow">
+              <span>— Single sign-on —</span>
             </div>
-            <button
-              type="button"
-              className="btn"
-              disabled={loading}
-              onClick={onLogin}
-              style={{
-                height: 44,
-                fontSize: 13.5,
-                fontWeight: 500,
-                width: '100%',
-                justifyContent: 'center',
-                gap: 10,
-              }}
-            >
-              <LarkMark />
-              {loading ? 'Checking session…' : 'Sign in with Lark'}
-            </button>
-            {errorMessage ? (
-              <div
-                style={{
-                  padding: 10,
-                  borderRadius: 'var(--r-sm)',
-                  border: '1px solid oklch(0.72 0.18 22 / 0.4)',
-                  background: 'oklch(0.72 0.18 22 / 0.1)',
-                  color: 'var(--rose)',
-                  fontSize: 12,
-                  lineHeight: 1.4,
-                }}
-              >
-                {errorMessage}
+            <h1 className="na-title">
+              Sign in to <span className="na-mono">PromptLab</span>
+            </h1>
+            <p className="na-lede">
+              PromptLab is your prompt engineering workspace — iterate on prompts, batch
+              test across models, and ship the best candidate.
+            </p>
+
+            {redirecting ? (
+              <div className="lk-progress">
+                <div className="lk-progress-bar">
+                  <div className="lk-progress-fill" style={{ width: `${fill}%` }} />
+                </div>
+                <div className="lk-progress-steps">
+                  {PROGRESS_STEPS.map((step, i) => {
+                    const cls = i < stepIndex ? 'done' : i === stepIndex ? 'active' : '';
+                    return (
+                      <div key={step.key} className={`lk-step ${cls}`}>
+                        <span className="lk-step-dot" />
+                        <span>{step.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            ) : null}
+            ) : (
+              <div>
+                <button
+                  type="button"
+                  className="lk-btn"
+                  disabled={loading}
+                  onClick={handleClick}
+                >
+                  <img src="/assets/lark.png" alt="" className="lk-btn-logo" />
+                  {loading ? 'Checking session…' : 'Continue with Lark'}
+                </button>
+              </div>
+            )}
+
+            {errorMessage ? <div className="lk-error">{errorMessage}</div> : null}
+
+            <div className="lk-foot">Access restricted to ByteDance users.</div>
           </div>
         </div>
-      </div>
-    </>
+      </main>
+    </div>
   );
 }
