@@ -54,7 +54,7 @@ export function AppLayout() {
 
             <div className="sidebar-user-copy">
               <strong>{firstName}</strong>
-              <span>{user?.email || 'Signed In With Google'}</span>
+              <span>{user?.email || 'Signed in with Lark'}</span>
             </div>
           </div>
 
