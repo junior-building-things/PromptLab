@@ -1,7 +1,7 @@
 import { KeyRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
-import { getProviderIconSrc } from '../lib/model-brand';
+import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
 import type { Provider } from '../lib/types';
 
 const providerOrder: Provider[] = ['openai', 'gemini', 'xai'];
@@ -47,127 +47,91 @@ export function ModelsPage() {
   }
 
   return (
-    <>
-      {/* Flush toolbar matches the DictateAI / Hamlet pattern: page title +
-        * sub on the left, no primary action here (model presets are managed
-        * elsewhere). Sits flush against the topbar with a hairline below. */}
-      <div className="tab-toolbar">
-        <div className="page-header-text">
-          <div className="page-header-title">Model management</div>
-          <div className="page-header-sub">
-            Add your provider API keys, then prepare model presets before batch tests hit the network.
-          </div>
+    <section className="page-stack">
+      <header className="hero-card">
+        <div>
+          <h2>Model Management</h2>
+          <p>Add your provider API keys, then prepare model presets before batch tests hit the network.</p>
         </div>
-      </div>
+      </header>
 
-      <div className="page-scroll">
-        <div className="page-body">
+      <div className="stack-list">
+        <section className="settings-grid provider-key-grid">
           {providerModels.map(({ provider, models: modelsForProvider }) => (
-            <div key={provider} className="s-group">
-              <div className="s-group-head">
-                <div className="title-wrap">
-                  <span className="title">{providerCardTitle[provider]}</span>
-                </div>
-                <div className="bar" />
-              </div>
-
-              <div className="s-row">
-                <div className="s-icon">
+            <article key={provider} className="surface-card model-card provider-key-card">
+              <div className="model-card-header">
+                <div className="model-identity">
                   <img
+                    className="provider-logo"
                     src={getProviderIconSrc(provider)}
                     alt={providerCardTitle[provider]}
-                    style={{ width: 16, height: 16, objectFit: 'contain' }}
                   />
-                </div>
-                <div className="s-body">
-                  <div className="s-label">Provider</div>
-                  <div className="s-desc">
-                    {providerKeys[provider].hasKey
-                      ? 'API key stored. Tap to update.'
-                      : 'No API key yet — add one to enable this provider in batch runs.'}
+                  <div>
+                    <h3>{providerCardTitle[provider]}</h3>
                   </div>
                 </div>
               </div>
 
-              <div className="s-row">
-                <div className="s-icon">
-                  <KeyRound strokeWidth={2} />
-                </div>
-                <div className="s-body">
-                  <div className="s-label">API key</div>
-                  <div className="s-desc">Stored encrypted in Postgres (AES-256-GCM).</div>
-                </div>
-                <div className="s-control">
-                  <div className="field-row">
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      className="s-input"
-                      value={
-                        draftKeys[provider] ||
-                        (providerKeys[provider].hasKey && editingProvider !== provider
-                          ? hiddenKeyMask
-                          : '')
-                      }
-                      onFocus={() => {
-                        if (providerKeys[provider].hasKey && draftKeys[provider].length === 0) {
-                          setEditingProvider(provider);
-                        }
-                      }}
-                      onBlur={() => {
-                        if (draftKeys[provider].length === 0 && editingProvider === provider) {
-                          setEditingProvider(null);
-                        }
-                      }}
-                      onChange={(event) => {
-                        const nextValue = event.target.value;
+              <div className="field-block">
+                <span className="field-block-label">
+                  <KeyRound size={15} />
+                  API Key
+                </span>
+                <div className="provider-key-input-row">
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    className="provider-key-input"
+                    value={
+                      draftKeys[provider] ||
+                      (providerKeys[provider].hasKey && editingProvider !== provider ? hiddenKeyMask : '')
+                    }
+                    onFocus={() => {
+                      if (providerKeys[provider].hasKey && draftKeys[provider].length === 0) {
                         setEditingProvider(provider);
-                        setDraftKeys((current) => ({
-                          ...current,
-                          [provider]: nextValue === hiddenKeyMask ? '' : nextValue,
-                        }));
-                      }}
-                      placeholder="Enter key"
-                    />
-                    <button
-                      type="button"
-                      className="btn"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => void handleSave(provider)}
-                      disabled={savingProvider === provider || draftKeys[provider].trim().length === 0}
-                    >
-                      {savingProvider === provider ? 'Saving…' : 'Verify'}
-                    </button>
-                  </div>
+                      }
+                    }}
+                    onBlur={() => {
+                      if (draftKeys[provider].length === 0 && editingProvider === provider) {
+                        setEditingProvider(null);
+                      }
+                    }}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setEditingProvider(provider);
+                      setDraftKeys((current) => ({
+                        ...current,
+                        [provider]: nextValue === hiddenKeyMask ? '' : nextValue,
+                      }));
+                    }}
+                    placeholder="Enter key"
+                  />
+                  <button
+                    type="button"
+                    className="button button-primary button-small provider-key-inline-save"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => void handleSave(provider)}
+                    disabled={savingProvider === provider || draftKeys[provider].trim().length === 0}
+                  >
+                    {savingProvider === provider ? 'Saving...' : 'Save'}
+                  </button>
                 </div>
               </div>
 
-              {modelsForProvider.length > 0 ? (
-                <div className="s-row s-row-col">
-                  <div className="s-head-row">
-                    <div className="s-icon" aria-hidden="true">
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-                        {modelsForProvider.length}
-                      </span>
+              <div className="field-block provider-models-block">
+                <span className="field-block-label">Available Models</span>
+                <div className="provider-model-list">
+                  {modelsForProvider.map((model) => (
+                    <div key={model.id} className="provider-model-row">
+                      <span>{model.name}</span>
                     </div>
-                    <div className="s-body">
-                      <div className="s-label">Available models</div>
-                      <div className="s-desc">Pick from these in the Batch Test composer.</div>
-                    </div>
-                  </div>
-                  <div className="provider-model-list">
-                    {modelsForProvider.map((model) => (
-                      <div key={model.id} className="provider-model-row">
-                        <span>{model.name}</span>
-                      </div>
-                    ))}
-                  </div>
+                  ))}
                 </div>
-              ) : null}
-            </div>
+              </div>
+            </article>
           ))}
-        </div>
+        </section>
       </div>
-    </>
+    </section>
   );
 }

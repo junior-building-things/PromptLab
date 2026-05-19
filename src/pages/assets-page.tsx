@@ -1,4 +1,4 @@
-import { FileImage, FileText, MoreHorizontal, Plus, Trash2, Upload, X } from 'lucide-react';
+import { FileImage, FileText, MoreHorizontal, Plus, Trash2, Upload } from 'lucide-react';
 import {
   type ChangeEvent,
   useMemo,
@@ -151,21 +151,18 @@ export function AssetsPage() {
 
   return (
     <>
-      <div className="tab-toolbar">
-        <div className="page-header-text">
-          <div className="page-header-title">Assets</div>
-          <div className="page-header-sub">
-            Store reusable text inputs and image references for batch testing.
+      <section className="page-stack">
+        <header className="hero-card">
+          <div>
+            <h2>Assets</h2>
+            <p>Store reusable text inputs and image references for batch testing.</p>
           </div>
-        </div>
-        <button type="button" className="btn btn-ai" onClick={openComposer}>
-          <Plus strokeWidth={2} />
-          Upload asset
-        </button>
-      </div>
+          <button className="button button-primary" onClick={openComposer}>
+            <Plus size={16} />
+            Upload Asset
+          </button>
+        </header>
 
-      <div className="page-scroll">
-        <div className="page-body">
         {sortedAssets.length > 0 ? (
           <div className="asset-grid">
             {sortedAssets.map((asset) => {
@@ -228,111 +225,104 @@ export function AssetsPage() {
             <div className="icon-pill icon-pill-muted">
               <Upload size={22} />
             </div>
-            <h3>No assets yet</h3>
+            <h3>No Assets Yet</h3>
             <p>Upload text inputs or image references to reuse them across prompt tests.</p>
           </article>
         )}
-        </div>
-      </div>
+      </section>
 
-      {/* Asset composer — DictateAI-style modal. Backdrop click + Cancel
-        * dismiss; rendered always so the CSS transition can play on
-        * enter/exit. */}
-      <div
-        className={`modal-overlay ${composerOpen ? 'open' : ''}`}
-        role="presentation"
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeComposer();
-        }}
-      >
-        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="asset-modal-title">
-          <div className="modal-header">
-            <div id="asset-modal-title" className="modal-title">Upload asset</div>
-            <button type="button" className="modal-close" onClick={closeComposer} aria-label="Close">
-              <X size={14} strokeWidth={2} />
-            </button>
-          </div>
-          <div className="modal-body">
-            <label className="modal-field">
-              <span className="modal-label">Name</span>
-              <input
-                value={draft.name}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, name: event.target.value }))
-                }
-                placeholder="Launch Inputs"
-              />
-            </label>
-
-            <label className="modal-field">
-              <span className="modal-label">Type</span>
-              <select
-                value={draft.kind}
-                onChange={(event) => {
-                  setSelectedFileName('');
-                  setDraft((current) => ({
-                    ...current,
-                    kind: event.target.value as AssetKind,
-                    source: '',
-                  }));
-                }}
-              >
-                <option value="text-inputs">Text inputs</option>
-                <option value="image-reference">Image reference</option>
-              </select>
-              <p className="meta-text">{typeCopy[draft.kind]}</p>
-            </label>
-
-            <div className="modal-field">
-              <span className="modal-label">Upload file</span>
-              <div className="button-row-inline">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload strokeWidth={2} />
-                  Choose file
-                </button>
-                <span className="meta-text">
-                  {draft.kind === 'image-reference' ? 'PNG or JPG' : 'TXT'}
-                </span>
+      {composerOpen ? (
+        <div className="composer-backdrop" onClick={closeComposer}>
+          <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
+            <header className="composer-sheet-header">
+              <div>
+                <h3>Upload Asset</h3>
               </div>
-              {selectedFileName ? <p className="meta-text">{selectedFileName}</p> : null}
-              <input
-                ref={fileInputRef}
-                className="sr-only"
-                type="file"
-                accept={accept}
-                onChange={handleFileChange}
-              />
-            </div>
+              <div className="button-row-inline">
+                <button className="button button-secondary" onClick={closeComposer}>
+                  Cancel
+                </button>
+                <button className="button button-primary" onClick={handleCreateAsset}>
+                  Upload Asset
+                </button>
+              </div>
+            </header>
 
-            {draft.kind === 'text-inputs' ? (
-              <label className="modal-field">
-                <span className="modal-label">Paste text inputs</span>
-                <textarea
-                  rows={6}
-                  value={draft.source}
+            <div className="stack-list">
+              <label className="field-block">
+                <span>Name</span>
+                <input
+                  value={draft.name}
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, source: event.target.value }))
+                    setDraft((current) => ({ ...current, name: event.target.value }))
                   }
-                  placeholder="Paste comma-separated text inputs."
+                  placeholder="Launch Inputs"
                 />
               </label>
-            ) : null}
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn" onClick={closeComposer}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn-ai" onClick={handleCreateAsset}>
-              <Plus strokeWidth={2} />
-              Upload asset
-            </button>
-          </div>
+
+              <label className="field-block">
+                <span>Type</span>
+                <select
+                  value={draft.kind}
+                  onChange={(event) =>
+                    {
+                      setSelectedFileName('');
+                      setDraft((current) => ({
+                        ...current,
+                        kind: event.target.value as AssetKind,
+                        source: '',
+                      }));
+                    }
+                  }
+                >
+                  <option value="text-inputs">Text Inputs</option>
+                  <option value="image-reference">Image Reference</option>
+                </select>
+                <p className="meta-text">{typeCopy[draft.kind]}</p>
+              </label>
+
+              <div className="field-block">
+                <span>Upload File</span>
+                <div className="button-row-inline">
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={16} />
+                    Choose File
+                  </button>
+                  <span className="meta-text">
+                    {draft.kind === 'image-reference' ? 'PNG or JPG' : 'TXT'}
+                  </span>
+                </div>
+                {selectedFileName ? <p className="meta-text">{selectedFileName}</p> : null}
+                <input
+                  ref={fileInputRef}
+                  className="sr-only"
+                  type="file"
+                  accept={accept}
+                  onChange={handleFileChange}
+                />
+              </div>
+
+              {draft.kind === 'text-inputs' ? (
+                <label className="field-block">
+                  <span>Paste Text Inputs</span>
+                  <textarea
+                    rows={6}
+                    value={draft.source}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, source: event.target.value }))
+                    }
+                    placeholder="Paste comma-separated text inputs."
+                  />
+                </label>
+              ) : null}
+            </div>
+          </section>
         </div>
-      </div>
+      ) : null}
     </>
   );
 }

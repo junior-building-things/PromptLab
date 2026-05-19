@@ -1,5 +1,5 @@
 import { differenceInDays, differenceInHours, differenceInMinutes, differenceInMonths, differenceInYears, format } from 'date-fns';
-import { ChevronDown, ChevronRight, FolderPlus, MoreHorizontal, Plus, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, FolderPlus, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useAppContext } from '../context/app-context';
 
@@ -144,48 +144,33 @@ export function PromptsPage() {
 
   return (
     <>
-      {/* Search + New Project toolbar — DictateAI shell. Search on the
-       * left, project count chip in the middle, primary action on the
-       * right. Page intro copy moved to a thin sub-row beneath. */}
-      <div className="tab-toolbar">
-        <div
-          className="flex h-8 items-center gap-2 rounded-md border px-3"
-          style={{
-            background: 'var(--bg-elev-2)',
-            borderColor: 'var(--hairline)',
-            color: 'var(--text-muted)',
-            width: 280,
-            display: 'inline-flex',
-          }}
-        >
-          <Search size={13} strokeWidth={2} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search prompts…"
-            style={{
-              flex: 1,
-              background: 'transparent',
-              border: 0,
-              outline: 'none',
-              fontSize: 12,
-              color: 'var(--text)',
-              fontFamily: 'inherit',
-            }}
-          />
-        </div>
-        <span className="mono-label" style={{ fontSize: '10.5px' }}>
-          {cards.length} {cards.length === 1 ? 'project' : 'projects'}
-        </span>
-        <div style={{ flex: 1 }} />
-        <button type="button" className="btn btn-ai" onClick={openProjectComposer}>
-          <FolderPlus strokeWidth={2} />
-          New project
-        </button>
-      </div>
+      <section className="page-stack">
+        <header className="hero-card">
+          <div>
+            <h2>Prompt Library</h2>
+            <p>
+              Organize prompts as projects, create versioned iterations, and keep the latest candidate
+              easy to test.
+            </p>
+          </div>
+          <button className="button button-primary" onClick={openProjectComposer}>
+            <FolderPlus size={16} />
+            New Project
+          </button>
+        </header>
 
-      <div className="page-scroll">
-        <div className="page-body">
+        <div className="toolbar-card">
+          <label className="search-input">
+            <Search size={16} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search project names or prompt bodies"
+            />
+          </label>
+          <div className="pill">{cards.length} projects</div>
+        </div>
+
         <div className="card-grid card-grid-prompts">
           {cards.map(({ project, versions, latestVersion }) => {
             const isExpanded = expandedProjects.has(project.id);
@@ -291,78 +276,67 @@ export function PromptsPage() {
             );
           })}
         </div>
-        </div>
-      </div>
+      </section>
 
-      {/* Composer modal — DictateAI shape (overlay + centered dialog with
-       * header / body / footer). The modal is always mounted so the CSS
-       * transition can play on enter / exit. */}
-      <div
-        className={`modal-overlay ${composer ? 'open' : ''}`}
-        role="presentation"
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeComposer();
-        }}
-      >
-        <div
-          className="modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="prompt-modal-title"
-          style={{ width: 'min(560px, 100%)' }}
-        >
-          <div className="modal-header">
-            <div id="prompt-modal-title" className="modal-title">
-              {composer?.mode === 'project' ? 'Create project' : 'Create prompt'}
+      {composer ? (
+        <div className="composer-backdrop" onClick={closeComposer}>
+          <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
+            <header className="composer-sheet-header">
+              <div>
+                <h3>{composer.mode === 'project' ? 'Create Project' : 'Create Prompt'}</h3>
+              </div>
+              <div className="button-row-inline">
+                <button className="button button-secondary" onClick={closeComposer}>
+                  Cancel
+                </button>
+                <button className="button button-primary" onClick={submitComposer}>
+                  {composer.mode === 'project' ? 'Create Project' : 'Create Prompt'}
+                </button>
+              </div>
+            </header>
+
+            <div className="stack-list">
+              <label className="field-block">
+                <span>Project name</span>
+                <input
+                  value={composer.projectName}
+                  disabled={composer.mode === 'prompt'}
+                  onChange={(event) =>
+                    setComposer((current) =>
+                      current
+                        ? {
+                            ...current,
+                            projectName: event.target.value,
+                          }
+                        : current,
+                    )
+                  }
+                  placeholder="Launch Messaging"
+                />
+              </label>
+
+              <label className="field-block">
+                <span>System prompt</span>
+                <textarea
+                  rows={12}
+                  value={composer.systemPrompt}
+                  onChange={(event) =>
+                    setComposer((current) =>
+                      current
+                        ? {
+                            ...current,
+                            systemPrompt: event.target.value,
+                          }
+                        : current,
+                    )
+                  }
+                  placeholder="Describe the role, task, inputs, and output constraints here."
+                />
+              </label>
             </div>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={closeComposer}
-              aria-label="Close"
-            >
-              <X size={14} strokeWidth={2} />
-            </button>
-          </div>
-          <div className="modal-body">
-            <label className="modal-field">
-              <span className="modal-label">Project name</span>
-              <input
-                value={composer?.projectName ?? ''}
-                disabled={composer?.mode === 'prompt'}
-                onChange={(event) =>
-                  setComposer((current) =>
-                    current ? { ...current, projectName: event.target.value } : current,
-                  )
-                }
-                placeholder="Launch Messaging"
-              />
-            </label>
-            <label className="modal-field">
-              <span className="modal-label">System prompt</span>
-              <textarea
-                rows={12}
-                value={composer?.systemPrompt ?? ''}
-                onChange={(event) =>
-                  setComposer((current) =>
-                    current ? { ...current, systemPrompt: event.target.value } : current,
-                  )
-                }
-                placeholder="Describe the role, task, inputs, and output constraints here."
-              />
-            </label>
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn" onClick={closeComposer}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn-ai" onClick={submitComposer}>
-              <Plus strokeWidth={2} />
-              {composer?.mode === 'project' ? 'Create project' : 'Create prompt'}
-            </button>
-          </div>
+          </section>
         </div>
-      </div>
+      ) : null}
     </>
   );
 }
