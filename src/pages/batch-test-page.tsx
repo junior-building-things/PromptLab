@@ -780,18 +780,19 @@ export function BatchTestPage() {
 
   return (
     <>
-      <section className="page-stack">
-        <header className="hero-card">
-          <div>
-            <h2>Batch Test</h2>
-            <p>Run and review previous batch tests.</p>
-          </div>
-          <button className="button button-primary" onClick={openComposer}>
-            <Play size={16} />
-            New Batch Test
-          </button>
-        </header>
+      <div className="tab-toolbar">
+        <div className="page-header-text">
+          <div className="page-header-title">Batch test</div>
+          <div className="page-header-sub">Run and review previous batch tests.</div>
+        </div>
+        <button type="button" className="btn btn-ai" onClick={openComposer}>
+          <Play strokeWidth={2} />
+          New batch test
+        </button>
+      </div>
 
+      <div className="page-scroll">
+        <div className="page-body">
         <div className="stack-list">
           {history.length === 0 ? (
             <div className="surface-card empty-card">
@@ -929,26 +930,37 @@ export function BatchTestPage() {
             </>
           )}
         </div>
-      </section>
+        </div>
+      </div>
 
-      {composerOpen ? (
-        <div className="composer-backdrop" onClick={closeComposer}>
-          <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
-            <header className="composer-sheet-header">
-              <div>
-                <h3>New Batch Test</h3>
-              </div>
-              <div className="button-row-inline">
-                <button className="button button-secondary" onClick={closeComposer}>
-                  Cancel
-                </button>
-                <button className="button button-primary" onClick={runBatch} disabled={running}>
-                  {running ? <LoaderCircle size={16} className="spin" /> : <Play size={16} />}
-                  {running ? 'Running...' : 'New Job'}
-                </button>
-              </div>
-            </header>
-
+      {/* New-batch-test composer — DictateAI modal shell. Width bumped to
+       * 620 px so the multi-select dropdowns + toggles don't feel cramped. */}
+      <div
+        className={`modal-overlay ${composerOpen ? 'open' : ''}`}
+        role="presentation"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeComposer();
+        }}
+      >
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="batch-modal-title"
+          style={{ width: 'min(620px, 100%)' }}
+        >
+          <div className="modal-header">
+            <div id="batch-modal-title" className="modal-title">New batch test</div>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={closeComposer}
+              aria-label="Close"
+            >
+              <X size={14} strokeWidth={2} />
+            </button>
+          </div>
+          <div className="modal-body">
             <div className="stack-list">
               <MultiSelectDropdown
                 label="Choose model"
@@ -1011,17 +1023,44 @@ export function BatchTestPage() {
               {errorMessage ? (
                 <article className="surface-card stat-card error-card">
                   <AlertCircle size={18} />
-                  <h3>Run Failed</h3>
+                  <h3>Run failed</h3>
                   <p>{errorMessage}</p>
                 </article>
               ) : null}
             </div>
-          </section>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn" onClick={closeComposer}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-ai"
+              onClick={runBatch}
+              disabled={running}
+            >
+              {running ? (
+                <LoaderCircle strokeWidth={2} className="spin" />
+              ) : (
+                <Play strokeWidth={2} />
+              )}
+              {running ? 'Running…' : 'Run batch'}
+            </button>
+          </div>
         </div>
-      ) : null}
+      </div>
 
-      {previewImageSrc ? (
-        <div className="composer-backdrop" onClick={() => setPreviewImageSrc(null)}>
+      {/* Image-preview lightbox — separate modal-overlay so it can layer
+       * above the composer if needed. */}
+      <div
+        className={`modal-overlay ${previewImageSrc ? 'open' : ''}`}
+        role="presentation"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setPreviewImageSrc(null);
+        }}
+        style={{ zIndex: 60 }}
+      >
+        {previewImageSrc ? (
           <section
             className="surface-card image-preview-sheet"
             onClick={(event) => event.stopPropagation()}
@@ -1040,8 +1079,8 @@ export function BatchTestPage() {
               alt="Generated output preview"
             />
           </section>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </>
   );
 }

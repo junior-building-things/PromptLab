@@ -67,6 +67,11 @@ export function AppLayout() {
       </aside>
 
       <main className="main-panel">
+        {/* Flex column with `min-height: 0` so each page can host its own
+         * `.tab-toolbar` (flex-shrink:0) and `.page-scroll` (flex:1) — the
+         * DictateAI pattern. Pages opt in by rendering those primitives
+         * at their root; legacy pages still work because `.page-stack`
+         * fills the column naturally. */}
         <div className="main-panel-inner">
           <Outlet />
         </div>
