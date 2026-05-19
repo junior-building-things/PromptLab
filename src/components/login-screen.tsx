@@ -1,13 +1,14 @@
-import { Bot, ImageIcon, PlaySquare, Sparkles } from 'lucide-react';
-
 /**
- * Lark wordmark — simplified geometric "L" glyph in Lark's brand gradient.
- * Inlined as SVG so we don't ship another image asset just for the
- * sign-in button.
+ * Login screen — re-skinned to match the Claude Design PromptLab.html
+ * aesthetic: dotted radial background, frosted dark card, violet AI
+ * accent. The brand mark up top gets the same 3.2 s breathing glow as
+ * the sidebar's `.brand-mark` so the auth screen feels like part of the
+ * app rather than a separate Google-OAuth landing page.
  */
+
 function LarkMark() {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" className="lark-mark">
+    <svg viewBox="0 0 32 32" aria-hidden="true" style={{ width: 22, height: 22 }}>
       <defs>
         <linearGradient id="lark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#00D6B9" />
@@ -23,12 +24,6 @@ function LarkMark() {
   );
 }
 
-const featureItems = [
-  { icon: Sparkles, className: 'feature-icon-prompts', label: 'Organize prompts by project and version' },
-  { icon: ImageIcon, className: 'feature-icon-assets', label: 'Upload and store testing assets' },
-  { icon: PlaySquare, className: 'feature-icon-batch', label: 'Batch test different prompts and models' },
-];
-
 type LoginScreenProps = {
   loading: boolean;
   errorMessage: string;
@@ -37,37 +32,122 @@ type LoginScreenProps = {
 
 export function LoginScreen({ loading, errorMessage, onLogin }: LoginScreenProps) {
   return (
-    <div className="auth-shell">
-      <section className="auth-stage">
-        <div className="auth-brand-stack">
-          <div className="brand-icon auth-brand-icon">
-            <Bot size={30} />
+    <>
+      <div className="app-bg" />
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          padding: '40px',
+        }}
+      >
+        <div
+          style={{
+            width: 'min(420px, 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 20,
+          }}
+        >
+          <div
+            className="brand-mark"
+            style={{ width: 56, height: 56, borderRadius: 14 }}
+          >
+            <img
+              src="/assets/app-icon.png"
+              alt="PromptLab"
+              style={{ width: '100%', height: '100%', borderRadius: 11, display: 'block' }}
+            />
           </div>
-          <h1>PromptLab</h1>
-        </div>
+          <div style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                letterSpacing: '-0.02em',
+                color: 'var(--text)',
+              }}
+            >
+              PromptLab
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                color: 'var(--text-dim)',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                marginTop: 4,
+              }}
+            >
+              v2.2 · Prompt management
+            </div>
+          </div>
 
-        <div className="auth-card">
-          <div className="auth-feature-list">
-            {featureItems.map(({ icon: Icon, className, label }) => (
-              <div key={label} className="auth-feature-item">
-                <Icon size={24} className={className} />
-                <span>{label}</span>
+          <div
+            className="modal"
+            style={{
+              width: '100%',
+              background: 'var(--panel)',
+              backdropFilter: 'blur(20px) saturate(140%)',
+              padding: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              borderRadius: 'var(--r-xl)',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                color: 'var(--text-dim)',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                textAlign: 'center',
+              }}
+            >
+              Sign in to continue
+            </div>
+            <button
+              type="button"
+              className="btn"
+              disabled={loading}
+              onClick={onLogin}
+              style={{
+                height: 44,
+                fontSize: 13.5,
+                fontWeight: 500,
+                width: '100%',
+                justifyContent: 'center',
+                gap: 10,
+              }}
+            >
+              <LarkMark />
+              {loading ? 'Checking session…' : 'Sign in with Lark'}
+            </button>
+            {errorMessage ? (
+              <div
+                style={{
+                  padding: 10,
+                  borderRadius: 'var(--r-sm)',
+                  border: '1px solid oklch(0.72 0.18 22 / 0.4)',
+                  background: 'oklch(0.72 0.18 22 / 0.1)',
+                  color: 'var(--rose)',
+                  fontSize: 12,
+                  lineHeight: 1.4,
+                }}
+              >
+                {errorMessage}
               </div>
-            ))}
+            ) : null}
           </div>
-
-          <div className="auth-divider">
-            <span>Continue With</span>
-          </div>
-
-          <button className="auth-lark-button" onClick={onLogin} disabled={loading}>
-            <LarkMark />
-            <span>{loading ? 'Checking session…' : 'Sign in with Lark'}</span>
-          </button>
-
-          {errorMessage ? <div className="auth-inline-error">{errorMessage}</div> : null}
         </div>
-      </section>
-    </div>
+      </div>
+    </>
   );
 }

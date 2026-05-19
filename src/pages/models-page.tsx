@@ -1,137 +1,209 @@
-import { KeyRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import {
+  IconImage,
+  IconKey,
+  IconText,
+  IconVideo,
+  ProviderMark,
+} from '../components/icons';
 import { useAppContext } from '../context/app-context';
-import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
 import type { Provider } from '../lib/types';
 
-const providerOrder: Provider[] = ['openai', 'gemini', 'xai'];
-const providerCardTitle: Record<Provider, string> = {
-  openai: 'OpenAI',
-  gemini: 'Google',
-  xai: 'xAI',
+/**
+ * Models / API Keys screen — port of the design's `renderModels` +
+ * `renderProvider`. Each provider gets a card with:
+ *   - logo + name + verified-dot status
+ *   - API-key input + "Verify" button (highlights as .btn-ai when
+ *     not yet connected)
+ *   - Available models grouped by Text / Image / Video, three-column
+ *     auto-fit grid below
+ *
+ * The provider model list comes from the app context (real data); the
+ * `--accent` palette tint per provider matches the design's
+ * `oklch(...)` values.
+ */
+
+type ProviderConfig = {
+  id: Provider;
+  name: string;
+  accent: string;
 };
+
+const PROVIDERS_ORDER: ProviderConfig[] = [
+  { id: 'openai', name: 'OpenAI', accent: 'oklch(0.78 0.14 165)' },
+  { id: 'gemini', name: 'Google', accent: 'oklch(0.74 0.14 250)' },
+  { id: 'xai', name: 'xAI', accent: 'oklch(0.78 0.14 30)' },
+];
+
+/** Maps our `Provider` enum to the design's PNG asset filename. We use
+ * `gemini` internally but the design ships `google.png`. */
+function providerToMark(p: Provider): 'openai' | 'google' | 'xai' | 'alibaba' {
+  if (p === 'gemini') return 'google';
+  return p as 'openai' | 'xai';
+}
+
 const hiddenKeyMask = '••••••••••••••••';
 
+/** Best-effort type-bucket inference for a model preset. The catalog's
+ * model `apiModel` strings carry enough signal (gpt-image-*, sora-*,
+ * gemini-*-image-*, veo-*, etc.) that we don't need an explicit field. */
+function modelType(apiModel: string): 'text' | 'image' | 'video' {
+  const n = apiModel.toLowerCase();
+  if (n.includes('image')) return 'image';
+  if (n.includes('sora') || n.includes('veo') || n.includes('video')) return 'video';
+  return 'text';
+}
+
+const TYPE_GROUPS = [
+  { key: 'text' as const, label: 'Text', icon: <IconText /> },
+  { key: 'image' as const, label: 'Image', icon: <IconImage /> },
+  { key: 'video' as const, label: 'Video', icon: <IconVideo /> },
+];
+
 export function ModelsPage() {
-  const {
-    models,
-    providerKeys,
-    saveProviderKey,
-    savingProvider,
-  } = useAppContext();
-  const [draftKeys, setDraftKeys] = useState<Record<Provider, string>>({
-    openai: '',
-    gemini: '',
-    xai: '',
-  });
-  const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
+  const { models, providerKeys, saveProviderKey, savingProvider } = useAppContext();
+  const [draftKeys, setDraftKeys] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<string | null>(null);
 
-  const providerModels = useMemo(
-    () =>
-      providerOrder.map((provider) => ({
-        provider,
-        models: models.filter((model) => model.provider === provider),
-      })),
-    [models],
-  );
+  const providerData = useMemo(() => {
+    return PROVIDERS_ORDER.map((cfg) => {
+      const providerModels = models.filter((m) => m.provider === cfg.id);
+      const groups = TYPE_GROUPS.map((g) => ({
+        ...g,
+        items: providerModels.filter((m) => modelType(m.apiModel) === g.key),
+      })).filter((g) => g.items.length > 0);
+      return {
+        cfg,
+        connected: providerKeys[cfg.id]?.hasKey ?? false,
+        groups,
+      };
+    });
+  }, [models, providerKeys]);
 
-  async function handleSave(provider: Provider) {
+  const handleSave = async (provider: Provider) => {
+    const draft = draftKeys[provider]?.trim();
+    if (!draft) return;
     try {
-      await saveProviderKey(provider, draftKeys[provider]);
-      setDraftKeys((current) => ({ ...current, [provider]: '' }));
-      setEditingProvider(null);
+      await saveProviderKey(provider, draft);
+      setDraftKeys((c) => ({ ...c, [provider]: '' }));
+      setEditing(null);
     } catch {
-      setDraftKeys((current) => ({ ...current, [provider]: '' }));
-      setEditingProvider(provider);
+      setEditing(provider);
     }
-  }
+  };
 
   return (
-    <section className="page-stack">
-      <header className="hero-card">
-        <div>
-          <h2>Model Management</h2>
-          <p>Add your provider API keys, then prepare model presets before batch tests hit the network.</p>
-        </div>
-      </header>
-
-      <div className="stack-list">
-        <section className="settings-grid provider-key-grid">
-          {providerModels.map(({ provider, models: modelsForProvider }) => (
-            <article key={provider} className="surface-card model-card provider-key-card">
-              <div className="model-card-header">
-                <div className="model-identity">
-                  <img
-                    className="provider-logo"
-                    src={getProviderIconSrc(provider)}
-                    alt={providerCardTitle[provider]}
-                  />
+    <div className="body">
+      <div className="section" style={{ marginTop: 0 }}>
+        <div className="provider-grid">
+          {providerData.map(({ cfg, connected, groups }) => {
+            const hasKey = providerKeys[cfg.id]?.hasKey ?? false;
+            const draft = draftKeys[cfg.id] ?? '';
+            const isEditing = editing === cfg.id;
+            const displayValue = draft || (hasKey && !isEditing ? hiddenKeyMask : '');
+            return (
+              <div
+                key={cfg.id}
+                className={`provider-card ${connected ? 'connected' : ''}`}
+                style={{ ['--accent' as never]: cfg.accent }}
+              >
+                <div className="provider-head">
+                  <div className="provider-logo">
+                    <ProviderMark provider={providerToMark(cfg.id)} />
+                  </div>
                   <div>
-                    <h3>{providerCardTitle[provider]}</h3>
+                    <div className="provider-name">{cfg.name}</div>
+                    <div className="provider-sub">
+                      <span className="provider-status-dot" />
+                      {connected ? 'Verified' : 'Not verified'}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="field-block">
-                <span className="field-block-label">
-                  <KeyRound size={15} />
-                  API Key
-                </span>
-                <div className="provider-key-input-row">
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    className="provider-key-input"
-                    value={
-                      draftKeys[provider] ||
-                      (providerKeys[provider].hasKey && editingProvider !== provider ? hiddenKeyMask : '')
-                    }
-                    onFocus={() => {
-                      if (providerKeys[provider].hasKey && draftKeys[provider].length === 0) {
-                        setEditingProvider(provider);
-                      }
-                    }}
-                    onBlur={() => {
-                      if (draftKeys[provider].length === 0 && editingProvider === provider) {
-                        setEditingProvider(null);
-                      }
-                    }}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      setEditingProvider(provider);
-                      setDraftKeys((current) => ({
-                        ...current,
-                        [provider]: nextValue === hiddenKeyMask ? '' : nextValue,
-                      }));
-                    }}
-                    placeholder="Enter key"
-                  />
-                  <button
-                    type="button"
-                    className="button button-primary button-small provider-key-inline-save"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => void handleSave(provider)}
-                    disabled={savingProvider === provider || draftKeys[provider].trim().length === 0}
-                  >
-                    {savingProvider === provider ? 'Saving...' : 'Save'}
-                  </button>
+                <div className="provider-key">
+                  <div className="field-label">
+                    <IconBox size={11}><IconKey /></IconBox>
+                    API key
+                  </div>
+                  <div className="key-row">
+                    <input
+                      className="input"
+                      type="password"
+                      autoComplete="new-password"
+                      value={displayValue}
+                      onFocus={() => {
+                        if (hasKey && !draft) setEditing(cfg.id);
+                      }}
+                      onBlur={() => {
+                        if (!draft && editing === cfg.id) setEditing(null);
+                      }}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setEditing(cfg.id);
+                        setDraftKeys((c) => ({
+                          ...c,
+                          [cfg.id]: next === hiddenKeyMask ? '' : next,
+                        }));
+                      }}
+                      placeholder={`Paste ${cfg.name} key`}
+                    />
+                    <button
+                      type="button"
+                      className={`btn ${connected ? '' : 'btn-ai'}`}
+                      disabled={savingProvider === cfg.id || draft.length === 0}
+                      onClick={() => void handleSave(cfg.id)}
+                    >
+                      {savingProvider === cfg.id ? 'Saving…' : 'Verify'}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="field-block provider-models-block">
-                <span className="field-block-label">Available Models</span>
-                <div className="provider-model-list">
-                  {modelsForProvider.map((model) => (
-                    <div key={model.id} className="provider-model-row">
-                      <span>{model.name}</span>
+                {groups.length > 0 ? (
+                  <div className="provider-models-wrap">
+                    <div className="field-label">Available models</div>
+                    <div className="model-groups">
+                      {groups.map((group) => (
+                        <div key={group.key} className="model-group">
+                          <div className="model-group-head">
+                            <span className="model-group-icon">
+                              <IconBox size={11}>{group.icon}</IconBox>
+                            </span>
+                            <span className="model-group-label">{group.label}</span>
+                            <span className="model-group-count">{group.items.length}</span>
+                          </div>
+                          <div className="model-list">
+                            {group.items.map((model) => (
+                              <div key={model.id} className="model-row">
+                                <div className="model-id">{model.apiModel}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ) : null}
               </div>
-            </article>
-          ))}
-        </section>
+            );
+          })}
+        </div>
       </div>
-    </section>
+    </div>
+  );
+}
+
+function IconBox({ children, size = 13 }: { children: React.ReactNode; size?: number }) {
+  return (
+    <span
+      style={{
+        display: 'inline-grid',
+        placeItems: 'center',
+        width: size,
+        height: size,
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </span>
   );
 }

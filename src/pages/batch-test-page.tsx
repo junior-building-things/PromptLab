@@ -17,8 +17,27 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { setPageChrome } from '../components/app-layout';
 import { useAppContext } from '../context/app-context';
+
+// Small inline helper for the topbar button — gives a lucide icon a
+// fixed pixel footprint that matches the design's `.btn svg { 13px }`.
+function BoxIcon({ children }: { children: ReactNode }) {
+  return (
+    <span
+      style={{
+        display: 'inline-grid',
+        placeItems: 'center',
+        width: 13,
+        height: 13,
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
 import type { AssetRecord, BatchRun, PromptVersion, TestResult } from '../lib/types';
 
@@ -778,247 +797,289 @@ export function BatchTestPage() {
     }
   }
 
+  // Inject the new "New Batch Test" CTA into the layout topbar.
+  useEffect(() => {
+    setPageChrome({
+      topbarRight: (
+        <button type="button" className="btn btn-primary" onClick={openComposer}>
+          <BoxIcon><Play size={13} /></BoxIcon>
+          New Batch Test
+        </button>
+      ),
+    });
+    return () => setPageChrome({});
+  }, []);
+
   return (
     <>
-      <section className="page-stack">
-        <header className="hero-card">
-          <div>
-            <h2>Batch Test</h2>
-            <p>Run and review previous batch tests.</p>
-          </div>
-          <button className="button button-primary" onClick={openComposer}>
-            <Play size={16} />
-            New Batch Test
-          </button>
-        </header>
-
-        <div className="stack-list">
+      <div className="body">
+        <div className="batch-list">
           {history.length === 0 ? (
-            <div className="surface-card empty-card">
-              <HistoryIcon size={44} />
-              <h3>No Batch Tests Yet</h3>
-              <p>Create a batch test to compare prompts, image references, optional text inputs, and models.</p>
+            <div className="hero" style={{ padding: 32, textAlign: 'center' }}>
+              <div className="page-sub">
+                No batch tests yet — hit "New Batch Test" to compare prompts and models.
+              </div>
             </div>
           ) : (
-            <>
-              {history.map((run) => (
-                <article key={run.id} className="surface-card history-shell">
-                  <div className="history-shell-header">
-                    <button className="history-toggle" onClick={() => toggleExpand(run.id)}>
-                      <div className="list-card-topline">
-                        <div className="icon-pill icon-pill-muted">
-                          {expandedTests.has(run.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                        </div>
-                        <div>
-                          <h3>{run.name}</h3>
-                          <div className="history-meta">
-                            <span>{format(new Date(run.createdAt), 'MMM d, yyyy HH:mm')}</span>
-                            <span
-                              className={`pill ${
-                                run.status === 'failed'
-                                  ? 'pill-danger'
-                                  : run.status === 'running'
-                                    ? 'pill-progress'
-                                    : 'pill-success'
-                              }`}
-                            >
-                              {run.status === 'running' ? (
-                                <>
-                                  <LoaderCircle size={14} className="spin" />
-                                  In Progress
-                                </>
-                              ) : run.status === 'failed' ? (
-                                <>
-                                  <CircleAlert size={14} />
-                                  Failed
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle size={14} />
-                                  Completed
-                                </>
-                              )}
-                            </span>
-                            <span className="pill pill-subtle">{run.results.length} Results</span>
-                          </div>
-                        </div>
+            history.map((run) => {
+              const isOpen = expandedTests.has(run.id);
+              const tables = isOpen ? buildRunTables(run) : [];
+              return (
+                <div key={run.id} className={`batch-job ${isOpen ? 'open' : ''}`}>
+                  <div className="batch-head" onClick={() => toggleExpand(run.id)}>
+                    <div className="project-chev">
+                      <ChevronRight size={12} />
+                    </div>
+                    <div className="batch-titlewrap">
+                      <div className="batch-title">{run.name}</div>
+                      <div className="batch-sub">
+                        <span className="batch-stamp">
+                          {format(new Date(run.createdAt), 'MMM d, yyyy · HH:mm')}
+                        </span>
+                        {run.status === 'running' ? (
+                          <span className="batch-pill running">
+                            <span className="spin"><LoaderCircle size={11} /></span>
+                            In progress
+                          </span>
+                        ) : run.status === 'failed' ? (
+                          <span className="batch-pill" style={{ color: 'var(--rose)' }}>
+                            <CircleAlert size={11} />
+                            Failed
+                          </span>
+                        ) : (
+                          <span className="batch-pill ok">
+                            <CheckCircle size={11} />
+                            Complete
+                          </span>
+                        )}
+                        <span className="batch-pill muted">{run.results.length} results</span>
                       </div>
-                    </button>
-
-                    <div className="card-menu-wrap history-card-menu">
-                      <button
-                        type="button"
-                        className="icon-action-button"
-                        aria-label="Open Batch Job Menu"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setOpenRunMenuId((current) => (current === run.id ? null : run.id));
-                        }}
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-
-                      {openRunMenuId === run.id ? (
-                        <div
-                          className="card-menu-sheet"
-                          onClick={(event) => event.stopPropagation()}
+                    </div>
+                    <div className="batch-actions" onClick={(event) => event.stopPropagation()}>
+                      <div className="history-card-menu" style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          className="icon-btn naked"
+                          aria-label="Batch actions"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenRunMenuId((c) => (c === run.id ? null : run.id));
+                          }}
                         >
-                          <button
-                            type="button"
-                            className="menu-sheet-action menu-sheet-danger"
-                            onClick={() => handleRemoveRun(run.id)}
+                          <MoreHorizontal size={14} />
+                        </button>
+                        {openRunMenuId === run.id ? (
+                          <div
+                            className="card-menu-sheet"
+                            style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: 'calc(100% + 6px)',
+                              minWidth: 140,
+                              background: 'var(--bg-elev-1)',
+                              border: '1px solid var(--hairline-strong)',
+                              borderRadius: 'var(--r-md)',
+                              boxShadow: 'var(--shadow-lg)',
+                              zIndex: 20,
+                              padding: 4,
+                            }}
                           >
-                            <Trash2 size={15} />
-                            Remove
-                          </button>
-                        </div>
-                      ) : null}
+                            <button
+                              type="button"
+                              className="dropdown-option"
+                              style={{ color: 'var(--rose)' }}
+                              onClick={() => handleRemoveRun(run.id)}
+                            >
+                              <Trash2 size={13} />
+                              Remove
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-
-                  {expandedTests.has(run.id) ? (
-                    <div className="batch-results-stack">
-                      {buildRunTables(run).map((table) => (
-                        <div className="surface-card batch-table-shell" key={table.key}>
-                          <div className="section-header-inline">
-                            <h3>{table.title}</h3>
+                  {isOpen ? (
+                    <div className="batch-body">
+                      {tables.map((table) => (
+                        <div className="batch-model" key={table.key}>
+                          <div className="batch-model-head">
+                            <span className="batch-model-name">{table.title}</span>
+                            <span className="batch-model-bar" />
                           </div>
-                          <div className="batch-table-scroll">
-                            <table className="batch-results-table">
-                              <thead>
-                                <tr>
-                                  <th>Text Inputs</th>
-                                  {table.columns.map((column) => (
-                                    <th key={column.id}>{column.label}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {table.rows.map((row) => (
-                                  <tr key={row.id}>
-                                    <th>{row.label}</th>
-                                    {table.columns.map((column) => {
-                                      const cell = table.cells.get(buildCellKey(row.id, column.id));
-                                      return (
-                                        <td key={column.id}>
-                                          <BatchResultCell
-                                            results={cell?.results ?? []}
-                                            isRunning={run.status === 'running'}
-                                            placeholderCount={
-                                              run.scenario.assetIds && run.scenario.assetIds.length > 0
-                                                ? run.scenario.assetIds.length
-                                                : 1
-                                            }
-                                            stickerize={Boolean(run.scenario.stickerize)}
-                                            onPreviewImage={setPreviewImageSrc}
-                                          />
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                          <div
+                            className="batch-matrix"
+                            style={{
+                              gridTemplateColumns: `140px repeat(${table.columns.length}, minmax(160px, 1fr))`,
+                            }}
+                          >
+                            <div className="batch-cell batch-cell-th">Text Inputs</div>
+                            {table.columns.map((column) => (
+                              <div key={column.id} className="batch-cell batch-cell-th">
+                                {column.label}
+                              </div>
+                            ))}
+                            {table.rows.map((row) => (
+                              <Fragment key={row.id}>
+                                <div className="batch-cell batch-cell-label">{row.label}</div>
+                                {table.columns.map((column) => {
+                                  const cell = table.cells.get(buildCellKey(row.id, column.id));
+                                  return (
+                                    <div key={column.id} className="batch-cell batch-cell-img">
+                                      <BatchResultCell
+                                        results={cell?.results ?? []}
+                                        isRunning={run.status === 'running'}
+                                        placeholderCount={
+                                          run.scenario.assetIds &&
+                                          run.scenario.assetIds.length > 0
+                                            ? run.scenario.assetIds.length
+                                            : 1
+                                        }
+                                        stickerize={Boolean(run.scenario.stickerize)}
+                                        onPreviewImage={setPreviewImageSrc}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </Fragment>
+                            ))}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : null}
-                </article>
-              ))}
-            </>
+                </div>
+              );
+            })
           )}
         </div>
-      </section>
+      </div>
 
-      {composerOpen ? (
-        <div className="composer-backdrop" onClick={closeComposer}>
-          <section className="surface-card composer-sheet" onClick={(event) => event.stopPropagation()}>
-            <header className="composer-sheet-header">
-              <div>
-                <h3>New Batch Test</h3>
-              </div>
-              <div className="button-row-inline">
-                <button className="button button-secondary" onClick={closeComposer}>
-                  Cancel
-                </button>
-                <button className="button button-primary" onClick={runBatch} disabled={running}>
-                  {running ? <LoaderCircle size={16} className="spin" /> : <Play size={16} />}
-                  {running ? 'Running...' : 'New Job'}
-                </button>
-              </div>
-            </header>
-
-            <div className="stack-list">
+      <div
+        className={`modal-overlay ${composerOpen ? '' : 'hidden'}`}
+        role="presentation"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeComposer();
+        }}
+      >
+        <div className="modal" role="dialog" aria-modal="true" style={{ maxWidth: 640 }}>
+          <div className="modal-head">
+            <div>
+              <div className="modal-title">New Batch Test</div>
+              <div className="modal-sub">Compare models and prompts</div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={closeComposer}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={runBatch}
+                disabled={running}
+              >
+                {running ? <LoaderCircle size={13} className="spin" /> : <Play size={13} />}
+                {running ? 'Running…' : 'New Job'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-body">
+            <div className="field">
+              <label className="field-label">
+                <Cpu size={11} />
+                Model<span className="req">*</span>
+              </label>
               <MultiSelectDropdown
-                label="Choose model"
-                labelIcon={<Cpu size={15} />}
+                label=""
+                labelIcon={null}
                 options={modelDropdownOptions}
                 selectedIds={selectedModelIds}
                 onToggle={(id) => setSelectedModelIds((current) => toggleSelection(current, id))}
-                emptyLabel="Choose model"
+                emptyLabel="Select models…"
               />
+            </div>
 
+            <div className="field">
+              <label className="field-label">
+                <FileText size={11} />
+                System prompt<span className="req">*</span>
+              </label>
               <MultiSelectDropdown
-                label="Choose system prompt"
-                labelIcon={<FileText size={15} />}
+                label=""
+                labelIcon={null}
                 options={promptDropdownOptions}
                 selectedIds={selectedPromptIds}
                 onToggle={(id) => setSelectedPromptIds((current) => toggleSelection(current, id))}
-                emptyLabel="Choose system prompt"
+                emptyLabel="Select prompts…"
               />
+            </div>
 
+            <div className="field">
+              <label className="field-label">
+                <ImageIcon size={11} />
+                Image reference
+              </label>
               <MultiSelectDropdown
-                label="Add image references (optional)"
-                labelIcon={<ImageIcon size={15} />}
+                label=""
+                labelIcon={null}
                 options={imageReferenceDropdownOptions}
                 selectedIds={selectedImageReferenceIds}
                 onToggle={(id) =>
                   setSelectedImageReferenceIds((current) => toggleSelection(current, id))
                 }
-                emptyLabel="Add image references (optional)"
+                emptyLabel="Select images…"
               />
+            </div>
 
+            <div className="field">
+              <label className="field-label">
+                <FileText size={11} />
+                Text input
+              </label>
               <MultiSelectDropdown
-                label="Add text inputs (optional)"
-                labelIcon={<FileText size={15} />}
+                label=""
+                labelIcon={null}
                 options={textInputDropdownOptions}
                 selectedIds={selectedTextInputAssetIds}
                 onToggle={(id) =>
                   setSelectedTextInputAssetIds((current) => toggleSelection(current, id))
                 }
-                emptyLabel="Add text inputs (optional)"
+                emptyLabel="Select text inputs…"
               />
+            </div>
 
-              <label className="checkbox-card">
-                <div className="checkbox-card-copy">
-                  <strong>Stickerize</strong>
-                  <p className="muted-copy">
-                    Remove the background and add the white outline to generated image outputs.
-                  </p>
+            <div className="field">
+              <label className="field-label">Stickerize</label>
+              <div className="field-toggle-row">
+                <div className="field-toggle-text">
+                  Remove the background and add the white outline to generated image outputs.
                 </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={stickerize}
-                  className={`toggle-switch${stickerize ? ' is-active' : ''}`}
+                  className={`toggle ${stickerize ? 'on' : ''}`}
                   onClick={() => setStickerize((current) => !current)}
-                >
-                  <span className="toggle-switch-thumb" />
-                </button>
-              </label>
-
-              {errorMessage ? (
-                <article className="surface-card stat-card error-card">
-                  <AlertCircle size={18} />
-                  <h3>Run Failed</h3>
-                  <p>{errorMessage}</p>
-                </article>
-              ) : null}
+                />
+              </div>
             </div>
-          </section>
+
+            {errorMessage ? (
+              <div
+                style={{
+                  padding: 12,
+                  border: '1px solid oklch(0.72 0.18 22 / 0.4)',
+                  borderRadius: 'var(--r-md)',
+                  background: 'oklch(0.72 0.18 22 / 0.08)',
+                  color: 'var(--rose)',
+                  fontSize: 12.5,
+                }}
+              >
+                {errorMessage}
+              </div>
+            ) : null}
+          </div>
         </div>
-      ) : null}
+      </div>
 
       {previewImageSrc ? (
         <div className="composer-backdrop" onClick={() => setPreviewImageSrc(null)}>
