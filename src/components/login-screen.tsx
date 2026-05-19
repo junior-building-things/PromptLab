@@ -1,12 +1,24 @@
 import { Bot, ImageIcon, PlaySquare, Sparkles } from 'lucide-react';
 
-function GoogleMark() {
+/**
+ * Lark wordmark — simplified geometric "L" glyph in Lark's brand gradient.
+ * Inlined as SVG so we don't ship another image asset just for the
+ * sign-in button.
+ */
+function LarkMark() {
   return (
-    <svg viewBox="0 0 48 48" aria-hidden="true" className="google-mark">
-      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.225 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.846 1.154 7.959 3.041l5.657-5.657C34.058 6.053 29.27 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917Z" />
-      <path fill="#FF3D00" d="M6.306 14.691 12.88 19.51C14.655 15.108 18.961 12 24 12c3.059 0 5.846 1.154 7.959 3.041l5.657-5.657C34.058 6.053 29.27 4 24 4c-7.682 0-14.347 4.337-17.694 10.691Z" />
-      <path fill="#4CAF50" d="M24 44c5.168 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.149 35.091 26.675 36 24 36c-5.204 0-9.618-3.316-11.283-7.946l-6.524 5.025C9.5 39.556 16.227 44 24 44Z" />
-      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.05 12.05 0 0 1-4.084 5.571l.003-.002 6.19 5.238C37.006 38.443 44 33 44 24c0-1.341-.138-2.65-.389-3.917Z" />
+    <svg viewBox="0 0 32 32" aria-hidden="true" className="lark-mark">
+      <defs>
+        <linearGradient id="lark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00D6B9" />
+          <stop offset="100%" stopColor="#00B0FF" />
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="7" fill="url(#lark-gradient)" />
+      <path
+        d="M9.5 8h2.6v13.2c0 .35.28.6.62.6h9.78v2.6H12.6c-1.71 0-3.1-1.4-3.1-3.1V8Z"
+        fill="#ffffff"
+      />
     </svg>
   );
 }
@@ -48,9 +60,9 @@ export function LoginScreen({ loading, errorMessage, onLogin }: LoginScreenProps
             <span>Continue With</span>
           </div>
 
-          <button className="auth-google-button" onClick={onLogin} disabled={loading}>
-            <GoogleMark />
-            <span>{loading ? 'Checking Session...' : 'Sign In With Google'}</span>
+          <button className="auth-lark-button" onClick={onLogin} disabled={loading}>
+            <LarkMark />
+            <span>{loading ? 'Checking session…' : 'Sign in with Lark'}</span>
           </button>
 
           {errorMessage ? <div className="auth-inline-error">{errorMessage}</div> : null}

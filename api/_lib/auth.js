@@ -1,9 +1,16 @@
 import crypto from 'node:crypto';
 
 const SESSION_COOKIE_NAME = 'promptlab-session';
-const STATE_COOKIE_NAME = 'promptlab-google-state';
+const STATE_COOKIE_NAME = 'promptlab-lark-state';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const STATE_MAX_AGE_SECONDS = 60 * 10;
+
+/**
+ * Email allowlist gate. Mirrors Hamlet's auth callback — only addresses
+ * in this set can mint a session. Extend as needed; consider lifting to
+ * a comma-separated env var if the list grows beyond a handful.
+ */
+const ALLOWED_EMAILS = new Set(['thomas.oefverstroem@bytedance.com']);
 
 function base64UrlEncode(value) {
   return Buffer.from(value).toString('base64url');
@@ -115,21 +122,42 @@ export function getBaseUrl(req) {
   return `${protocol}://${hostHeader}`;
 }
 
-export function getGoogleConfig(req) {
+/**
+ * Lark / Feishu OAuth config. Endpoints mirror Hamlet's auth flow exactly:
+ * - `authorize` for the user redirect (front channel)
+ * - `app_access_token/internal` to mint an app token (back channel)
+ * - `authen/v1/access_token` to exchange the user code (back channel)
+ * - `authen/v1/user_info` to read the signed-in user's profile
+ *
+ * Scopes are trimmed compared to Hamlet — PromptLab only needs identity
+ * (`contact:user.*`); chat/im/docs are dropped.
+ */
+export function getLarkConfig(req) {
+  const base = process.env.LARK_BASE_URL || 'https://open.larkoffice.com';
+  const origin = process.env.APP_URL || getBaseUrl(req);
   return {
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    redirectUri: process.env.GOOGLE_REDIRECT_URI || `${getBaseUrl(req)}/api/auth/google/callback`,
-    authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenUrl: 'https://oauth2.googleapis.com/token',
-    userInfoUrl: 'https://openidconnect.googleapis.com/v1/userinfo',
-    scope: 'openid email profile',
+    appId: process.env.LARK_APP_ID,
+    appSecret: process.env.LARK_APP_SECRET,
+    baseUrl: base,
+    redirectUri:
+      process.env.LARK_REDIRECT_URI || `${origin}/api/auth/lark/callback`,
+    authorizeUrl: `${base}/open-apis/authen/v1/authorize`,
+    appTokenUrl: `${base}/open-apis/auth/v3/app_access_token/internal`,
+    userTokenUrl: `${base}/open-apis/authen/v1/access_token`,
+    userInfoUrl: `${base}/open-apis/authen/v1/user_info`,
+    scope: 'contact:user.id:readonly contact:user.base:readonly contact:user.email:readonly',
   };
 }
 
-export function hasRequiredAuthConfig(req) {
-  const config = getGoogleConfig(req);
-  return Boolean(config.clientId && config.clientSecret && process.env.SESSION_SECRET);
+export function hasRequiredAuthConfig() {
+  return Boolean(
+    process.env.LARK_APP_ID && process.env.LARK_APP_SECRET && process.env.SESSION_SECRET,
+  );
+}
+
+export function isEmailAllowed(email) {
+  if (!email) return false;
+  return ALLOWED_EMAILS.has(email.toLowerCase());
 }
 
 function encodeSignedPayload(payload) {

@@ -8,13 +8,13 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (!hasRequiredAuthConfig(req)) {
+  if (!hasRequiredAuthConfig()) {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');
     res.end(
       JSON.stringify({
         authenticated: false,
-        error: 'Missing GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, or SESSION_SECRET.',
+        error: 'Missing LARK_APP_ID, LARK_APP_SECRET, or SESSION_SECRET.',
       }),
     );
     return;

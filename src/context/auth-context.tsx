@@ -23,15 +23,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 function mapAuthError(code: string) {
   switch (code) {
     case 'missing_config':
-      return 'Google Sign-In is not configured yet. Add the Google client credentials and session secret in Vercel.';
+      return 'Lark sign-in is not configured yet. Set LARK_APP_ID, LARK_APP_SECRET, and SESSION_SECRET in your environment.';
     case 'invalid_state':
-      return 'The Google sign-in flow expired or was interrupted. Try again.';
+      return 'The Lark sign-in flow expired or was interrupted. Try again.';
     case 'access_denied':
-      return 'The Google sign-in request was cancelled or denied.';
+      return 'The Lark sign-in request was cancelled or denied.';
+    case 'access_limited':
+      return 'Your Lark account isn’t on the access list yet. Ask a maintainer to add you.';
     case 'oauth_failed':
-      return 'Google sign-in failed during token exchange.';
+      return 'Lark sign-in failed during the token exchange. Check the serverless logs.';
     default:
-      return 'Google sign-in failed.';
+      return 'Lark sign-in failed.';
   }
 }
 
@@ -101,7 +103,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [refresh]);
 
   const login = useCallback(() => {
-    window.location.assign('/api/auth/google/login');
+    window.location.assign('/api/auth/lark/login');
   }, []);
 
   const logout = useCallback(async () => {
