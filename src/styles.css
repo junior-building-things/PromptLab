@@ -1,117 +1,24 @@
-/* ============================================================================
- * Design tokens — ported from DictateAI / Hamlet so the three apps share a
- * common visual language. Light mode default, dark mode override below.
- *
- * Old PromptLab tokens (--surface, --muted, --accent, --border, ...) are
- * kept as aliases that point at the new tokens, so the ~1900 lines of
- * existing class definitions further down keep rendering without each
- * having to be rewritten.
- * ============================================================================ */
 :root {
   color-scheme: light;
-
-  --font-sans: "Geist", "SF Pro Display", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-
-  /* Surfaces */
-  --bg: #f6f7f8;
-  --bg-elev-1: #ffffff;
-  --bg-elev-2: #fafbfc;
-  --bg-elev-3: #f1f2f4;
-  --panel: rgba(255, 255, 255, 0.78);
-  --panel-solid: #ffffff;
-
-  /* Borders / dividers */
-  --hairline: rgba(15, 17, 22, 0.07);
-  --hairline-strong: rgba(15, 17, 22, 0.14);
-
-  /* Text scale */
-  --text: #14161a;
-  --text-muted: #5c6066;
-  --text-dim: #8b9098;
-
-  /* Blue accent — same hue (220) as Hamlet. `--ai-h` lets the rest of
-   * the system tune the tone without rewiring every reference. */
-  --ai-h: 220;
-  --ai: oklch(0.55 0.13 var(--ai-h));
-  --ai-soft: oklch(0.55 0.13 var(--ai-h) / 0.10);
-  --ai-glow: oklch(0.55 0.13 var(--ai-h) / 0.25);
-
-  /* Status colors — for badges, success/error chips, future use. */
-  --green: oklch(0.65 0.16 155);
-  --amber: oklch(0.72 0.16 75);
-  --rose: oklch(0.62 0.20 22);
-  --violet: oklch(0.58 0.18 295);
-
-  /* `.btn-ai` token family — same as DictateAI. Tinted-blue pill for the
-   * primary call-to-action ("Run batch", "Add prompt", etc.). */
-  --btn-ai-base: 59 130 246;
-  --btn-ai-bg: rgb(var(--btn-ai-base) / 0.08);
-  --btn-ai-bg-hover: rgb(var(--btn-ai-base) / 0.14);
-  --btn-ai-border: rgb(var(--btn-ai-base) / 0.25);
-  --btn-ai-border-hover: rgb(var(--btn-ai-base) / 0.4);
-  --btn-ai-text: rgb(37 99 235);
-
-  /* Radii + shadows */
-  --r-sm: 6px;
-  --r-md: 8px;
-  --r-lg: 12px;
-  --r-xl: 16px;
-  --r-2xl: 20px;
-  --shadow-sm: 0 1px 2px rgba(15, 17, 22, 0.06);
-  --shadow-md: 0 6px 20px rgba(15, 17, 22, 0.08), 0 1px 3px rgba(15, 17, 22, 0.05);
-  --shadow-lg: 0 18px 48px rgba(15, 17, 22, 0.12), 0 2px 8px rgba(15, 17, 22, 0.06);
-
-  /* Backdrop dot-grid — pulled from the existing PromptLab style, kept
-   * since both Hamlet and PromptLab share it. */
-  --bg-dot: rgba(15, 23, 42, 0.13);
-
-  /* ===== Aliases for pre-existing PromptLab class definitions ===== */
-  --bg-soft: var(--bg-elev-3);
-  --surface: var(--bg-elev-1);
-  --surface-strong: var(--bg-elev-1);
-  --surface-ink: var(--text);
-  --muted: var(--text-muted);
-  --muted-soft: var(--text-dim);
-  --border: var(--hairline);
-  --border-strong: var(--hairline-strong);
-  --accent: var(--ai);
-  --accent-strong: oklch(0.50 0.14 var(--ai-h));
-  --accent-soft: var(--ai-soft);
-  --success: var(--green);
-  --success-soft: oklch(0.65 0.16 155 / 0.12);
-  --shadow: var(--shadow-md);
-
-  font-family: var(--font-sans);
+  font-family: "SF Pro Display", "Avenir Next", "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-}
-
-[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #0a0b0d;
-  --bg-elev-1: #111316;
-  --bg-elev-2: #16191e;
-  --bg-elev-3: #1c2027;
-  --panel: rgba(17, 19, 22, 0.72);
-  --panel-solid: #111316;
-  --hairline: rgba(255, 255, 255, 0.06);
-  --hairline-strong: rgba(255, 255, 255, 0.12);
-  --text: #e8eaed;
-  --text-muted: #8b9098;
-  --text-dim: #5c6066;
-  --ai: oklch(0.82 0.14 var(--ai-h));
-  --ai-soft: oklch(0.82 0.14 var(--ai-h) / 0.14);
-  --ai-glow: oklch(0.82 0.14 var(--ai-h) / 0.4);
-  --btn-ai-bg: rgb(var(--btn-ai-base) / 0.15);
-  --btn-ai-bg-hover: rgb(var(--btn-ai-base) / 0.22);
-  --btn-ai-border: rgb(var(--btn-ai-base) / 0.4);
-  --btn-ai-border-hover: rgb(var(--btn-ai-base) / 0.55);
-  --btn-ai-text: rgb(147 197 253);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.4);
-  --bg-dot: rgba(255, 255, 255, 0.10);
+  --bg: #f4f7fb;
+  --bg-soft: #edf2f7;
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-strong: #ffffff;
+  --surface-ink: #0f172a;
+  --muted: #64748b;
+  --muted-soft: #94a3b8;
+  --border: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(37, 99, 235, 0.28);
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.12);
+  --success: #16a34a;
+  --success-soft: rgba(34, 197, 94, 0.12);
+  --shadow: 0 24px 70px rgba(15, 23, 42, 0.08);
+  --bg-dot: rgba(15, 23, 42, 0.13);
 }
 
 * {
@@ -128,15 +35,12 @@ body,
 body {
   position: relative;
   overflow-x: hidden;
-  /* Neutral neutral-tinted page background — mirrors Hamlet, where the
-   * Apple-style frosted panels carry the visual weight rather than a
-   * colored gradient. */
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.6), transparent 40%),
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.82), transparent 36%),
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 28%),
     var(--bg);
-  color: var(--text);
+  color: var(--surface-ink);
   letter-spacing: -0.01em;
-  font-family: var(--font-sans);
 }
 
 body::before {
@@ -204,12 +108,11 @@ body::after {
   display: grid;
   gap: 1.7rem;
   padding: 2rem;
-  border-radius: var(--r-2xl);
-  background: var(--panel);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
 }
 
 .loading-card {
@@ -428,10 +331,9 @@ textarea {
   flex-direction: column;
   gap: 1rem;
   padding: 1.5rem 1rem;
-  background: var(--panel);
-  border-right: 1px solid var(--hairline);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  background: rgba(255, 255, 255, 0.9);
+  border-right: 1px solid rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(12px);
 }
 
 .brand-mark {
@@ -446,13 +348,10 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
-  /* DictateAI-style brand chip — tinted blue panel with a soft glow rather
-   * than the heavier gradient slab. Picks up `--ai-h` so the chip retunes
-   * with the accent. */
-  background: var(--ai-soft);
-  color: var(--ai);
-  box-shadow: 0 0 12px 1px var(--ai-glow), inset 0 0 0 1px var(--hairline-strong);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  box-shadow: 0 0 16px rgba(37, 99, 235, 0.35);
 }
 
 .brand-icon {
@@ -563,29 +462,22 @@ p {
 }
 
 .nav-link::before {
-  /* DictateAI-style left-edge accent bar — slightly thicker (3 px) and
-   * with a soft accent glow so it reads as "engaged" rather than just
-   * "underlined". Sits 12 px outside the link box, anchored vertically. */
   content: "";
   position: absolute;
-  left: -12px;
+  left: -0.55rem;
   top: 50%;
-  width: 3px;
+  width: 2px;
   height: 0;
-  border-radius: 2px;
-  background: var(--ai);
-  box-shadow: 0 0 8px var(--ai-glow);
+  border-radius: 999px;
+  background: var(--accent);
   transform: translateY(-50%);
   transition: height 150ms ease;
 }
 
-.nav-link:hover {
-  background: var(--hairline);
-  color: var(--text);
-}
+.nav-link:hover,
 .nav-link.is-active {
-  background: var(--hairline);
-  color: var(--text);
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--surface-ink);
 }
 
 .nav-link.is-active::before {
@@ -1996,346 +1888,4 @@ textarea:disabled {
     padding: 0 1.35rem 1.35rem;
     align-self: flex-end;
   }
-}
-
-/* ============================================================================
- * DictateAI-style primitives. Added at the end so they layer on top of the
- * pre-existing PromptLab page CSS — pages migrating to the shared design
- * vocabulary should swap in these classes (rather than the legacy
- * page-specific class names) for the redesign to fully take effect.
- *
- * Mirrors the component library in `DictateAI/src/styles/globals.css`:
- *   .panel              - frosted card chrome (sidebar / main area / hero)
- *   .surface            - solid card chrome (history rows, model rows)
- *   .btn / .btn-ai      - neutral pill / accent CTA pill
- *   .btn-static         - non-interactive status pill ("Ready", "Active")
- *   .s-group / .s-row   - settings-style list rows with mono-cap headers
- *   .s-icon             - 28x28 glyph chip on s-row leading edge
- *   .tab-toolbar        - flush toolbar above page content
- *   .page-scroll        - the only descendant that scrolls inside a page
- *   .page-body          - centered 56rem column with 18/24px padding
- *   .thead / .trow      - table-style row layouts (history, vocab, etc.)
- *   .modal              - centered dialog (used by add/edit forms)
- *   .mono-label         - uppercase-mono section header chip
- * ============================================================================ */
-
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-xl);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  box-shadow: var(--shadow-md);
-}
-.surface {
-  background: var(--bg-elev-1);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-lg);
-}
-
-.mono-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-}
-
-/* --------- Buttons --------- */
-.btn {
-  height: 32px;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border-radius: var(--r-sm);
-  background: var(--bg-elev-2);
-  border: 1px solid var(--hairline);
-  color: var(--text);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-.btn:hover:not(:disabled) {
-  background: var(--bg-elev-3);
-  border-color: var(--hairline-strong);
-}
-.btn:disabled {
-  cursor: not-allowed;
-  background: var(--bg-elev-2);
-  border-color: var(--hairline);
-  color: var(--text-dim);
-}
-.btn svg {
-  width: 13px;
-  height: 13px;
-}
-.btn.btn-static {
-  cursor: default;
-  color: var(--text-dim);
-}
-.btn.btn-static:hover {
-  background: var(--bg-elev-2);
-  border-color: var(--hairline);
-}
-
-.btn.btn-ai,
-.btn-ai {
-  height: 32px;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border-radius: var(--r-sm);
-  background: var(--btn-ai-bg);
-  border: 1px solid var(--btn-ai-border);
-  color: var(--btn-ai-text);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-.btn.btn-ai:hover:not(:disabled),
-.btn-ai:hover:not(:disabled) {
-  background: var(--btn-ai-bg-hover);
-  border-color: var(--btn-ai-border-hover);
-}
-.btn.btn-ai:disabled,
-.btn-ai:disabled {
-  cursor: not-allowed;
-  background: var(--bg-elev-2);
-  border-color: var(--hairline);
-  color: var(--text-dim);
-}
-.btn-ai svg {
-  width: 13px;
-  height: 13px;
-}
-
-/* --------- Settings-style groups + rows --------- */
-.s-group {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  margin-bottom: 28px;
-}
-.s-group:last-child {
-  margin-bottom: 0;
-}
-.s-group-head {
-  padding: 0 0 4px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.s-group-head .title-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex-shrink: 0;
-}
-.s-group-head .title {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-  font-weight: 400;
-}
-.s-group-head .desc {
-  font-size: 11.5px;
-  color: var(--text-muted);
-}
-.s-group-head .bar {
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, var(--hairline) 0%, transparent 90%);
-  align-self: center;
-}
-
-.s-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 0;
-}
-.s-row + .s-row {
-  border-top: 1px solid var(--hairline);
-}
-.s-row .s-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: var(--bg-elev-3);
-  border: 1px solid var(--hairline);
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.s-row .s-icon svg {
-  width: 14px;
-  height: 14px;
-}
-.s-row .s-body {
-  flex: 1;
-  min-width: 0;
-}
-.s-row .s-label {
-  font-size: 13px;
-  color: var(--text);
-}
-.s-row .s-desc {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-.s-row .s-control {
-  flex-shrink: 0;
-}
-
-/* --------- Page chrome --------- */
-.tab-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--hairline);
-  background: var(--bg-elev-1);
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-.page-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  position: relative;
-}
-.page-body {
-  padding: 18px 24px 24px;
-  width: 100%;
-  max-width: 56rem;
-  margin: 0 auto;
-  flex-shrink: 0;
-}
-.page-body:has(> .thead) {
-  padding-top: 0;
-}
-
-/* --------- Table-style rows --------- */
-.thead {
-  display: grid;
-  padding: 10px 4px;
-  background: var(--bg-elev-1);
-  position: relative;
-  flex-shrink: 0;
-  z-index: 5;
-}
-.thead::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: 100vw;
-  height: 1px;
-  background: var(--hairline);
-  pointer-events: none;
-}
-.thead > div {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-}
-.trow {
-  display: grid;
-  padding: 10px 4px;
-  align-items: center;
-  border-bottom: 1px solid var(--hairline);
-  font-size: 13px;
-  color: var(--text);
-  transition: background 0.1s ease;
-}
-.trow:hover {
-  background: var(--bg-elev-2);
-}
-
-/* --------- Modal dialog --------- */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: oklch(0 0 0 / 0.35);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.12s ease, visibility 0s linear 0.12s;
-}
-.modal-overlay.open {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.12s ease, visibility 0s;
-}
-.modal {
-  width: min(440px, 100%);
-  background: var(--bg-elev-1);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  transform: translateY(4px) scale(0.99);
-  transition: transform 0.14s ease;
-}
-.modal-overlay.open .modal {
-  transform: translateY(0) scale(1);
-}
-.modal-header {
-  display: flex;
-  align-items: center;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--hairline);
-}
-.modal-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.01em;
-  flex: 1;
-}
-.modal-close {
-  display: inline-grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-sm);
-  color: var(--text-dim);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-.modal-close:hover {
-  background: var(--hairline);
-  color: var(--text);
-}
-.modal-body {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--hairline);
 }
