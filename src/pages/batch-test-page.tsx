@@ -444,6 +444,17 @@ export function BatchTestPage() {
     });
   }
 
+  function handleDownloadRun(run: BatchRun) {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(run, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    const sanitizedName = run.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    downloadAnchor.setAttribute('download', `${sanitizedName}-batch-test.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  }
+
   function getPromptLabel(id: string) {
     const version = promptVersions.find((entry) => entry.id === id);
     if (!version) return 'Unknown Prompt';
@@ -836,47 +847,32 @@ export function BatchTestPage() {
                         <span className="batch-pill muted">{run.results.length} results</span>
                       </div>
                     </div>
-                    <div className="batch-actions" onClick={(event) => event.stopPropagation()}>
-                      <div className="history-card-menu" style={{ position: 'relative' }}>
-                        <button
-                          type="button"
-                          className="icon-btn naked"
-                          aria-label="Batch actions"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setOpenRunMenuId((c) => (c === run.id ? null : run.id));
-                          }}
-                        >
-                          <MoreHorizontal size={14} />
-                        </button>
-                        {openRunMenuId === run.id ? (
-                          <div
-                            className="card-menu-sheet"
-                            style={{
-                              position: 'absolute',
-                              right: 0,
-                              top: 'calc(100% + 6px)',
-                              minWidth: 140,
-                              background: 'var(--bg-elev-1)',
-                              border: '1px solid var(--hairline-strong)',
-                              borderRadius: 'var(--r-md)',
-                              boxShadow: 'var(--shadow-lg)',
-                              zIndex: 20,
-                              padding: 4,
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="dropdown-option"
-                              style={{ color: 'var(--rose)' }}
-                              onClick={() => handleRemoveRun(run.id)}
-                            >
-                              <Trash2 size={13} />
-                              Remove
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
+                    <div className="batch-actions" style={{ display: 'flex', gap: 6 }} onClick={(event) => event.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="icon-btn naked"
+                        aria-label="Download batch test results"
+                        title="Download JSON"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDownloadRun(run);
+                        }}
+                      >
+                        <Download size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn naked"
+                        aria-label="Delete batch test"
+                        title="Remove"
+                        style={{ color: 'var(--rose)' }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleRemoveRun(run.id);
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
                   {isOpen ? (
