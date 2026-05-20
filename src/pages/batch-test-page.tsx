@@ -157,7 +157,14 @@ function TextIcon({ Icon }: { Icon: LucideIcon }) {
 
 function tryParseJSON(text?: string): any {
   if (!text) return null;
-  const trimmed = text.trim();
+  let trimmed = text.trim();
+
+  // Extract JSON from markdown code blocks (e.g., ```json ... ```)
+  const codeBlockMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (codeBlockMatch) {
+    trimmed = codeBlockMatch[1].trim();
+  }
+
   if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
     try {
       return JSON.parse(trimmed);
