@@ -44,7 +44,7 @@ function BoxIcon({ children }: { children: ReactNode }) {
   );
 }
 import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
-import type { AssetRecord, BatchRun, PromptVersion, TestResult } from '../lib/types';
+import type { AssetRecord, BatchRun, ModelRecord, PromptProject, PromptVersion, TestResult } from '../lib/types';
 
 type ApiResult = {
   modelId: string;
@@ -190,18 +190,44 @@ function BatchResultCell({
 }) {
   if (results.length === 0) {
     if (isRunning) {
+      // Loading state from the Claude Design PromptLab.html mockup:
+      // a square (aspect-ratio 1/1) thumb panel with a violet
+      // shimmer sweeping across it. The `.batch-thumb.loading`
+      // keyframes live in styles.css (shimmer-thumb, 1.6 s ease).
+      // One thumb per pending result — stacked vertically when a
+      // single matrix cell expects multiple results (e.g. when the
+      // run targets multiple image-reference assets).
       return (
-        <div className="batch-table-cell-stack">
-          {Array.from({ length: placeholderCount }).map((_, index) => (
-            <div key={index} className="batch-table-result">
-              <div className="batch-table-output-placeholder" />
-            </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            width: '100%',
+          }}
+        >
+          {Array.from({ length: Math.max(1, placeholderCount) }).map((_, index) => (
+            <div key={index} className="batch-thumb loading" />
           ))}
         </div>
       );
     }
 
-    return <div className="batch-table-empty">No Result</div>;
+    return (
+      <div
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10.5,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: 'var(--text-dim)',
+          textAlign: 'center',
+          width: '100%',
+        }}
+      >
+        No result
+      </div>
+    );
   }
 
   return (
