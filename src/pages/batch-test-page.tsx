@@ -191,7 +191,12 @@ type BatchTable = {
   cells: Map<string, BatchTableCell>;
 };
 
-const BATCH_REQUEST_TIMEOUT_MS = 90000;
+// 5 minutes — matches the api/batch-run.js function's maxDuration: 300
+// ceiling. OpenAI image-gen at quality:'high' regularly takes 30-120s,
+// so the previous 90s client cap killed the request before the
+// provider returned. The server-side cap is the real backstop; this
+// just stops the client from abandoning an in-flight call too early.
+const BATCH_REQUEST_TIMEOUT_MS = 300_000;
 const SYSTEM_PROMPT_ONLY_ROW_ID = '__system-prompt-only__';
 const SYSTEM_PROMPT_ONLY_ROW_LABEL = 'System Prompt Only';
 
