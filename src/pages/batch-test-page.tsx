@@ -63,7 +63,12 @@ const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string; description
 ];
 
 function thinkingLabelFor(value: ThinkingLevel | undefined): string | undefined {
-  if (!value || value === 'dynamic') return undefined;
+  // Return undefined only when no level was persisted at all — that's
+  // a pre-Thinking-dropdown run and the caller should fall back to the
+  // legacy inferThinkingLevel heuristic. An explicit 'dynamic' is the
+  // user's chosen value and should render as "Dynamic", not silently
+  // collapse to the inferred default.
+  if (!value) return undefined;
   return THINKING_OPTIONS.find((option) => option.value === value)?.label;
 }
 
@@ -1513,11 +1518,13 @@ export function BatchTestPage() {
       modelIds: selectedModelIds,
       userInput: selectedUserInputs.length > 0 ? selectedUserInputs.join(' | ') : undefined,
       stickerize,
-      // 'dynamic' is the implicit provider-default and adds nothing the
-      // pipeline doesn't already do; persist only explicit overrides so
-      // older runs (no thinkingLevel) and new "Dynamic" runs both look
-      // the same on disk.
-      thinkingLevel: thinkingLevel !== 'dynamic' ? thinkingLevel : undefined,
+      // Persist the user's exact pick — including 'dynamic' — so the
+      // results header can render "GPT-5.5, Dynamic thinking" rather
+      // than falling back to the legacy inferThinkingLevel heuristic
+      // (which guesses "High" for gpt-5* and would mislabel the run).
+      // Older runs without a thinkingLevel field still flow through the
+      // inference fallback in formatModelLabel.
+      thinkingLevel,
     };
     // Run name is the prompt-project name(s) — no version, no timestamp.
     // Sorted unique projects so the title stays stable across re-runs.
