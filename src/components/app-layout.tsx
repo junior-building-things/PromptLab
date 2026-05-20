@@ -153,13 +153,11 @@ export function AppLayout() {
   const chrome = usePageChrome();
   const { theme, toggle: toggleTheme } = useTheme();
 
-  // Reset the chrome snapshot on every navigation so a stale topbar
-  // action from the prior page doesn't bleed across. Pages immediately
-  // call `setPageChrome` again in their own mount effect to populate
-  // their content — a single repaint covers the transition.
-  useEffect(() => {
-    setPageChrome({});
-  }, [location.pathname]);
+  // Each page owns its own chrome lifecycle — its mount effect calls
+  // setPageChrome({ … }) and the cleanup clears it. A parent-level
+  // reset here would race against the child effects (parents run
+  // *after* children in React) and wipe the just-set topbar buttons
+  // on every navigation. Don't add one back.
 
   const meta = PAGE_META[location.pathname] ?? PAGE_META['/'];
   const initials = useMemo(() => {
