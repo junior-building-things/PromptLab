@@ -556,6 +556,27 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey, thinkingLev
     });
   }
 
+  // Only force the image_generation tool for image-capable models.
+  // Text-only models like gpt-5 / gpt-4o handled the forced tool call
+  // by running an internal image-gen pass that took 60-120s and often
+  // hit the function timeout. apiModel matches "image" or "gpt-image-1"
+  // for the dedicated image families; everything else stays text-only.
+  const apiModel = model.apiModel.toLowerCase();
+  const isImageModel = apiModel.includes('image');
+  const imageGenTools = isImageModel
+    ? {
+        tools: [
+          {
+            type: 'image_generation',
+            action: 'generate',
+            size: '1024x1024',
+            quality: 'high',
+          },
+        ],
+        tool_choice: { type: 'image_generation' },
+      }
+    : {};
+
   const started = Date.now();
   const response = await fetch(OPENAI_URL, {
     method: 'POST',
@@ -565,15 +586,7 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey, thinkingLev
     },
     body: JSON.stringify({
       model: model.apiModel,
-      tools: [
-        {
-          type: 'image_generation',
-          action: 'generate',
-          size: '1024x1024',
-          quality: 'high',
-        },
-      ],
-      tool_choice: { type: 'image_generation' },
+      ...imageGenTools,
       input,
       // Reasoning effort knob, conditionally included. Spreading a
       // null-returning helper into the object is a no-op, so
