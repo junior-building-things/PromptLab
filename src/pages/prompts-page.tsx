@@ -6,10 +6,10 @@ import {
   IconCopy,
   IconEdit,
   IconFilter,
-  IconMore,
   IconPlay,
   IconPlus,
   IconSearch,
+  IconTrash,
 } from '../components/icons';
 import { Modal } from '../components/modal';
 import { useAppContext } from '../context/app-context';
@@ -195,9 +195,9 @@ export function PromptsPage() {
                         type="button"
                         className="icon-btn naked"
                         onClick={() => handleRemoveProject(project.id, project.name)}
-                        aria-label="Project actions"
+                        aria-label="Remove project"
                       >
-                        <IconBox><IconMore /></IconBox>
+                        <IconBox><IconTrash /></IconBox>
                       </button>
                     </div>
                   </div>
