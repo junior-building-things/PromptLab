@@ -175,6 +175,422 @@ function tryParseJSON(text?: string): any {
   return null;
 }
 
+function generateBatchHtmlReport(
+  run: BatchRun,
+  assets: AssetRecord[],
+  promptProjects: PromptProject[],
+  promptVersions: PromptVersion[],
+  models: ModelRecord[]
+): string {
+  function getPromptLabel(id: string) {
+    const version = promptVersions.find((entry) => entry.id === id);
+    if (!version) return 'Unknown Prompt';
+    const project = promptProjects.find((entry) => entry.id === version.projectId);
+    return `${project?.name ?? 'Unknown Project'} · v${version.version}`;
+  }
+
+  function getModel(id: string) {
+    return models.find((entry) => entry.id === id);
+  }
+
+  function getAsset(id: string) {
+    return assets.find((entry) => entry.id === id);
+  }
+
+  function getRowLabels(run: BatchRun) {
+    const rowsMap = new Map<string, { id: string; assetId?: string; userInput?: string }>();
+
+    run.results.forEach((result) => {
+      const id = buildRowId(result.assetId, result.userInput);
+      if (!rowsMap.has(id)) {
+        rowsMap.set(id, {
+          id,
+          assetId: result.assetId,
+          userInput: result.userInput,
+        });
+      }
+    });
+
+    if (rowsMap.size === 0) {
+      const assetIds = run.scenario.assetIds || [];
+      const userInput = run.scenario.userInput || '';
+
+      assetIds.forEach((assetId) => {
+        const id = buildRowId(assetId, userInput);
+        rowsMap.set(id, { id, assetId, userInput });
+      });
+
+      if (assetIds.length === 0 && userInput.trim().length > 0) {
+        const id = buildRowId(undefined, userInput);
+        rowsMap.set(id, { id, userInput });
+      }
+    }
+
+    if (rowsMap.size === 0) {
+      return [{ id: SYSTEM_PROMPT_ONLY_ROW_ID, label: SYSTEM_PROMPT_ONLY_ROW_LABEL }];
+    }
+
+    return [...rowsMap.values()];
+  }
+
+  function buildRunTables(run: BatchRun): BatchTable[] {
+    const promptIds =
+      run.scenario.promptIds && run.scenario.promptIds.length > 0
+        ? run.scenario.promptIds
+        : [...new Set(run.results.map((result) => result.promptId))];
+    const modelIds =
+      run.scenario.modelIds && run.scenario.modelIds.length > 0
+        ? run.scenario.modelIds
+        : [...new Set(run.results.map((result) => result.modelId))];
+    const rows = getRowLabels(run);
+
+    const promptColumns = promptIds.map((id) => ({ id, label: getPromptLabel(id) }));
+    const modelColumns = modelIds.map((id) => ({ id, label: getModel(id)?.name ?? 'Unknown Model' }));
+    const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
+
+    const tableConfigs =
+      promptColumns.length > 1 && modelColumns.length > 1
+        ? modelColumns.map((modelColumn) => ({
+            key: modelColumn.id,
+            title: modelColumn.label,
+            scopeModelId: modelColumn.id,
+            columns: promptColumns,
+          }))
+        : [
+            {
+              key: 'default',
+              title:
+                modelColumns.length > 1 && promptColumns.length <= 1
+                  ? 'Results'
+                  : modelColumns[0]?.label ?? 'Results',
+              scopeModelId: undefined,
+              columns: usePromptColumns ? promptColumns : modelColumns,
+            },
+          ];
+
+    return tableConfigs.map((config) => {
+      const cells = new Map<string, BatchTableCell>();
+
+      run.results
+        .filter((result) => (config.scopeModelId ? result.modelId === config.scopeModelId : true))
+        .forEach((result) => {
+          const rowId = buildRowId(result.assetId, result.userInput);
+          const columnId = usePromptColumns ? result.promptId : result.modelId;
+          const key = buildCellKey(rowId, columnId);
+          const existing = cells.get(key);
+
+          if (existing) {
+            existing.results.push(result);
+            return;
+          }
+
+          cells.set(key, {
+            rowId,
+            columnId,
+            results: [result],
+          });
+        });
+
+      return {
+        key: config.key,
+        title: config.title,
+        columns: config.columns,
+        rows,
+        cells,
+      };
+    });
+  }
+
+  const tables = buildRunTables(run);
+  const dateStr = format(new Date(run.createdAt), 'MMM d, yyyy · HH:mm');
+
+  let tablesHtml = '';
+  tables.forEach((table) => {
+    const gridCols = `220px repeat(${table.columns.length}, minmax(180px, 1fr))`;
+    
+    let headerRowCells = '';
+    const hasImages = run.scenario.assetIds && run.scenario.assetIds.length > 0;
+    const hasTexts = run.scenario.userInput && run.scenario.userInput.trim().length > 0;
+    const headerLabel = hasImages && hasTexts ? 'Inputs' : hasImages ? 'Image References' : 'Text Inputs';
+    headerRowCells += `<div class="cell cell-th">${headerLabel}</div>`;
+    table.columns.forEach((column) => {
+      headerRowCells += `<div class="cell cell-th">${column.label}</div>`;
+    });
+
+    let bodyRows = '';
+    table.rows.forEach((row) => {
+      let labelContentHtml = '';
+      if (row.id === SYSTEM_PROMPT_ONLY_ROW_ID) {
+        labelContentHtml = `<span style="font-style: italic; color: var(--text-dim);">${SYSTEM_PROMPT_ONLY_ROW_LABEL}</span>`;
+      } else {
+        const asset = row.assetId ? getAsset(row.assetId) : undefined;
+        if (asset) {
+          labelContentHtml += `
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <img class="input-thumb" src="${asset.source}" alt="${asset.name}" title="${asset.name}" />
+              ${row.userInput ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${row.userInput}</div>` : ''}
+            </div>
+          `;
+        } else if (row.userInput) {
+          labelContentHtml += `<div style="color: var(--text);">${row.userInput}</div>`;
+        } else {
+          labelContentHtml += `<span style="color: var(--text-dim); font-style: italic;">No Inputs</span>`;
+        }
+      }
+
+      bodyRows += `<div class="cell cell-label">${labelContentHtml}</div>`;
+
+      table.columns.forEach((column) => {
+        const cellData = table.cells.get(buildCellKey(row.id, column.id));
+        let cellContentHtml = '';
+        if (!cellData || cellData.results.length === 0) {
+          cellContentHtml = `<div class="output-text" style="color: var(--text-dim); font-style: italic;">No Result</div>`;
+        } else {
+          cellData.results.forEach((result) => {
+            let outputHtml = '';
+            if (isImageOutput(result.outputImage)) {
+              outputHtml = `
+                <div style="margin-bottom: 8px;">
+                  <a href="${result.outputImage}" download="output-image.png" style="display: block;">
+                    <img class="output-image" src="${result.outputImage}" alt="Output Image" />
+                  </a>
+                </div>
+              `;
+            } else if (result.output) {
+              const jsonObject = tryParseJSON(result.output);
+              if (jsonObject) {
+                outputHtml = `<pre class="output-json">${JSON.stringify(jsonObject, null, 2)}</pre>`;
+              } else {
+                outputHtml = `<div class="output-text">${result.output}</div>`;
+              }
+            } else {
+              outputHtml = `<div class="output-text" style="color: var(--text-dim); font-style: italic;">Empty Output</div>`;
+            }
+
+            const latencyHtml = result.latencyMs ? `<span>${result.latencyMs.toLocaleString()} ms</span>` : '';
+            const scoreHtml = result.score !== undefined ? `<span class="pill" style="color: var(--ai); border-color: rgba(139, 92, 246, 0.3); background: rgba(139, 92, 246, 0.08);">Score: ${result.score}</span>` : '';
+
+            cellContentHtml += `
+              <div class="result-box" style="margin-bottom: 12px;">
+                ${outputHtml}
+                <div class="meta-metrics">
+                  ${latencyHtml}
+                  ${scoreHtml}
+                </div>
+              </div>
+            `;
+          });
+        }
+        bodyRows += `<div class="cell cell-content">${cellContentHtml}</div>`;
+      });
+    });
+
+    tablesHtml += `
+      <div class="table-container" style="margin-bottom: 32px;">
+        <h2 class="matrix-title">${table.title}</h2>
+        <div class="grid" style="grid-template-columns: ${gridCols};">
+          ${headerRowCells}
+          ${bodyRows}
+        </div>
+      </div>
+    `;
+  });
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${run.name} - Batch Test Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090b;
+      --bg-elev: #18181b;
+      --bg-elev-2: #27272a;
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+      --hairline: rgba(255, 255, 255, 0.08);
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+      --ai: #8b5cf6;
+      --green: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+    .header {
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--hairline);
+      padding-bottom: 24px;
+    }
+    .title {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 99px;
+      border: 1px solid var(--hairline);
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+    }
+    .pill.ok {
+      color: var(--green);
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.2);
+    }
+    .matrix-section {
+      background: var(--bg-elev);
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .matrix-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .matrix-title::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--hairline) 0%, transparent 90%);
+    }
+    .grid {
+      display: grid;
+      column-gap: 16px;
+      row-gap: 16px;
+    }
+    .cell {
+      min-width: 0;
+    }
+    .cell-th {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .cell-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      display: flex;
+      align-items: flex-start;
+      border-top: 1px solid rgba(255, 255, 255, 0.03);
+      padding-top: 12px;
+    }
+    .input-thumb {
+      width: 100px;
+      height: 100px;
+      border-radius: 8px;
+      border: 1px solid var(--hairline);
+      object-fit: cover;
+      background: var(--bg-elev-2);
+    }
+    .cell-content {
+      border-top: 1px solid rgba(255, 255, 255, 0.03);
+      padding-top: 12px;
+    }
+    .output-text {
+      font-size: 13px;
+      color: var(--text-muted);
+      white-space: pre-wrap;
+    }
+    .output-json {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--hairline);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      overflow-x: auto;
+      max-height: 280px;
+      color: oklch(0.82 0.08 195);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .output-image {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--hairline);
+      display: block;
+      transition: transform 0.15s ease;
+      background: var(--bg-elev-2);
+    }
+    .output-image:hover {
+      transform: scale(1.02);
+    }
+    .result-box {
+      border: 1px solid var(--hairline);
+      background: rgba(255, 255, 255, 0.01);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .meta-metrics {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1 class="title">${run.name}</h1>
+      <div class="meta">
+        <span>${dateStr}</span>
+        <span class="pill ok">${run.status}</span>
+        <span>${run.results.length} results</span>
+      </div>
+    </header>
+
+    <main class="matrix-section">
+      ${tablesHtml}
+    </main>
+  </div>
+</body>
+</html>`;
+}
+
 function BatchResultCell({
   results,
   isRunning,
@@ -471,14 +887,18 @@ export function BatchTestPage() {
   }
 
   function handleDownloadRun(run: BatchRun) {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(run, null, 2));
+    const htmlContent = generateBatchHtmlReport(run, assets, promptProjects, promptVersions, models);
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const downloadUrl = URL.createObjectURL(blob);
+    
     const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('href', downloadUrl);
     const sanitizedName = run.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    downloadAnchor.setAttribute('download', `${sanitizedName}-batch-test.json`);
+    downloadAnchor.setAttribute('download', `${sanitizedName}-batch-report.html`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+    URL.revokeObjectURL(downloadUrl);
   }
 
   function getPromptLabel(id: string) {
