@@ -263,6 +263,14 @@ function generateBatchHtmlReport(
     const modelColumns = modelIds.map((id) => ({ id, label: getModel(id)?.name ?? 'Unknown Model' }));
     const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
 
+    // Single-prompt × multi-model runs used to read "Results" — replace
+    // with the prompt's version ("Prompt vN") so the matrix header tells
+    // the reader what's being compared across models.
+    const singlePromptVersion =
+      promptColumns.length === 1
+        ? promptVersions.find((entry) => entry.id === promptColumns[0].id)?.version
+        : undefined;
+
     const tableConfigs =
       promptColumns.length > 1 && modelColumns.length > 1
         ? modelColumns.map((modelColumn) => ({
@@ -275,8 +283,10 @@ function generateBatchHtmlReport(
             {
               key: 'default',
               title:
-                modelColumns.length > 1 && promptColumns.length <= 1
-                  ? 'Results'
+                modelColumns.length > 1 && promptColumns.length === 1
+                  ? singlePromptVersion !== undefined
+                    ? `Prompt v${singlePromptVersion}`
+                    : promptColumns[0]?.label ?? 'Results'
                   : modelColumns[0]?.label ?? 'Results',
               scopeModelId: undefined,
               columns: usePromptColumns ? promptColumns : modelColumns,
@@ -1047,6 +1057,13 @@ export function BatchTestPage() {
     const modelColumns = modelIds.map((id) => ({ id, label: getModel(id)?.name ?? 'Unknown Model' }));
     const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
 
+    // Single-prompt × multi-model runs read "Prompt vN" — the prompt
+    // version is what's being compared across models in that matrix.
+    const singlePromptVersion =
+      promptColumns.length === 1
+        ? promptVersions.find((entry) => entry.id === promptColumns[0].id)?.version
+        : undefined;
+
     const tableConfigs =
       promptColumns.length > 1 && modelColumns.length > 1
         ? modelColumns.map((modelColumn) => ({
@@ -1059,8 +1076,10 @@ export function BatchTestPage() {
             {
               key: 'default',
               title:
-                modelColumns.length > 1 && promptColumns.length <= 1
-                  ? 'Results'
+                modelColumns.length > 1 && promptColumns.length === 1
+                  ? singlePromptVersion !== undefined
+                    ? `Prompt v${singlePromptVersion}`
+                    : promptColumns[0]?.label ?? 'Results'
                   : modelColumns[0]?.label ?? 'Results',
               scopeModelId: undefined,
               columns: usePromptColumns ? promptColumns : modelColumns,
@@ -1187,11 +1206,26 @@ export function BatchTestPage() {
       userInput: selectedUserInputs.length > 0 ? selectedUserInputs.join(' | ') : undefined,
       stickerize,
     };
+    // Run name is the prompt-project name(s) — no version, no timestamp.
+    // Sorted unique projects so the title stays stable across re-runs.
+    const projectNames = (() => {
+      const names = selectedPrompts
+        .map((prompt) => {
+          const project = promptProjects.find((entry) => entry.id === prompt.projectId);
+          return project?.name;
+        })
+        .filter((name): name is string => Boolean(name));
+      return Array.from(new Set(names));
+    })();
+    const draftRunName =
+      projectNames.length === 0
+        ? 'Batch run'
+        : projectNames.length === 1
+          ? projectNames[0]
+          : projectNames.join(', ');
+
     const draftRun = createRun({
-      name:
-        selectedPrompts.length === 1
-          ? `${getPromptLabel(selectedPrompts[0].id)} - ${format(new Date(), 'MMM d HH:mm')}`
-          : `${selectedPrompts.length} Prompt Selections - ${format(new Date(), 'MMM d HH:mm')}`,
+      name: draftRunName,
       status: 'running',
       errorMessage: undefined,
       scenario: draftScenario,
