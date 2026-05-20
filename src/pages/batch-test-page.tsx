@@ -67,6 +67,78 @@ function thinkingLabelFor(value: ThinkingLevel | undefined): string | undefined 
   return THINKING_OPTIONS.find((option) => option.value === value)?.label;
 }
 
+/** Map a model's provider field to a key into the inlined-logo map.
+ * Gemini is published under `google.png` in our public assets, so this
+ * isolates that rename in one place. */
+type ProviderLogoKey = 'openai' | 'openai_darkmode' | 'google' | 'xai';
+
+const PROVIDER_LOGO_FILES: Record<ProviderLogoKey, string> = {
+  openai: '/assets/openai.png',
+  openai_darkmode: '/assets/openai_darkmode.png',
+  google: '/assets/google.png',
+  xai: '/assets/xai.png',
+};
+
+/** Fetch each provider PNG and convert to a data URI. Used by the HTML
+ * report download so the file works offline / on any origin — `<img
+ * src="/assets/openai.png">` would 404 once the user opens the file
+ * outside the dev server. Failures fall back to an empty string so the
+ * report still renders (just without the mark for that provider). */
+async function loadProviderLogoDataUris(): Promise<Record<ProviderLogoKey, string>> {
+  const entries = await Promise.all(
+    (Object.keys(PROVIDER_LOGO_FILES) as ProviderLogoKey[]).map(async (key) => {
+      try {
+        const response = await fetch(PROVIDER_LOGO_FILES[key]);
+        if (!response.ok) return [key, ''] as const;
+        const blob = await response.blob();
+        const dataUri = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+        return [key, dataUri] as const;
+      } catch {
+        return [key, ''] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries) as Record<ProviderLogoKey, string>;
+}
+
+/** Provider mark for the batch matrix headers. Uses the public-served
+ * PNGs under `/assets/` so the same paths work in the live UI and in
+ * the downloaded HTML report. For OpenAI we render both the dark and
+ * light marks and let CSS toggle visibility based on `data-theme` —
+ * cleaner than `filter: invert(1)` and lets us use the dedicated
+ * `openai_darkmode.png` asset. */
+function ProviderMarkInline({ model }: { model: ModelRecord | undefined }) {
+  if (!model) return null;
+  const provider = model.provider;
+  if (provider === 'openai') {
+    return (
+      <span className="batch-provider-mark batch-provider-mark-openai">
+        <img
+          src="/assets/openai.png"
+          alt="openai"
+          className="batch-provider-img batch-provider-img-openai-light"
+        />
+        <img
+          src="/assets/openai_darkmode.png"
+          alt="openai"
+          className="batch-provider-img batch-provider-img-openai-dark"
+        />
+      </span>
+    );
+  }
+  const file = provider === 'gemini' ? 'google.png' : `${provider}.png`;
+  return (
+    <span className="batch-provider-mark">
+      <img src={`/assets/${file}`} alt={provider} className="batch-provider-img" />
+    </span>
+  );
+}
+
 type ApiResult = {
   modelId: string;
   output: string;
@@ -94,7 +166,18 @@ type BatchTableCell = {
 type BatchTable = {
   key: string;
   title: string;
-  columns: Array<{ id: string; label: string }>;
+  /** When the table title represents a single model (multi-model splits)
+   * we stash the model id so renderers can show the provider mark next
+   * to the name. Undefined when the title is a prompt version label or
+   * the generic "Results" fallback. */
+  titleModelId?: string;
+  columns: Array<{
+    id: string;
+    label: string;
+    /** Set when this column header represents a model (i.e. multi-model
+     * single-prompt runs) so the matrix can render the provider mark. */
+    modelId?: string;
+  }>;
   rows: Array<{ id: string; label: string; assetId?: string; userInput?: string }>;
   cells: Map<string, BatchTableCell>;
 };
@@ -259,8 +342,36 @@ function generateBatchHtmlReport(
   assets: AssetRecord[],
   promptProjects: PromptProject[],
   promptVersions: PromptVersion[],
-  models: ModelRecord[]
+  models: ModelRecord[],
+  providerLogos: Record<ProviderLogoKey, string> = {
+    openai: '',
+    openai_darkmode: '',
+    google: '',
+    xai: '',
+  },
 ): string {
+  /** Inline a provider mark for the given model id. Returns empty string
+   * when the model can't be resolved or its provider doesn't ship a
+   * logo asset. For OpenAI we use the dark-mode (white) mark since the
+   * report body sits on the dark `--bg` panel. */
+  function providerMarkHtml(modelId: string | undefined): string {
+    if (!modelId) return '';
+    const model = getModel(modelId);
+    if (!model) return '';
+    const key: ProviderLogoKey | null =
+      model.provider === 'openai'
+        ? 'openai_darkmode'
+        : model.provider === 'gemini'
+        ? 'google'
+        : model.provider === 'xai'
+        ? 'xai'
+        : null;
+    if (!key) return '';
+    const src = providerLogos[key];
+    if (!src) return '';
+    return `<img class="provider-mark" src="${src}" alt="${model.provider}" />`;
+  }
+
   function getPromptLabel(id: string) {
     const version = promptVersions.find((entry) => entry.id === id);
     if (!version) return 'Unknown Prompt';
@@ -342,6 +453,7 @@ function generateBatchHtmlReport(
     const modelColumns = modelIds.map((id) => ({
       id,
       label: formatModelLabel(getModel(id), run.scenario.thinkingLevel),
+      modelId: id,
     }));
     const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
 
@@ -353,11 +465,18 @@ function generateBatchHtmlReport(
         ? promptVersions.find((entry) => entry.id === promptColumns[0].id)?.version
         : undefined;
 
-    const tableConfigs =
+    const tableConfigs: Array<{
+      key: string;
+      title: string;
+      titleModelId?: string;
+      scopeModelId?: string;
+      columns: Array<{ id: string; label: string; modelId?: string }>;
+    }> =
       promptColumns.length > 1 && modelColumns.length > 1
         ? modelColumns.map((modelColumn) => ({
             key: modelColumn.id,
             title: modelColumn.label,
+            titleModelId: modelColumn.id,
             scopeModelId: modelColumn.id,
             columns: promptColumns,
           }))
@@ -370,6 +489,10 @@ function generateBatchHtmlReport(
                     ? `Prompt v${singlePromptVersion}`
                     : promptColumns[0]?.label ?? 'Results'
                   : modelColumns[0]?.label ?? 'Results',
+              titleModelId:
+                modelColumns.length === 1 && promptColumns.length <= 1
+                  ? modelColumns[0]?.id
+                  : undefined,
               scopeModelId: undefined,
               columns: usePromptColumns ? promptColumns : modelColumns,
             },
@@ -401,6 +524,7 @@ function generateBatchHtmlReport(
       return {
         key: config.key,
         title: config.title,
+        titleModelId: config.titleModelId,
         columns: config.columns,
         rows,
         cells,
@@ -421,7 +545,8 @@ function generateBatchHtmlReport(
     const headerLabel = hasImages && hasTexts ? 'Inputs' : hasImages ? 'Image References' : 'Text Inputs';
     headerRowCells += `<div class="cell cell-th">${headerLabel}</div>`;
     table.columns.forEach((column) => {
-      headerRowCells += `<div class="cell cell-th">${column.label}</div>`;
+      const mark = providerMarkHtml(column.modelId);
+      headerRowCells += `<div class="cell cell-th">${mark}${column.label}</div>`;
     });
 
     let bodyRows = '';
@@ -494,9 +619,10 @@ function generateBatchHtmlReport(
       });
     });
 
+    const titleMark = providerMarkHtml(table.titleModelId);
     tablesHtml += `
       <div class="table-container" style="margin-bottom: 32px;">
-        <h2 class="matrix-title">${table.title}</h2>
+        <h2 class="matrix-title">${titleMark}${table.title}</h2>
         <div class="grid" style="grid-template-columns: ${gridCols};">
           ${headerRowCells}
           ${bodyRows}
@@ -634,6 +760,20 @@ function generateBatchHtmlReport(
       top: 42px;
       background: var(--bg-elev);
       z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .provider-mark {
+      width: 14px;
+      height: 14px;
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    .cell-th .provider-mark {
+      width: 12px;
+      height: 12px;
     }
     .cell-label {
       font-family: var(--font-mono);
@@ -1049,11 +1189,22 @@ export function BatchTestPage() {
     });
   }
 
-  function handleDownloadRun(run: BatchRun) {
-    const htmlContent = generateBatchHtmlReport(run, assets, promptProjects, promptVersions, models);
+  async function handleDownloadRun(run: BatchRun) {
+    // Inline provider PNGs as data URIs so the downloaded HTML works
+    // offline / on any origin — the live UI's /assets/* paths would
+    // 404 once the file is opened outside the dev server.
+    const providerLogos = await loadProviderLogoDataUris();
+    const htmlContent = generateBatchHtmlReport(
+      run,
+      assets,
+      promptProjects,
+      promptVersions,
+      models,
+      providerLogos,
+    );
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const downloadUrl = URL.createObjectURL(blob);
-    
+
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', downloadUrl);
     const sanitizedName = run.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -1146,6 +1297,7 @@ export function BatchTestPage() {
     const modelColumns = modelIds.map((id) => ({
       id,
       label: formatModelLabel(getModel(id), run.scenario.thinkingLevel),
+      modelId: id,
     }));
     const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
 
@@ -1156,11 +1308,18 @@ export function BatchTestPage() {
         ? promptVersions.find((entry) => entry.id === promptColumns[0].id)?.version
         : undefined;
 
-    const tableConfigs =
+    const tableConfigs: Array<{
+      key: string;
+      title: string;
+      titleModelId?: string;
+      scopeModelId?: string;
+      columns: Array<{ id: string; label: string; modelId?: string }>;
+    }> =
       promptColumns.length > 1 && modelColumns.length > 1
         ? modelColumns.map((modelColumn) => ({
             key: modelColumn.id,
             title: modelColumn.label,
+            titleModelId: modelColumn.id,
             scopeModelId: modelColumn.id,
             columns: promptColumns,
           }))
@@ -1173,6 +1332,13 @@ export function BatchTestPage() {
                     ? `Prompt v${singlePromptVersion}`
                     : promptColumns[0]?.label ?? 'Results'
                   : modelColumns[0]?.label ?? 'Results',
+              // The single-table fallback only carries a model in its
+              // title when there's exactly one model — multi-model
+              // single-prompt runs use the prompt version as title.
+              titleModelId:
+                modelColumns.length === 1 && promptColumns.length <= 1
+                  ? modelColumns[0]?.id
+                  : undefined,
               scopeModelId: undefined,
               columns: usePromptColumns ? promptColumns : modelColumns,
             },
@@ -1204,6 +1370,7 @@ export function BatchTestPage() {
       return {
         key: config.key,
         title: config.title,
+        titleModelId: config.titleModelId,
         columns: config.columns,
         rows,
         cells,
@@ -1529,6 +1696,9 @@ export function BatchTestPage() {
                       {tables.map((table) => (
                         <div className="batch-model" key={table.key}>
                           <div className="batch-model-head">
+                            {table.titleModelId && (
+                              <ProviderMarkInline model={getModel(table.titleModelId)} />
+                            )}
                             <span className="batch-model-name">{table.title}</span>
                             <span className="batch-model-bar" />
                           </div>
@@ -1546,6 +1716,9 @@ export function BatchTestPage() {
                             })()}
                             {table.columns.map((column) => (
                               <div key={column.id} className="batch-cell batch-cell-th">
+                                {column.modelId && (
+                                  <ProviderMarkInline model={getModel(column.modelId)} />
+                                )}
                                 {column.label}
                               </div>
                             ))}
@@ -1662,6 +1835,58 @@ export function BatchTestPage() {
 
             <div className="field">
               <label className="field-label">
+                <Cpu size={11} />
+                Thinking
+              </label>
+              <div
+                className={`dropdown ${thinkingDropdownOpen ? 'open' : ''}`}
+                data-value={thinkingLevel}
+              >
+                <button
+                  type="button"
+                  className="dropdown-trigger"
+                  onClick={() => setThinkingDropdownOpen((open) => !open)}
+                >
+                  <span className="dropdown-label">
+                    {THINKING_OPTIONS.find((option) => option.value === thinkingLevel)?.label}
+                  </span>
+                  <svg
+                    className="dropdown-chev"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 4.5l3 3 3-3" />
+                  </svg>
+                </button>
+                <div className="dropdown-menu" hidden={!thinkingDropdownOpen}>
+                  {THINKING_OPTIONS.map((option) => (
+                    <div
+                      key={option.value}
+                      className={`dropdown-option ${
+                        thinkingLevel === option.value ? 'selected' : ''
+                      }`}
+                      onClick={() => {
+                        setThinkingLevel(option.value);
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span>{option.label}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                          {option.description}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="field-label">
                 <FileText size={11} />
                 System prompt<span className="req">*</span>
               </label>
@@ -1705,59 +1930,6 @@ export function BatchTestPage() {
                 emptyLabel="Select text inputs…"
                 searchPlaceholder="Search text inputs…"
               />
-            </div>
-
-            <div className="field">
-              <label className="field-label">
-                <Cpu size={11} />
-                Thinking
-              </label>
-              <div
-                className={`dropdown ${thinkingDropdownOpen ? 'open' : ''}`}
-                data-value={thinkingLevel}
-              >
-                <button
-                  type="button"
-                  className="dropdown-trigger"
-                  onClick={() => setThinkingDropdownOpen((open) => !open)}
-                >
-                  <span className="dropdown-label">
-                    {THINKING_OPTIONS.find((option) => option.value === thinkingLevel)?.label}
-                  </span>
-                  <svg
-                    className="dropdown-chev"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M3 4.5l3 3 3-3" />
-                  </svg>
-                </button>
-                <div className="dropdown-menu" hidden={!thinkingDropdownOpen}>
-                  {THINKING_OPTIONS.map((option) => (
-                    <div
-                      key={option.value}
-                      className={`dropdown-option ${
-                        thinkingLevel === option.value ? 'selected' : ''
-                      }`}
-                      onClick={() => {
-                        setThinkingLevel(option.value);
-                        setThinkingDropdownOpen(false);
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span>{option.label}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                          {option.description}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
             <div className="field">

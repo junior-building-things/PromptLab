@@ -138,10 +138,29 @@ export const IconStickerize = () => (
   </svg>
 );
 
-/** Provider mark — picks the correct PNG + filter class. Inverted to white
- * in dark mode for OpenAI / xAI (monochrome marks); Google + Alibaba are
- * already colored so they keep their native palette via `colored`. */
+/** Provider mark — picks the correct PNG + filter class. Google + Alibaba
+ * are colored so they keep their native palette via `colored`. xAI keeps
+ * its monochrome mark inverted to white in dark mode (CSS filter). OpenAI
+ * ships two assets: the dark-on-light original plus a `_darkmode` white
+ * variant — we render both and let CSS toggle visibility by theme so we
+ * avoid the lossy `filter: invert(1)` hack. */
 export function ProviderMark({ provider }: { provider: 'openai' | 'google' | 'xai' | 'alibaba' }) {
+  if (provider === 'openai') {
+    return (
+      <>
+        <img
+          src="/assets/openai.png"
+          alt="openai"
+          className="provider-img provider-img-openai provider-img-openai-light"
+        />
+        <img
+          src="/assets/openai_darkmode.png"
+          alt="openai"
+          className="provider-img provider-img-openai provider-img-openai-dark"
+        />
+      </>
+    );
+  }
   const colored = provider === 'google' || provider === 'alibaba';
   return (
     <img

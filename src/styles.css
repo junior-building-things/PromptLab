@@ -665,6 +665,18 @@ button { cursor: pointer; }
 .provider-logo .provider-img { width: 22px; height: 22px; display: block; filter: invert(1); }
 .provider-logo .provider-img.provider-img-colored { filter: none; }
 [data-theme="light"] .provider-logo .provider-img { filter: none; }
+/* OpenAI ships two source assets — dark mark for light theme, white
+ * mark for dark theme. We render both and toggle by attribute so the
+ * mark is crisp at any DPR. The base .provider-img rule above sets
+ * filter: invert(1) for monochrome marks like xAI; the OpenAI variants
+ * are themselves pre-colored, so they opt out of filtering. */
+.provider-img-openai { filter: none !important; }
+/* Dark is the default theme (no data-theme attribute), light mode sets
+ * data-theme="light". Show the white mark in dark, the dark mark in light. */
+.provider-img-openai-light { display: none; }
+.provider-img-openai-dark { display: block; }
+[data-theme="light"] .provider-img-openai-light { display: block; }
+[data-theme="light"] .provider-img-openai-dark { display: none; }
 .provider-name { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
 .provider-sub {
   font-family: var(--font-mono); font-size: 10px;
@@ -1041,6 +1053,25 @@ button { cursor: pointer; }
   flex: 1; height: 1px;
   background: linear-gradient(90deg, var(--hairline) 0%, transparent 90%);
 }
+
+/* Provider mark embedded in the matrix title + column headers. We keep
+ * this lightweight (no rounded badge chrome) so the mark reads as part
+ * of the label, not as a separate chip. For OpenAI we render both light
+ * and dark assets and toggle by data-theme — same trick the .provider-
+ * img-openai rule applies to the dropdown / provider cards. */
+.batch-provider-mark {
+  display: inline-flex; align-items: center;
+  flex-shrink: 0;
+}
+.batch-provider-img {
+  width: 14px; height: 14px; display: block;
+}
+.batch-cell-th .batch-provider-img { width: 12px; height: 12px; margin-right: 4px; }
+.batch-provider-img-openai-light { display: none; }
+.batch-provider-img-openai-dark { display: block; }
+[data-theme="light"] .batch-provider-img-openai-light { display: block; }
+[data-theme="light"] .batch-provider-img-openai-dark { display: none; }
+.batch-cell-th { display: flex; align-items: center; }
 
 .batch-matrix {
   display: grid;
