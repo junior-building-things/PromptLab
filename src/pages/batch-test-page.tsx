@@ -140,6 +140,52 @@ function buildCellKey(rowId: string, columnId: string) {
   return `${rowId}::${columnId}`;
 }
 
+/**
+ * Infer a model's "thinking level" string for display next to the
+ * model name. Different reasoning families surface different
+ * vocabularies (Gemini's "dynamic", OpenAI's "high/medium/low"), so
+ * this is a best-effort inference from the model id pattern. Image /
+ * video / classic chat models have no thinking concept and return
+ * undefined — the caller drops the label in those cases.
+ *
+ * If a real per-model `thinkingLevel` field is added to ModelRecord
+ * later, this helper should prefer that field over the inference.
+ */
+function inferThinkingLevel(model: ModelRecord | undefined): string | undefined {
+  if (!model) return undefined;
+  const id = model.apiModel.toLowerCase();
+  // Image / video families have no thinking concept.
+  if (id.includes('image') || id.includes('sora') || id.includes('veo')) {
+    return undefined;
+  }
+  // Gemini text models default to dynamic thinking unless explicitly
+  // pinned with a thinkingBudget. The Pro variants are configurable.
+  if (id.startsWith('gemini')) return 'Dynamic';
+  // OpenAI gpt-5 family (and the o-series, in case it's ever added)
+  // exposes a reasoning_effort knob; "high" is the common default
+  // for these comparisons.
+  if (id.startsWith('gpt-5') || id.startsWith('o3') || id.startsWith('o4')) {
+    return 'High';
+  }
+  // xAI grok 4.3+ exposes reasoning.
+  if (/^grok-(4\.3|5)/.test(id)) return 'High';
+  // qwen3-max + qwen3-plus have thinking mode.
+  if (id.startsWith('qwen3-max') || id.startsWith('qwen3-plus')) {
+    return 'Default';
+  }
+  return undefined;
+}
+
+/** Compose the "MODEL NAME, DYNAMIC THINKING" display label used in
+ * matrix section headers + column labels. Falls back to just the
+ * model's name when there's no thinking level to append. */
+function formatModelLabel(model: ModelRecord | undefined): string {
+  if (!model) return 'Unknown Model';
+  const thinking = inferThinkingLevel(model);
+  if (!thinking) return model.name;
+  return `${model.name}, ${thinking} thinking`;
+}
+
 function buildRowId(assetId?: string, userInput?: string) {
   if (assetId && userInput) return `${assetId}::${userInput}`;
   if (assetId) return assetId;
@@ -260,7 +306,7 @@ function generateBatchHtmlReport(
     const rows = getRowLabels(run);
 
     const promptColumns = promptIds.map((id) => ({ id, label: getPromptLabel(id) }));
-    const modelColumns = modelIds.map((id) => ({ id, label: getModel(id)?.name ?? 'Unknown Model' }));
+    const modelColumns = modelIds.map((id) => ({ id, label: formatModelLabel(getModel(id)) }));
     const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
 
     // Single-prompt × multi-model runs used to read "Results" — replace
@@ -331,7 +377,7 @@ function generateBatchHtmlReport(
 
   let tablesHtml = '';
   tables.forEach((table) => {
-    const gridCols = `220px repeat(${table.columns.length}, minmax(180px, 1fr))`;
+    const gridCols = `260px repeat(${table.columns.length}, minmax(180px, 1fr))`;
     
     let headerRowCells = '';
     const hasImages = run.scenario.assetIds && run.scenario.assetIds.length > 0;
@@ -393,14 +439,16 @@ function generateBatchHtmlReport(
             }
 
             const latencyHtml = result.latencyMs ? `<span>${result.latencyMs.toLocaleString()} ms</span>` : '';
-            const scoreHtml = result.score !== undefined ? `<span class="pill" style="color: var(--ai); border-color: rgba(139, 92, 246, 0.3); background: rgba(139, 92, 246, 0.08);">Score: ${result.score}</span>` : '';
+            // Score badge intentionally omitted from the HTML report — it
+            // was a placeholder length-based heuristic, not a real quality
+            // measurement, so showing it on a shareable artifact was
+            // misleading. Add a real evaluator before resurfacing this.
 
             cellContentHtml += `
               <div class="result-box" style="margin-bottom: 12px;">
                 ${outputHtml}
                 <div class="meta-metrics">
                   ${latencyHtml}
-                  ${scoreHtml}
                 </div>
               </div>
             `;
@@ -561,8 +609,8 @@ function generateBatchHtmlReport(
       padding-top: 12px;
     }
     .input-thumb {
-      width: 100px;
-      height: 100px;
+      width: 150px;
+      height: 150px;
       border-radius: 8px;
       border: 1px solid var(--hairline);
       object-fit: cover;
@@ -1054,7 +1102,7 @@ export function BatchTestPage() {
     const rows = getRowLabels(run);
 
     const promptColumns = promptIds.map((id) => ({ id, label: getPromptLabel(id) }));
-    const modelColumns = modelIds.map((id) => ({ id, label: getModel(id)?.name ?? 'Unknown Model' }));
+    const modelColumns = modelIds.map((id) => ({ id, label: formatModelLabel(getModel(id)) }));
     const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
 
     // Single-prompt × multi-model runs read "Prompt vN" — the prompt
@@ -1430,7 +1478,7 @@ export function BatchTestPage() {
                           <div
                             className="batch-matrix"
                             style={{
-                              gridTemplateColumns: `220px repeat(${table.columns.length}, minmax(160px, 1fr))`,
+                              gridTemplateColumns: `260px repeat(${table.columns.length}, minmax(160px, 1fr))`,
                             }}
                           >
                             {(() => {
@@ -1452,8 +1500,8 @@ export function BatchTestPage() {
                                     {asset && (
                                       <div
                                         style={{
-                                          width: 80,
-                                          height: 80,
+                                          width: 120,
+                                          height: 120,
                                           borderRadius: 6,
                                           background: 'var(--bg-elev-3)',
                                           border: '1px solid var(--hairline)',
