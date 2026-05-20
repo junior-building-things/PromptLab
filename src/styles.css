@@ -911,8 +911,31 @@ button { cursor: pointer; }
   flex-shrink: 0;
 }
 .dropdown-option.dropdown-add::before,
-.dropdown[id="projectTypeDropdown"] .dropdown-option::before,
-.dropdown[id="thinkingDropdown"] .dropdown-option::before { display: none; content: none; }
+.dropdown[id="projectTypeDropdown"] .dropdown-option::before { display: none; content: none; }
+
+/* Single-select Thinking dropdown: render an empty box on unselected
+ * options and a filled checkmark on the .selected one — mirrors the
+ * multi-select indicator above but keyed off the single-select state
+ * class. Without this, every option (including the active one) got
+ * the same empty box and "selected" was only signalled by the violet
+ * background, which read as "hover" instead of "selected". */
+.dropdown[id="thinkingDropdown"] .dropdown-option.selected::before {
+  content: "";
+  width: 12px; height: 12px;
+  border: 1px solid #fff;
+  background: #fff;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12l5 5L20 7'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 10px;
+}
+[data-theme="light"] .dropdown[id="thinkingDropdown"] .dropdown-option.selected::before {
+  border-color: #000;
+  background-color: #000;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12l5 5L20 7'/></svg>");
+}
 
 .dropdown-group-head {
   font-family: var(--font-mono); font-size: 9.5px;
