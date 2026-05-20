@@ -903,7 +903,11 @@ function generateBatchHtmlReport(
       <h1 class="title">${run.name}</h1>
       <div class="meta">
         <span>${dateStr}</span>
-        <span class="pill ok">${run.status}</span>
+        <!-- The downloaded report is a frozen artifact of a finished run,
+             so always read "Completed" — surfacing "running" / "failed"
+             on a static HTML file the user is about to share would be
+             misleading. -->
+        <span class="pill ok">Completed</span>
         <span>${run.results.length} results</span>
       </div>
     </header>
