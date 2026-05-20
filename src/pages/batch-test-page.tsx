@@ -579,6 +579,34 @@ function generateBatchHtmlReport(
       color: oklch(0.82 0.08 195);
       white-space: pre-wrap;
       word-break: break-all;
+      /* Transparent scrollbar so the rounded panel reads as a clean
+       * card instead of a chunky light-gray bar on the right edge.
+       * Firefox uses scrollbar-color; WebKit/Chromium use the
+       * ::-webkit-scrollbar pseudo-elements below. */
+      scrollbar-width: thin;
+      scrollbar-color: transparent transparent;
+    }
+    .output-json:hover {
+      scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+    }
+    .output-json::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+      background: transparent;
+    }
+    .output-json::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .output-json::-webkit-scrollbar-thumb {
+      background: transparent;
+      border-radius: 3px;
+      transition: background 0.15s ease;
+    }
+    .output-json:hover::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+    }
+    .output-json::-webkit-scrollbar-corner {
+      background: transparent;
     }
     .output-image {
       max-width: 100%;
