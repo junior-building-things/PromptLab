@@ -517,8 +517,29 @@ function generateBatchHtmlReport(
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--text-dim);
-      padding-bottom: 8px;
+      padding: 12px 4px 8px;
       border-bottom: 1px solid var(--hairline);
+      /* Sticky column header — mirrors the live page's batch-cell-th
+       * behavior (commit 5d00eea). Stays pinned at the viewport top
+       * while the parent .grid is in view; scrolls away with the
+       * section once the next matrix becomes the focus. The ::before
+       * shim covers the .matrix-section padding above so body rows
+       * don't peek through between the sticky band and the section
+       * edge. */
+      position: sticky;
+      top: 0;
+      background: var(--bg-elev);
+      z-index: 10;
+    }
+    .cell-th::before {
+      content: "";
+      position: absolute;
+      top: -24px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-elev);
+      z-index: -1;
     }
     .cell-label {
       font-family: var(--font-mono);
