@@ -556,13 +556,14 @@ function generateBatchHtmlReport(
       align-items: center;
       gap: 8px;
       /* Sticky as well, stacked above the column-header row. Without
-       * this the matrix-title scrolls *behind* the sticky .cell-th
-       * band (which has a higher z-index for its own background fill)
-       * and the upper half of the title text gets clipped — the
-       * "PROMPT V1 cut off" bug. */
+       * this the matrix-title scrolls behind the sticky .cell-th band
+       * and the upper half of the title text gets clipped. Background
+       * matches the surrounding .matrix-section panel (var(--bg-elev))
+       * so the sticky band blends into the panel instead of showing
+       * up as a darker stripe over it. */
       position: sticky;
       top: 0;
-      background: var(--bg);
+      background: var(--bg-elev);
       z-index: 11;
     }
     .matrix-title::after {
@@ -589,13 +590,13 @@ function generateBatchHtmlReport(
       border-bottom: 1px solid var(--hairline);
       /* Sticky column header stacks just below the also-sticky
        * matrix-title. top matches the matrix-title's computed height
-       * (font 12 + line-height ~1.5 + 24 px vertical padding ~ 42 px)
-       * so the two pin without overlapping. Background uses page bg
-       * so there's no color mismatch between the sticky band and the
-       * scrolling content underneath. */
+       * so the two pin without overlapping. Background matches the
+       * surrounding panel (var(--bg-elev)) so the sticky band blends
+       * into the matrix-section panel rather than showing up as a
+       * darker stripe over it. */
       position: sticky;
       top: 42px;
-      background: var(--bg);
+      background: var(--bg-elev);
       z-index: 10;
     }
     .cell-label {
