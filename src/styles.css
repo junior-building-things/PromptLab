@@ -119,6 +119,18 @@ button { cursor: pointer; }
   flex-shrink: 0;
   position: relative;
   animation: brand-glow-pulse 3.2s ease-in-out infinite;
+  /* Holds the lucide `Bot` glyph (white-on-violet). Tinted accent
+   * background + thin hairline border + flex centering for the SVG. */
+  background: var(--ai-soft);
+  border: 1px solid oklch(0.65 0.17 var(--ai-h) / 0.3);
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+.brand-mark svg {
+  width: 60%;
+  height: 60%;
+  display: block;
 }
 .brand-mark img {
   border-radius: 10px;

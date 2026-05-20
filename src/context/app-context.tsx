@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react';
 import {
   createContext,
   useCallback,
@@ -1215,13 +1216,10 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
           >
             <div
               className="brand-mark"
+              aria-label="PromptLab"
               style={{ width: 44, height: 44, borderRadius: 11 }}
             >
-              <img
-                src="/assets/app-icon.png"
-                alt="PromptLab"
-                style={{ width: '100%', height: '100%', borderRadius: 9, display: 'block' }}
-              />
+              <Bot strokeWidth={2} />
             </div>
             <div
               style={{

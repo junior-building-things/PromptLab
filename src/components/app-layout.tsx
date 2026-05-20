@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
@@ -180,8 +181,8 @@ export function AppLayout() {
         {/* ============ SIDEBAR ============ */}
         <aside className="sidebar">
           <div className="brand">
-            <div className="brand-mark">
-              <img src="/assets/app-icon.png" alt="PromptLab" />
+            <div className="brand-mark" aria-label="PromptLab">
+              <Bot strokeWidth={2} />
             </div>
             <div>
               <div className="brand-name">PromptLab</div>
