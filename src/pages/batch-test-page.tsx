@@ -550,10 +550,20 @@ function generateBatchHtmlReport(
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--text);
-      margin-bottom: 16px;
+      margin-bottom: 0;
+      padding: 12px 0;
       display: flex;
       align-items: center;
       gap: 8px;
+      /* Sticky as well, stacked above the column-header row. Without
+       * this the matrix-title scrolls *behind* the sticky .cell-th
+       * band (which has a higher z-index for its own background fill)
+       * and the upper half of the title text gets clipped — the
+       * "PROMPT V1 cut off" bug. */
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 11;
     }
     .matrix-title::after {
       content: "";
@@ -577,27 +587,16 @@ function generateBatchHtmlReport(
       color: var(--text-dim);
       padding: 12px 4px 8px;
       border-bottom: 1px solid var(--hairline);
-      /* Sticky column header — mirrors the live page's batch-cell-th
-       * behavior (commit 5d00eea). Stays pinned at the viewport top
-       * while the parent .grid is in view; scrolls away with the
-       * section once the next matrix becomes the focus. The ::before
-       * shim covers the .matrix-section padding above so body rows
-       * don't peek through between the sticky band and the section
-       * edge. */
+      /* Sticky column header stacks just below the also-sticky
+       * matrix-title. top matches the matrix-title's computed height
+       * (font 12 + line-height ~1.5 + 24 px vertical padding ~ 42 px)
+       * so the two pin without overlapping. Background uses page bg
+       * so there's no color mismatch between the sticky band and the
+       * scrolling content underneath. */
       position: sticky;
-      top: 0;
-      background: var(--bg-elev);
+      top: 42px;
+      background: var(--bg);
       z-index: 10;
-    }
-    .cell-th::before {
-      content: "";
-      position: absolute;
-      top: -24px;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: var(--bg-elev);
-      z-index: -1;
     }
     .cell-label {
       font-family: var(--font-mono);
