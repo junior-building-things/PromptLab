@@ -1095,6 +1095,9 @@ button { cursor: pointer; }
   width: 14px; height: 14px; display: block;
 }
 .batch-cell-th .batch-provider-img { width: 12px; height: 12px; margin-right: 4px; }
+/* Google mark optical-size correction — see ProviderMarkInline. */
+.batch-provider-img-google { width: 12px; height: 12px; }
+.batch-cell-th .batch-provider-img-google { width: 10px; height: 10px; }
 .batch-provider-img-openai-light { display: none; }
 .batch-provider-img-openai-dark { display: block; }
 [data-theme="light"] .batch-provider-img-openai-light { display: block; }

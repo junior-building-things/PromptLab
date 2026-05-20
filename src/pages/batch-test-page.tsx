@@ -132,9 +132,13 @@ function ProviderMarkInline({ model }: { model: ModelRecord | undefined }) {
     );
   }
   const file = provider === 'gemini' ? 'google.png' : `${provider}.png`;
+  // The Google mark renders heavier than OpenAI / xAI at the same box
+  // size (the asset has almost no inner padding), so it visually
+  // dominates the model name. Tag it so CSS can shave a couple pixels.
+  const sizeClass = provider === 'gemini' ? ' batch-provider-img-google' : '';
   return (
     <span className="batch-provider-mark">
-      <img src={`/assets/${file}`} alt={provider} className="batch-provider-img" />
+      <img src={`/assets/${file}`} alt={provider} className={`batch-provider-img${sizeClass}`} />
     </span>
   );
 }
@@ -369,7 +373,9 @@ function generateBatchHtmlReport(
     if (!key) return '';
     const src = providerLogos[key];
     if (!src) return '';
-    return `<img class="provider-mark" src="${src}" alt="${model.provider}" />`;
+    // Google mark optical-size correction — same reason as the live UI.
+    const sizeClass = key === 'google' ? ' provider-mark-google' : '';
+    return `<img class="provider-mark${sizeClass}" src="${src}" alt="${model.provider}" />`;
   }
 
   function getPromptLabel(id: string) {
@@ -774,6 +780,17 @@ function generateBatchHtmlReport(
     .cell-th .provider-mark {
       width: 12px;
       height: 12px;
+    }
+    /* Google mark optical-size correction — its asset has minimal
+     * inner padding so it visually outweighs the other marks at the
+     * shared box size. */
+    .provider-mark-google {
+      width: 12px;
+      height: 12px;
+    }
+    .cell-th .provider-mark-google {
+      width: 10px;
+      height: 10px;
     }
     .cell-label {
       font-family: var(--font-mono);
