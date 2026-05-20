@@ -197,6 +197,17 @@ export const initialModels: ModelRecord[] = [
   // --- Google Models ---
   // TEXT
   {
+    id: 'model-gemini-gemini-3-5-flash',
+    name: 'gemini-3.5-flash',
+    provider: 'gemini',
+    apiModel: 'gemini-3.5-flash',
+    endpoint: 'Generate Content API',
+    temperature: 0.5,
+    maxTokens: 1600,
+    status: 'ready',
+    envVar: 'VITE_GEMINI_API_KEY',
+  },
+  {
     id: 'model-gemini-gemini-3-1-flash-lite',
     name: 'gemini-3.1-flash-lite',
     provider: 'gemini',
