@@ -985,6 +985,11 @@ button { cursor: pointer; }
 }
 .dd-provider-icon img.provider-img.provider-img-colored { filter: none; }
 [data-theme="light"] .dd-provider-icon img.provider-img { filter: none; }
+/* ProviderMarkInline (used by the model dropdown) ships its own
+ * pre-colored OpenAI assets, so size them down to fit the 16x16
+ * container and skip the invert filter. */
+.dd-provider-icon .batch-provider-img { width: 12px; height: 12px; }
+.dd-provider-icon .batch-provider-img-google { width: 10px; height: 10px; }
 
 /* ============== BATCH TEST ============== */
 .batch-list { display: flex; flex-direction: column; gap: 12px; }

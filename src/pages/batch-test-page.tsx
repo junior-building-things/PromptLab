@@ -43,7 +43,7 @@ function BoxIcon({ children }: { children: ReactNode }) {
     </span>
   );
 }
-import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
+import { getProviderLabel } from '../lib/model-brand';
 import type {
   AssetRecord,
   BatchRun,
@@ -1171,13 +1171,11 @@ export function BatchTestPage() {
           label: model.name,
           searchText: `${model.name.toLowerCase()} ${getProviderLabel(model.provider).toLowerCase()}`,
           group: type,
-          icon: (
-            <img
-              src={getProviderIconSrc(model.provider)}
-              alt={getProviderLabel(model.provider)}
-              style={{ width: 12, height: 12, display: 'block' }}
-            />
-          ),
+          // Reuse the dark-mode-aware ProviderMarkInline so the dropdown
+          // icon swaps to openai_darkmode.png in dark theme — the older
+          // getProviderIconSrc returned a single static asset that read
+          // as a dark blob on the dark dropdown background.
+          icon: <ProviderMarkInline model={model} />,
         };
       }),
     [readyModels],
