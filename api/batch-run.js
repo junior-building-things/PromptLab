@@ -71,6 +71,50 @@ function scoreOutput(text) {
   return Math.max(72, Math.min(98, 72 + lengthScore));
 }
 
+/**
+ * Translate the cross-provider thinking-level enum into the field each
+ * provider's API actually accepts. Returns `null` when no override
+ * should be applied (the caller spreads the result into the request
+ * body, so null means "skip this field entirely").
+ *
+ *   level=='dynamic' / undefined → null (use provider's silent default)
+ *   level=='minimal' → OpenAI/xAI 'minimal' (omitted for xAI since
+ *     `minimal` isn't a documented value there); Gemini thinkingBudget 0
+ *     (disable thinking)
+ *   level=='low'/'medium'/'high' → straight passthrough where the
+ *     provider has matching vocabulary; mapped to Gemini token presets.
+ */
+function openAiReasoning(level) {
+  if (!level || level === 'dynamic') return null;
+  // OpenAI Responses API documents 'minimal' | 'low' | 'medium' | 'high'.
+  return { effort: level };
+}
+
+function geminiThinkingConfig(level) {
+  if (!level || level === 'dynamic') return null;
+  // Gemini expects an integer `thinkingBudget` in tokens. Map levels to
+  // sensible presets; 0 disables thinking entirely.
+  const budgetByLevel = {
+    minimal: 0,
+    low: 512,
+    medium: 4096,
+    high: 16384,
+  };
+  const thinkingBudget = budgetByLevel[level];
+  if (thinkingBudget === undefined) return null;
+  return { thinkingBudget };
+}
+
+function xaiReasoningEffort(level) {
+  if (!level || level === 'dynamic') return null;
+  // xAI documents low / medium / high. Coerce 'minimal' to 'low' so
+  // user intent ("least thinking") still produces the closest available
+  // setting rather than silently dropping the override.
+  if (level === 'minimal') return 'low';
+  if (['low', 'medium', 'high'].includes(level)) return level;
+  return null;
+}
+
 function toDataUrl(mimeType, data) {
   if (!mimeType || !data) {
     return undefined;
@@ -458,7 +502,7 @@ function buildUserText({ prompt, userInput, asset }) {
   return sections.join('\n\n');
 }
 
-async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
+async function callOpenAI({ prompt, userInput, asset, model, apiKey, thinkingLevel }) {
   if (!apiKey) {
     throw new Error('Missing OpenAI API key. Add it in the Models view before running a batch test.');
   }
@@ -522,6 +566,10 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
       ],
       tool_choice: { type: 'image_generation' },
       input,
+      // Reasoning effort knob, conditionally included. Spreading a
+      // null-returning helper into the object is a no-op, so
+      // 'dynamic' / unset → unchanged request body.
+      ...(openAiReasoning(thinkingLevel) ? { reasoning: openAiReasoning(thinkingLevel) } : {}),
     }),
   });
 
@@ -545,7 +593,7 @@ async function callOpenAI({ prompt, userInput, asset, model, apiKey }) {
   };
 }
 
-async function callGemini({ prompt, userInput, asset, model, apiKey }) {
+async function callGemini({ prompt, userInput, asset, model, apiKey, thinkingLevel }) {
   if (!apiKey) {
     throw new Error('Missing Gemini API key. Add it in the Models view before running a batch test.');
   }
@@ -586,6 +634,11 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
           parts: userParts,
         },
       ],
+      // Map our cross-provider level into Gemini's numeric thinking
+      // budget (lives on generationConfig). null = no override.
+      ...(geminiThinkingConfig(thinkingLevel)
+        ? { generationConfig: { thinkingConfig: geminiThinkingConfig(thinkingLevel) } }
+        : {}),
     }),
   });
 
@@ -605,7 +658,7 @@ async function callGemini({ prompt, userInput, asset, model, apiKey }) {
   };
 }
 
-async function callXAI({ prompt, userInput, asset, model, apiKey }) {
+async function callXAI({ prompt, userInput, asset, model, apiKey, thinkingLevel }) {
   if (!apiKey) {
     throw new Error('Missing xAI API key. Add it in the Models view before running a batch test.');
   }
@@ -664,6 +717,11 @@ async function callXAI({ prompt, userInput, asset, model, apiKey }) {
       temperature: model.temperature,
       max_tokens: model.maxTokens,
       messages,
+      // xAI grok 4.3+ exposes reasoning_effort in the Chat Completions
+      // shape (low/medium/high). null = no override.
+      ...(xaiReasoningEffort(thinkingLevel)
+        ? { reasoning_effort: xaiReasoningEffort(thinkingLevel) }
+        : {}),
     }),
   });
 
@@ -696,6 +754,11 @@ export default async function handler(req, res) {
     const { prompt, asset, models, userInput } = body || {};
     const normalizedUserInput = normalizeUserInput(userInput);
     const stickerize = body?.stickerize !== false;
+    // Thinking-effort knob set by the user in the New Batch Test modal.
+    // Forwarded to each provider's reasoning field by the call site
+    // below; "dynamic" (or omitted) means we don't set anything and
+    // let the provider's silent default kick in.
+    const thinkingLevel = body?.thinkingLevel || undefined;
 
     if (!prompt?.systemPrompt || !Array.isArray(models) || models.length === 0) {
       return json(res, 400, { error: 'Missing prompt or models in request body.' });
@@ -707,11 +770,11 @@ export default async function handler(req, res) {
           let execution;
           const apiKey = await getProviderApiKey(user, model.provider);
           if (model.provider === 'openai') {
-            execution = await callOpenAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey });
+            execution = await callOpenAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey, thinkingLevel });
           } else if (model.provider === 'gemini') {
-            execution = await callGemini({ prompt, userInput: normalizedUserInput, asset, model, apiKey });
+            execution = await callGemini({ prompt, userInput: normalizedUserInput, asset, model, apiKey, thinkingLevel });
           } else {
-            execution = await callXAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey });
+            execution = await callXAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey, thinkingLevel });
           }
 
           execution = await postProcessOutputImage(execution, { stickerize });

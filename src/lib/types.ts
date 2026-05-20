@@ -50,6 +50,18 @@ export type ModelRecord = {
   envVar: string;
 };
 
+/** Thinking / reasoning effort knob shared across providers. Maps to:
+ *   - OpenAI gpt-5 / o-series: `reasoning_effort` ('minimal' | 'low' |
+ *     'medium' | 'high') — `'dynamic'` skips the field so the provider
+ *     uses its own default.
+ *   - Gemini 2.5+:  `thinkingConfig.thinkingBudget` (numeric tokens; we
+ *     map levels → presets, and `'dynamic'` omits the field).
+ *   - xAI grok 4.3+: `reasoning_effort` ('low' | 'medium' | 'high'),
+ *     `'minimal'` and `'dynamic'` collapse to omission.
+ *   - Non-reasoning models (image / video / classic chat): the field is
+ *     simply ignored. */
+export type ThinkingLevel = 'dynamic' | 'minimal' | 'low' | 'medium' | 'high';
+
 export type BatchScenario = {
   promptId: string;
   promptIds?: string[];
@@ -59,6 +71,7 @@ export type BatchScenario = {
   modelIds: string[];
   userInput?: string;
   stickerize?: boolean;
+  thinkingLevel?: ThinkingLevel;
 };
 
 export type TestResult = {

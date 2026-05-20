@@ -44,7 +44,28 @@ function BoxIcon({ children }: { children: ReactNode }) {
   );
 }
 import { getProviderIconSrc, getProviderLabel } from '../lib/model-brand';
-import type { AssetRecord, BatchRun, ModelRecord, PromptProject, PromptVersion, TestResult } from '../lib/types';
+import type {
+  AssetRecord,
+  BatchRun,
+  ModelRecord,
+  PromptProject,
+  PromptVersion,
+  TestResult,
+  ThinkingLevel,
+} from '../lib/types';
+
+const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string; description: string }> = [
+  { value: 'dynamic', label: 'Dynamic', description: 'Provider default — model picks how much to think.' },
+  { value: 'minimal', label: 'Minimal', description: 'Skip reasoning when possible. Lowest latency.' },
+  { value: 'low', label: 'Low', description: 'Light reasoning budget.' },
+  { value: 'medium', label: 'Medium', description: 'Balanced effort for typical tasks.' },
+  { value: 'high', label: 'High', description: 'Maximum reasoning budget. Highest latency / cost.' },
+];
+
+function thinkingLabelFor(value: ThinkingLevel | undefined): string | undefined {
+  if (!value || value === 'dynamic') return undefined;
+  return THINKING_OPTIONS.find((option) => option.value === value)?.label;
+}
 
 type ApiResult = {
   modelId: string;
@@ -177,13 +198,25 @@ function inferThinkingLevel(model: ModelRecord | undefined): string | undefined 
 }
 
 /** Compose the "MODEL NAME, DYNAMIC THINKING" display label used in
- * matrix section headers + column labels. Falls back to just the
- * model's name when there's no thinking level to append. */
-function formatModelLabel(model: ModelRecord | undefined): string {
+ * matrix section headers + column labels. Prefers the run's explicit
+ * scenario.thinkingLevel when one is set; otherwise falls back to the
+ * per-family inference. "dynamic" (provider default) is treated the
+ * same as no level — the label is just the model name. */
+function formatModelLabel(
+  model: ModelRecord | undefined,
+  scenarioThinking?: ThinkingLevel,
+): string {
   if (!model) return 'Unknown Model';
-  const thinking = inferThinkingLevel(model);
-  if (!thinking) return model.name;
-  return `${model.name}, ${thinking} thinking`;
+  // Skip the label entirely for image / video / non-reasoning models —
+  // showing "Sora, High thinking" would be nonsense.
+  const supportsThinking = inferThinkingLevel(model) !== undefined;
+  if (!supportsThinking) return model.name;
+  const explicit = thinkingLabelFor(scenarioThinking);
+  if (explicit) return `${model.name}, ${explicit} thinking`;
+  // Fallback to the inferred default vocabulary.
+  const inferred = inferThinkingLevel(model);
+  if (!inferred) return model.name;
+  return `${model.name}, ${inferred} thinking`;
 }
 
 function buildRowId(assetId?: string, userInput?: string) {
@@ -306,7 +339,10 @@ function generateBatchHtmlReport(
     const rows = getRowLabels(run);
 
     const promptColumns = promptIds.map((id) => ({ id, label: getPromptLabel(id) }));
-    const modelColumns = modelIds.map((id) => ({ id, label: formatModelLabel(getModel(id)) }));
+    const modelColumns = modelIds.map((id) => ({
+      id,
+      label: formatModelLabel(getModel(id), run.scenario.thinkingLevel),
+    }));
     const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
 
     // Single-prompt × multi-model runs used to read "Results" — replace
@@ -850,6 +886,11 @@ export function BatchTestPage() {
   const [selectedTextInputAssetIds, setSelectedTextInputAssetIds] = useState<string[]>([]);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [stickerize, setStickerize] = useState(false);
+  // Default to 'dynamic' — each provider's silent default kicks in, which
+  // is roughly what every run before this knob existed used. Users can
+  // pin a specific effort with the dropdown.
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>('dynamic');
+  const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
@@ -1102,7 +1143,10 @@ export function BatchTestPage() {
     const rows = getRowLabels(run);
 
     const promptColumns = promptIds.map((id) => ({ id, label: getPromptLabel(id) }));
-    const modelColumns = modelIds.map((id) => ({ id, label: formatModelLabel(getModel(id)) }));
+    const modelColumns = modelIds.map((id) => ({
+      id,
+      label: formatModelLabel(getModel(id), run.scenario.thinkingLevel),
+    }));
     const usePromptColumns = promptColumns.length > 1 || modelColumns.length <= 1;
 
     // Single-prompt × multi-model runs read "Prompt vN" — the prompt
@@ -1175,6 +1219,10 @@ export function BatchTestPage() {
   function closeComposer() {
     setComposerOpen(false);
     setErrorMessage('');
+    // Close any open dropdown panels the user left expanded — the
+    // selected value itself is preserved so reopening the modal keeps
+    // the user's last pick.
+    setThinkingDropdownOpen(false);
   }
 
   async function executeScenario(
@@ -1199,6 +1247,10 @@ export function BatchTestPage() {
           models: selectedModels,
           userInput: userInput?.trim() ? userInput : undefined,
           stickerize: shouldStickerize,
+          // Map the user's pick into the request body so the serverless
+          // function can route it to each provider's thinking knob.
+          // 'dynamic' is omitted (provider default kicks in).
+          thinkingLevel: thinkingLevel !== 'dynamic' ? thinkingLevel : undefined,
         }),
         signal: controller.signal,
       });
@@ -1253,6 +1305,11 @@ export function BatchTestPage() {
       modelIds: selectedModelIds,
       userInput: selectedUserInputs.length > 0 ? selectedUserInputs.join(' | ') : undefined,
       stickerize,
+      // 'dynamic' is the implicit provider-default and adds nothing the
+      // pipeline doesn't already do; persist only explicit overrides so
+      // older runs (no thinkingLevel) and new "Dynamic" runs both look
+      // the same on disk.
+      thinkingLevel: thinkingLevel !== 'dynamic' ? thinkingLevel : undefined,
     };
     // Run name is the prompt-project name(s) — no version, no timestamp.
     // Sorted unique projects so the title stays stable across re-runs.
@@ -1648,6 +1705,59 @@ export function BatchTestPage() {
                 emptyLabel="Select text inputs…"
                 searchPlaceholder="Search text inputs…"
               />
+            </div>
+
+            <div className="field">
+              <label className="field-label">
+                <Cpu size={11} />
+                Thinking
+              </label>
+              <div
+                className={`dropdown ${thinkingDropdownOpen ? 'open' : ''}`}
+                data-value={thinkingLevel}
+              >
+                <button
+                  type="button"
+                  className="dropdown-trigger"
+                  onClick={() => setThinkingDropdownOpen((open) => !open)}
+                >
+                  <span className="dropdown-label">
+                    {THINKING_OPTIONS.find((option) => option.value === thinkingLevel)?.label}
+                  </span>
+                  <svg
+                    className="dropdown-chev"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 4.5l3 3 3-3" />
+                  </svg>
+                </button>
+                <div className="dropdown-menu" hidden={!thinkingDropdownOpen}>
+                  {THINKING_OPTIONS.map((option) => (
+                    <div
+                      key={option.value}
+                      className={`dropdown-option ${
+                        thinkingLevel === option.value ? 'selected' : ''
+                      }`}
+                      onClick={() => {
+                        setThinkingLevel(option.value);
+                        setThinkingDropdownOpen(false);
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span>{option.label}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                          {option.description}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="field">
