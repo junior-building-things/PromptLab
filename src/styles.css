@@ -953,13 +953,17 @@ button { cursor: pointer; }
   border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
   background: var(--bg-elev-2);
-  overflow: hidden;
+  overflow: visible;
 }
 .batch-head {
   display: flex; align-items: center; gap: 14px;
   padding: 14px 18px;
   cursor: pointer;
   user-select: none;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.batch-job:not(.open) .batch-head {
+  border-radius: var(--r-lg);
 }
 .batch-head:hover { background: var(--bg-elev-3); }
 .batch-job.open .project-chev { transform: rotate(90deg); }
@@ -1005,6 +1009,7 @@ button { cursor: pointer; }
   border-top: 1px solid var(--hairline);
   padding: 18px;
   background: var(--bg-elev-1);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
 }
 .batch-job.open .batch-body { display: flex; flex-direction: column; gap: 18px; }
 
@@ -1039,14 +1044,31 @@ button { cursor: pointer; }
 
 .batch-matrix {
   display: grid;
-  gap: 10px;
+  column-gap: 10px;
+  row-gap: 10px;
+  position: relative;
 }
 .batch-cell { min-width: 0; }
 .batch-cell-th {
   font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--text-dim);
-  padding: 4px 2px;
+  padding: 6px 4px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-elev-1);
+  z-index: 10;
+  border-bottom: 1px solid var(--hairline);
+}
+.batch-cell-th::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-elev-1);
+  z-index: -1;
 }
 .batch-cell-label {
   font-family: var(--font-mono); font-size: 12px;
