@@ -155,6 +155,19 @@ function TextIcon({ Icon }: { Icon: LucideIcon }) {
   );
 }
 
+function tryParseJSON(text?: string): any {
+  if (!text) return null;
+  const trimmed = text.trim();
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function BatchResultCell({
   results,
   isRunning,
@@ -213,8 +226,34 @@ function BatchResultCell({
               </button>
             </div>
           ) : (
-            <div className="batch-table-output-fallback">
-              <p>{result.output || 'No image output returned.'}</p>
+            <div className="batch-table-output-fallback" style={{ width: '100%' }}>
+              {(() => {
+                const jsonObject = tryParseJSON(result.output);
+                if (jsonObject) {
+                  return (
+                    <pre
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        lineHeight: '1.4',
+                        margin: 0,
+                        padding: '8px',
+                        background: 'var(--bg-elev-1)',
+                        border: '1px solid var(--hairline)',
+                        borderRadius: '4px',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all',
+                        color: 'oklch(0.82 0.08 195)', // elegant premium teal/blue
+                        textAlign: 'left',
+                        width: '100%',
+                      }}
+                    >
+                      {JSON.stringify(jsonObject, null, 2)}
+                    </pre>
+                  );
+                }
+                return <p>{result.output || 'No image output returned.'}</p>;
+              })()}
             </div>
           )}
         </div>
