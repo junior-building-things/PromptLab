@@ -850,7 +850,7 @@ export function BatchTestPage() {
                           <div
                             className="batch-matrix"
                             style={{
-                              gridTemplateColumns: `140px repeat(${table.columns.length}, minmax(160px, 1fr))`,
+                              gridTemplateColumns: `180px repeat(${table.columns.length}, minmax(160px, 1fr))`,
                             }}
                           >
                             {(() => {
@@ -868,33 +868,30 @@ export function BatchTestPage() {
                               const asset = row.assetId ? getAsset(row.assetId) : undefined;
                               return (
                                 <Fragment key={row.id}>
-                                  <div className="batch-cell batch-cell-label">
+                                  <div className="batch-cell batch-cell-label" style={{ gap: 12 }}>
                                     {asset && (
                                       <div
                                         style={{
-                                          width: 28,
-                                          height: 28,
-                                          borderRadius: 4,
+                                          width: 60,
+                                          height: 60,
+                                          borderRadius: 6,
                                           background: 'var(--bg-elev-3)',
                                           border: '1px solid var(--hairline)',
                                           backgroundImage: asset.source.startsWith('data:image') || asset.source.startsWith('http') ? `url(${asset.source})` : undefined,
                                           backgroundSize: 'cover',
                                           backgroundPosition: 'center',
                                           flexShrink: 0,
-                                          marginRight: 8,
+                                          cursor: 'pointer',
                                         }}
                                         title={asset.name}
+                                        onClick={() => setPreviewImageSrc(asset.source)}
                                       />
                                     )}
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {row.userInput && asset 
-                                        ? `${asset.name} · ${row.userInput}` 
-                                        : row.userInput 
-                                          ? row.userInput 
-                                          : asset 
-                                            ? asset.name 
-                                            : row.label}
-                                    </span>
+                                    {(!asset || row.userInput) && (
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {row.userInput || row.label}
+                                      </span>
+                                    )}
                                   </div>
                                   {table.columns.map((column) => {
                                     const cell = table.cells.get(buildCellKey(row.id, column.id));
