@@ -8,7 +8,6 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { Bot } from 'lucide-react';
 import {
   initialAssets,
   initialHistory,
@@ -1193,21 +1192,53 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   );
 
   if (!storageReady) {
+    // Initial bootstrap state — fetching the persisted app state from
+    // Postgres. Uses the same `.na-page` chrome as the sign-in screen
+    // (grid backdrop + violet glow) so the moment between auth and
+    // app-shell feels like one continuous flow rather than two
+    // unrelated screens. The "..." animation is driven by `loadingDots`
+    // from the parent component.
     return (
-      <div className="auth-shell">
-        <section className="auth-card loading-card">
-          <div className="loading-workspace-row">
-            <div className="brand-icon loading-workspace-icon">
-              <Bot size={24} />
+      <div className="na-page">
+        <div className="na-grid" />
+        <div className="na-glow" />
+        <main className="na-main">
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 16,
+            }}
+          >
+            <div
+              className="brand-mark"
+              style={{ width: 44, height: 44, borderRadius: 11 }}
+            >
+              <img
+                src="/assets/app-icon.png"
+                alt="PromptLab"
+                style={{ width: '100%', height: '100%', borderRadius: 9, display: 'block' }}
+              />
             </div>
-            <h2>
-              Loading Workspace
-              <span className="loading-dots" aria-hidden="true">
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: 'var(--text-muted)',
+              }}
+            >
+              Loading workspace
+              <span className="loading-dots" aria-hidden="true" style={{ marginLeft: 4 }}>
                 {loadingDots}
               </span>
-            </h2>
+            </div>
           </div>
-        </section>
+        </main>
       </div>
     );
   }
