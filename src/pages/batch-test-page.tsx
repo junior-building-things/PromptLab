@@ -1416,48 +1416,74 @@ export function BatchTestPage() {
     userInput?: string,
     shouldStickerize = true,
   ) {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), BATCH_REQUEST_TIMEOUT_MS);
+    // Fan out one /api/batch-run request per model rather than batching
+    // them all into a single POST. The server-side handler used to
+    // Promise.all over the model list, which meant a slow provider
+    // (e.g. OpenAI image-gen) blocked the response until Vercel's
+    // serverless function timeout aborted the entire request — taking
+    // a fast Gemini result down with it. With per-model requests, each
+    // one's timeout / error is independent: GPT can fail and Gemini
+    // still surfaces its result.
+    const singleModelRequest = async (model: typeof selectedModels[number]) => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), BATCH_REQUEST_TIMEOUT_MS);
 
-    let response: Response;
+      try {
+        const response = await fetch('/api/batch-run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            asset,
+            models: [model],
+            userInput: userInput?.trim() ? userInput : undefined,
+            stickerize: shouldStickerize,
+            // Map the user's pick into the request body so the serverless
+            // function can route it to each provider's thinking knob.
+            // 'dynamic' is omitted (provider default kicks in).
+            thinkingLevel: thinkingLevel !== 'dynamic' ? thinkingLevel : undefined,
+          }),
+          signal: controller.signal,
+        });
 
-    try {
-      response = await fetch('/api/batch-run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          asset,
-          models: selectedModels,
-          userInput: userInput?.trim() ? userInput : undefined,
-          stickerize: shouldStickerize,
-          // Map the user's pick into the request body so the serverless
-          // function can route it to each provider's thinking knob.
-          // 'dynamic' is omitted (provider default kicks in).
-          thinkingLevel: thinkingLevel !== 'dynamic' ? thinkingLevel : undefined,
-        }),
-        signal: controller.signal,
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('Batch job timed out before the provider returned a result.');
+        const payload = (await response.json()) as
+          | { results: ApiResult[]; errors?: ApiError[] }
+          | { error?: string; details?: string };
+
+        if (!response.ok || !('results' in payload)) {
+          const failurePayload = payload as { error?: string; details?: string };
+          const message =
+            failurePayload.error || failurePayload.details || 'Batch run failed.';
+          return {
+            results: [] as ApiResult[],
+            errors: [{ modelId: model.id, message }],
+          };
+        }
+
+        return payload as { results: ApiResult[]; errors?: ApiError[] };
+      } catch (error) {
+        const message =
+          error instanceof DOMException && error.name === 'AbortError'
+            ? 'Batch job timed out before the provider returned a result.'
+            : error instanceof Error
+              ? error.message
+              : 'Batch run failed for an unknown reason.';
+        return {
+          results: [] as ApiResult[],
+          errors: [{ modelId: model.id, message }],
+        };
+      } finally {
+        window.clearTimeout(timeoutId);
       }
+    };
 
-      throw error;
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
-
-    const payload = (await response.json()) as
-      | { results: ApiResult[]; errors?: ApiError[] }
-      | { error?: string; details?: string };
-
-    if (!response.ok || !('results' in payload)) {
-      const failurePayload = payload as { error?: string; details?: string };
-      throw new Error(failurePayload.error || failurePayload.details || 'Batch run failed.');
-    }
-
-    return payload;
+    const perModelResponses = await Promise.all(selectedModels.map(singleModelRequest));
+    const merged: { results: ApiResult[]; errors: ApiError[] } = { results: [], errors: [] };
+    perModelResponses.forEach((entry) => {
+      merged.results.push(...entry.results);
+      if (entry.errors) merged.errors.push(...entry.errors);
+    });
+    return merged;
   }
 
   async function runBatch() {
