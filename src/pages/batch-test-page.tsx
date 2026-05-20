@@ -197,14 +197,20 @@ function generateBatchHtmlReport(
     return assets.find((entry) => entry.id === id);
   }
 
+  function getAssetName(id?: string) {
+    if (!id) return undefined;
+    return assets.find((entry) => entry.id === id)?.name;
+  }
+
   function getRowLabels(run: BatchRun) {
-    const rowsMap = new Map<string, { id: string; assetId?: string; userInput?: string }>();
+    const rowsMap = new Map<string, { id: string; label: string; assetId?: string; userInput?: string }>();
 
     run.results.forEach((result) => {
-      const id = buildRowId(result.assetId, result.userInput);
-      if (!rowsMap.has(id)) {
-        rowsMap.set(id, {
-          id,
+      const rowId = buildRowId(result.assetId, result.userInput);
+      if (!rowsMap.has(rowId)) {
+        rowsMap.set(rowId, {
+          id: rowId,
+          label: result.userInput || getAssetName(result.assetId) || SYSTEM_PROMPT_ONLY_ROW_LABEL,
           assetId: result.assetId,
           userInput: result.userInput,
         });
@@ -212,18 +218,27 @@ function generateBatchHtmlReport(
     });
 
     if (rowsMap.size === 0) {
-      const assetIds = run.scenario.assetIds || [];
-      const userInput = run.scenario.userInput || '';
+      const assetIds = run.scenario.assetIds && run.scenario.assetIds.length > 0
+        ? run.scenario.assetIds
+        : (run.scenario.assetId ? [run.scenario.assetId] : [undefined]);
+
+      const userInputs = run.scenario.userInput
+        ? run.scenario.userInput.split(' | ').map((val) => val.trim()).filter(Boolean)
+        : [undefined];
 
       assetIds.forEach((assetId) => {
-        const id = buildRowId(assetId, userInput);
-        rowsMap.set(id, { id, assetId, userInput });
+        userInputs.forEach((userInput) => {
+          const id = buildRowId(assetId, userInput);
+          if (id !== SYSTEM_PROMPT_ONLY_ROW_ID) {
+            rowsMap.set(id, {
+              id,
+              label: userInput || getAssetName(assetId) || SYSTEM_PROMPT_ONLY_ROW_LABEL,
+              assetId,
+              userInput,
+            });
+          }
+        });
       });
-
-      if (assetIds.length === 0 && userInput.trim().length > 0) {
-        const id = buildRowId(undefined, userInput);
-        rowsMap.set(id, { id, userInput });
-      }
     }
 
     if (rowsMap.size === 0) {
