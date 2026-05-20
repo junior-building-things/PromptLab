@@ -672,11 +672,15 @@ button { cursor: pointer; }
  * are themselves pre-colored, so they opt out of filtering. */
 .provider-img-openai { filter: none !important; }
 /* Dark is the default theme (no data-theme attribute), light mode sets
- * data-theme="light". Show the white mark in dark, the dark mark in light. */
-.provider-img-openai-light { display: none; }
-.provider-img-openai-dark { display: block; }
-[data-theme="light"] .provider-img-openai-light { display: block; }
-[data-theme="light"] .provider-img-openai-dark { display: none; }
+ * data-theme="light". Show the white mark in dark, the dark mark in
+ * light. !important is needed because parent-container rules like
+ * `.provider-logo .provider-img { display: block }` outrank a single-
+ * class selector on specificity and would otherwise force both copies
+ * of the mark to render. */
+.provider-img-openai-light { display: none !important; }
+.provider-img-openai-dark { display: block !important; }
+[data-theme="light"] .provider-img-openai-light { display: block !important; }
+[data-theme="light"] .provider-img-openai-dark { display: none !important; }
 .provider-name { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
 .provider-sub {
   font-family: var(--font-mono); font-size: 10px;
