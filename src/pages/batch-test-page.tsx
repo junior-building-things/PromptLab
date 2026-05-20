@@ -274,17 +274,11 @@ export function BatchTestPage() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
   const [openRunMenuId, setOpenRunMenuId] = useState<string | null>(null);
-  const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>(
-    promptVersions[0] ? [promptVersions[0].id] : [],
-  );
+  const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
   const [selectedImageReferenceIds, setSelectedImageReferenceIds] = useState<string[]>([]);
-  const [selectedTextInputAssetIds, setSelectedTextInputAssetIds] = useState<string[]>(
-    assets.find((asset) => asset.kind === 'text-inputs')
-      ? [assets.find((asset) => asset.kind === 'text-inputs')!.id]
-      : [],
-  );
+  const [selectedTextInputAssetIds, setSelectedTextInputAssetIds] = useState<string[]>([]);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
-  const [stickerize, setStickerize] = useState(true);
+  const [stickerize, setStickerize] = useState(false);
   const [running, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
