@@ -74,7 +74,7 @@ type BatchTable = {
   key: string;
   title: string;
   columns: Array<{ id: string; label: string }>;
-  rows: Array<{ id: string; label: string }>;
+  rows: Array<{ id: string; label: string; assetId?: string; userInput?: string }>;
   cells: Map<string, BatchTableCell>;
 };
 
@@ -138,6 +138,13 @@ function getResultDownloadName(result: TestResult) {
 
 function buildCellKey(rowId: string, columnId: string) {
   return `${rowId}::${columnId}`;
+}
+
+function buildRowId(assetId?: string, userInput?: string) {
+  if (assetId && userInput) return `${assetId}::${userInput}`;
+  if (assetId) return assetId;
+  if (userInput) return userInput;
+  return SYSTEM_PROMPT_ONLY_ROW_ID;
 }
 
 function TextIcon({ Icon }: { Icon: LucideIcon }) {
@@ -417,27 +424,51 @@ export function BatchTestPage() {
   }
 
   function getRowLabels(run: BatchRun) {
-    const labels = new Map<string, string>();
+    const rowsMap = new Map<string, { id: string; label: string; assetId?: string; userInput?: string }>();
 
+    // 1. Build from results if they exist
     run.results.forEach((result) => {
-      if (result.userInput) {
-        labels.set(result.userInput, result.userInput);
+      const rowId = buildRowId(result.assetId, result.userInput);
+      if (!rowsMap.has(rowId)) {
+        rowsMap.set(rowId, {
+          id: rowId,
+          label: result.userInput || getAssetName(result.assetId) || SYSTEM_PROMPT_ONLY_ROW_LABEL,
+          assetId: result.assetId,
+          userInput: result.userInput,
+        });
       }
     });
 
-    if (labels.size === 0 && run.scenario.userInput) {
-      run.scenario.userInput.split(' | ').forEach((value) => {
-        if (value.trim()) {
-          labels.set(value, value);
-        }
+    // 2. If no results yet, build from scenario configuration
+    if (rowsMap.size === 0) {
+      const assetIds = run.scenario.assetIds && run.scenario.assetIds.length > 0
+        ? run.scenario.assetIds
+        : (run.scenario.assetId ? [run.scenario.assetId] : [undefined]);
+
+      const userInputs = run.scenario.userInput
+        ? run.scenario.userInput.split(' | ').map((val) => val.trim()).filter(Boolean)
+        : [undefined];
+
+      assetIds.forEach((assetId) => {
+        userInputs.forEach((userInput) => {
+          const rowId = buildRowId(assetId, userInput);
+          if (rowId !== SYSTEM_PROMPT_ONLY_ROW_ID) {
+            rowsMap.set(rowId, {
+              id: rowId,
+              label: userInput || getAssetName(assetId) || SYSTEM_PROMPT_ONLY_ROW_LABEL,
+              assetId,
+              userInput,
+            });
+          }
+        });
       });
     }
 
-    if (labels.size === 0) {
+    if (rowsMap.size === 0) {
       return [{ id: SYSTEM_PROMPT_ONLY_ROW_ID, label: SYSTEM_PROMPT_ONLY_ROW_LABEL }];
     }
 
-    return [...labels.entries()].map(([id, label]) => ({ id, label }));
+    return [...rowsMap.values()];
   }
 
   function buildRunTables(run: BatchRun): BatchTable[] {
@@ -481,7 +512,7 @@ export function BatchTestPage() {
       run.results
         .filter((result) => (config.scopeModelId ? result.modelId === config.scopeModelId : true))
         .forEach((result) => {
-          const rowId = result.userInput?.trim() ? result.userInput : SYSTEM_PROMPT_ONLY_ROW_ID;
+          const rowId = buildRowId(result.assetId, result.userInput);
           const columnId = usePromptColumns ? result.promptId : result.modelId;
           const key = buildCellKey(rowId, columnId);
           const existing = cells.get(key);
@@ -822,36 +853,71 @@ export function BatchTestPage() {
                               gridTemplateColumns: `140px repeat(${table.columns.length}, minmax(160px, 1fr))`,
                             }}
                           >
-                            <div className="batch-cell batch-cell-th">Text Inputs</div>
+                            {(() => {
+                              const hasImages = run.scenario.assetIds && run.scenario.assetIds.length > 0;
+                              const hasTexts = run.scenario.userInput && run.scenario.userInput.trim().length > 0;
+                              const headerLabel = hasImages && hasTexts ? 'Inputs' : hasImages ? 'Image References' : 'Text Inputs';
+                              return <div className="batch-cell batch-cell-th">{headerLabel}</div>;
+                            })()}
                             {table.columns.map((column) => (
                               <div key={column.id} className="batch-cell batch-cell-th">
                                 {column.label}
                               </div>
                             ))}
-                            {table.rows.map((row) => (
-                              <Fragment key={row.id}>
-                                <div className="batch-cell batch-cell-label">{row.label}</div>
-                                {table.columns.map((column) => {
-                                  const cell = table.cells.get(buildCellKey(row.id, column.id));
-                                  return (
-                                    <div key={column.id} className="batch-cell batch-cell-img">
-                                      <BatchResultCell
-                                        results={cell?.results ?? []}
-                                        isRunning={run.status === 'running'}
-                                        placeholderCount={
-                                          run.scenario.assetIds &&
-                                          run.scenario.assetIds.length > 0
-                                            ? run.scenario.assetIds.length
-                                            : 1
-                                        }
-                                        stickerize={Boolean(run.scenario.stickerize)}
-                                        onPreviewImage={setPreviewImageSrc}
+                            {table.rows.map((row) => {
+                              const asset = row.assetId ? getAsset(row.assetId) : undefined;
+                              return (
+                                <Fragment key={row.id}>
+                                  <div className="batch-cell batch-cell-label">
+                                    {asset && (
+                                      <div
+                                        style={{
+                                          width: 28,
+                                          height: 28,
+                                          borderRadius: 4,
+                                          background: 'var(--bg-elev-3)',
+                                          border: '1px solid var(--hairline)',
+                                          backgroundImage: asset.source.startsWith('data:image') || asset.source.startsWith('http') ? `url(${asset.source})` : undefined,
+                                          backgroundSize: 'cover',
+                                          backgroundPosition: 'center',
+                                          flexShrink: 0,
+                                          marginRight: 8,
+                                        }}
+                                        title={asset.name}
                                       />
-                                    </div>
-                                  );
-                                })}
-                              </Fragment>
-                            ))}
+                                    )}
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {row.userInput && asset 
+                                        ? `${asset.name} · ${row.userInput}` 
+                                        : row.userInput 
+                                          ? row.userInput 
+                                          : asset 
+                                            ? asset.name 
+                                            : row.label}
+                                    </span>
+                                  </div>
+                                  {table.columns.map((column) => {
+                                    const cell = table.cells.get(buildCellKey(row.id, column.id));
+                                    return (
+                                      <div key={column.id} className="batch-cell batch-cell-img">
+                                        <BatchResultCell
+                                          results={cell?.results ?? []}
+                                          isRunning={run.status === 'running'}
+                                          placeholderCount={
+                                            run.scenario.assetIds &&
+                                            run.scenario.assetIds.length > 0
+                                              ? run.scenario.assetIds.length
+                                              : 1
+                                          }
+                                          stickerize={Boolean(run.scenario.stickerize)}
+                                          onPreviewImage={setPreviewImageSrc}
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </Fragment>
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
