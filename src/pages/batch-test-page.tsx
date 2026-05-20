@@ -883,7 +883,7 @@ export function BatchTestPage() {
                           <div
                             className="batch-matrix"
                             style={{
-                              gridTemplateColumns: `180px repeat(${table.columns.length}, minmax(160px, 1fr))`,
+                              gridTemplateColumns: `220px repeat(${table.columns.length}, minmax(160px, 1fr))`,
                             }}
                           >
                             {(() => {
@@ -905,8 +905,8 @@ export function BatchTestPage() {
                                     {asset && (
                                       <div
                                         style={{
-                                          width: 60,
-                                          height: 60,
+                                          width: 80,
+                                          height: 80,
                                           borderRadius: 6,
                                           background: 'var(--bg-elev-3)',
                                           border: '1px solid var(--hairline)',
