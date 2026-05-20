@@ -1839,6 +1839,7 @@ export function BatchTestPage() {
                 Thinking
               </label>
               <div
+                id="thinkingDropdown"
                 className={`dropdown ${thinkingDropdownOpen ? 'open' : ''}`}
                 data-value={thinkingLevel}
               >

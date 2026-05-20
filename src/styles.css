@@ -911,7 +911,8 @@ button { cursor: pointer; }
   flex-shrink: 0;
 }
 .dropdown-option.dropdown-add::before,
-.dropdown[id="projectTypeDropdown"] .dropdown-option::before { display: none; content: none; }
+.dropdown[id="projectTypeDropdown"] .dropdown-option::before,
+.dropdown[id="thinkingDropdown"] .dropdown-option::before { display: none; content: none; }
 
 .dropdown-group-head {
   font-family: var(--font-mono); font-size: 9.5px;
