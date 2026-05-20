@@ -1298,7 +1298,7 @@ export function BatchTestPage() {
                         type="button"
                         className="icon-btn naked"
                         aria-label="Download batch test results"
-                        title="Download JSON"
+                        title="Download HTML Report"
                         onClick={(event) => {
                           event.stopPropagation();
                           handleDownloadRun(run);
