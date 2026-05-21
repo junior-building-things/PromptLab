@@ -14,10 +14,21 @@ import {
 import { Modal } from '../components/modal';
 import { useAppContext } from '../context/app-context';
 
+type ComposerMode =
+  // "Create project" — full form including project type, project name
+  // editable, both fields required.
+  | { kind: 'create-project' }
+  // "Add prompt" — same modal chrome but project name locked to an
+  // existing project, project-type field hidden, only the system
+  // prompt is captured. handleCreate routes the submit through
+  // createPromptVersion(projectId, ...) instead of createPromptProject.
+  | { kind: 'add-prompt'; projectId: string };
+
 type ComposerState = {
   projectName: string;
   projectType: string;
   systemPrompt: string;
+  mode: ComposerMode;
 };
 
 const PROJECT_TYPES = [
@@ -56,6 +67,7 @@ export function PromptsPage() {
     projectName: '',
     projectType: '',
     systemPrompt: '',
+    mode: { kind: 'create-project' },
   });
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
   const [projectTypeOpen, setProjectTypeOpen] = useState(false);
@@ -88,7 +100,19 @@ export function PromptsPage() {
   useEffect(() => {
     setPageChrome({
       topbarRight: (
-        <button type="button" className="btn btn-primary" onClick={() => setComposerOpen(true)}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => {
+            setComposer({
+              projectName: '',
+              projectType: '',
+              systemPrompt: '',
+              mode: { kind: 'create-project' },
+            });
+            setComposerOpen(true);
+          }}
+        >
           <IconBox><IconPlus /></IconBox>
           New project
         </button>
@@ -125,19 +149,37 @@ export function PromptsPage() {
 
   const handleCreate = () => {
     if (!composer.projectName.trim() || !composer.systemPrompt.trim()) return;
-    createPromptProject({
-      name: composer.projectName.trim(),
-      systemPrompt: composer.systemPrompt.trim(),
+    if (composer.mode.kind === 'add-prompt') {
+      // Appending a new version to an existing project — project name
+      // is locked in the form so we trust the mode payload's id rather
+      // than re-resolving by name.
+      createPromptVersion(composer.mode.projectId, composer.systemPrompt.trim());
+    } else {
+      createPromptProject({
+        name: composer.projectName.trim(),
+        systemPrompt: composer.systemPrompt.trim(),
+      });
+    }
+    setComposer({
+      projectName: '',
+      projectType: '',
+      systemPrompt: '',
+      mode: { kind: 'create-project' },
     });
-    setComposer({ projectName: '', projectType: '', systemPrompt: '' });
     setComposerOpen(false);
   };
 
-  const handleNewPromptVersion = (projectId: string) => {
-    const next = window.prompt('New system prompt for this project:');
-    if (next && next.trim()) {
-      createPromptVersion(projectId, next.trim());
-    }
+  const handleNewPromptVersion = (projectId: string, projectName: string) => {
+    // Reuse the same modal as "Create project" but locked into add-
+    // prompt mode: project name is pre-filled + read-only, project type
+    // field is hidden, and submit routes to createPromptVersion.
+    setComposer({
+      projectName,
+      projectType: '',
+      systemPrompt: '',
+      mode: { kind: 'add-prompt', projectId },
+    });
+    setComposerOpen(true);
   };
 
   const handleRemoveProject = (projectId: string, projectName: string) => {
@@ -186,7 +228,7 @@ export function PromptsPage() {
                       <button
                         type="button"
                         className="btn btn-ai"
-                        onClick={() => handleNewPromptVersion(project.id)}
+                        onClick={() => handleNewPromptVersion(project.id, project.name)}
                       >
                         <IconBox><IconPlus /></IconBox>
                         New prompt
@@ -249,8 +291,12 @@ export function PromptsPage() {
       <Modal
         open={composerOpen}
         onClose={() => setComposerOpen(false)}
-        title="Create project"
-        sub="New prompt workspace"
+        title={composer.mode.kind === 'add-prompt' ? 'Add prompt' : 'Create project'}
+        sub={
+          composer.mode.kind === 'add-prompt'
+            ? 'New version for an existing project'
+            : 'New prompt workspace'
+        }
         headerActions={
           <>
             <button type="button" className="btn" onClick={() => setComposerOpen(false)}>
@@ -263,7 +309,7 @@ export function PromptsPage() {
               onClick={handleCreate}
             >
               <IconBox><IconPlus /></IconBox>
-              Create project
+              {composer.mode.kind === 'add-prompt' ? 'Add prompt' : 'Create project'}
             </button>
           </>
         }
@@ -276,6 +322,11 @@ export function PromptsPage() {
             type="text"
             className="field-input"
             value={composer.projectName}
+            // Project name is fixed when adding a prompt to an existing
+            // project — the user chose the target by clicking "New
+            // prompt" on a specific card.
+            readOnly={composer.mode.kind === 'add-prompt'}
+            disabled={composer.mode.kind === 'add-prompt'}
             onChange={(event) =>
               setComposer((c) => ({ ...c, projectName: event.target.value }))
             }
@@ -283,53 +334,55 @@ export function PromptsPage() {
           />
         </div>
 
-        <div className="field">
-          <label className="field-label">Project type</label>
-          <div className="type-row">
-            <div
-              className={`dropdown ${projectTypeOpen ? 'open' : ''}`}
-              data-value={composer.projectType}
-            >
-              <button
-                type="button"
-                className="dropdown-trigger"
-                onClick={() => setProjectTypeOpen((o) => !o)}
+        {composer.mode.kind === 'create-project' && (
+          <div className="field">
+            <label className="field-label">Project type</label>
+            <div className="type-row">
+              <div
+                className={`dropdown ${projectTypeOpen ? 'open' : ''}`}
+                data-value={composer.projectType}
               >
-                <span className="dropdown-label">
-                  {PROJECT_TYPES.find((t) => t.value === composer.projectType)?.label ??
-                    'Select a type…'}
-                </span>
-                <svg
-                  className="dropdown-chev"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <button
+                  type="button"
+                  className="dropdown-trigger"
+                  onClick={() => setProjectTypeOpen((o) => !o)}
                 >
-                  <path d="M3 4.5l3 3 3-3" />
-                </svg>
-              </button>
-              <div className="dropdown-menu" hidden={!projectTypeOpen}>
-                {PROJECT_TYPES.map((type) => (
-                  <div
-                    key={type.value}
-                    className={`dropdown-option ${
-                      composer.projectType === type.value ? 'selected' : ''
-                    }`}
-                    onClick={() => {
-                      setComposer((c) => ({ ...c, projectType: type.value }));
-                      setProjectTypeOpen(false);
-                    }}
+                  <span className="dropdown-label">
+                    {PROJECT_TYPES.find((t) => t.value === composer.projectType)?.label ??
+                      'Select a type…'}
+                  </span>
+                  <svg
+                    className="dropdown-chev"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    {type.label}
-                  </div>
-                ))}
+                    <path d="M3 4.5l3 3 3-3" />
+                  </svg>
+                </button>
+                <div className="dropdown-menu" hidden={!projectTypeOpen}>
+                  {PROJECT_TYPES.map((type) => (
+                    <div
+                      key={type.value}
+                      className={`dropdown-option ${
+                        composer.projectType === type.value ? 'selected' : ''
+                      }`}
+                      onClick={() => {
+                        setComposer((c) => ({ ...c, projectType: type.value }));
+                        setProjectTypeOpen(false);
+                      }}
+                    >
+                      {type.label}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="field">
           <label className="field-label">
