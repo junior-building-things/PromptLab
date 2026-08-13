@@ -8,13 +8,9 @@ import {
 } from './_lib/store.js';
 
 // OpenAI image generation via the Responses API regularly takes 30-90s
-// at quality:'high'. Vercel's default function timeout is 10s on the
-// Hobby plan and 60s on Pro; raise the ceiling so a slow provider has
-// a real chance to finish before the function is killed. Hobby plans
-// silently cap this at 60s — Pro / Enterprise honor up to 300s.
-export const config = {
-  maxDuration: 300,
-};
+// at quality:'high'. The request ceiling is the Cloud Run service's
+// --timeout (600s, set in .github/workflows/deploy.yml), not anything
+// declared here.
 
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';

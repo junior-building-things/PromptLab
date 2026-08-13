@@ -1,0 +1,42 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Non-secret env (LARK_APP_ID, APP_URL, LARK_BASE_URL) lives on the
+      # service and persists across deploys — it is deliberately not
+      # repeated here, so a redeploy can't silently drop it. Secrets are
+      # pinned to :latest, so rotating one in Secret Manager only needs a
+      # redeploy to take effect.
+      #
+      # --timeout 600 covers the slowest batch: image models routinely
+      # take 30-90s and api/batch-run.js fans out one request per model.
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy promptlab \
+            --source . \
+            --region asia-southeast1 \
+            --allow-unauthenticated \
+            --memory 1Gi \
+            --cpu 1 \
+            --timeout 600 \
+            --update-secrets \
+              DATABASE_URL=promptlab-database-url:latest,SESSION_SECRET=promptlab-session-secret:latest,ENCRYPTION_SECRET=promptlab-encryption-secret:latest,LARK_APP_SECRET=promptlab-lark-app-secret:latest,BRIA_API_TOKEN=promptlab-bria-api-token:latest \
+            --quiet
