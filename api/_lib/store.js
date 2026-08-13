@@ -71,6 +71,14 @@ async function ensureSchema() {
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       );
+
+      create table if not exists promptlab_images (
+        id text primary key,
+        user_id text not null,
+        mime_type text not null,
+        bytes bytea not null,
+        created_at timestamptz not null default now()
+      );
     `);
   }
 
@@ -189,4 +197,73 @@ export async function getProviderApiKey(user, provider) {
   }
 
   return decryptValue(encrypted);
+}
+
+const IMAGE_URL_PREFIX = '/api/images?id=';
+
+/** Binary payloads (generated outputs, uploaded reference images) are
+ * kept out of the workspace JSON — a handful of base64 data URLs blows
+ * past both the browser's localStorage quota and the 4.5 MB serverless
+ * request-body limit. They live in `promptlab_images` instead and the
+ * state only ever carries a `/api/images?id=…` reference. */
+export function isStoredImageUrl(value) {
+  return typeof value === 'string' && value.startsWith(IMAGE_URL_PREFIX);
+}
+
+function parseDataUrl(value) {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(value || '');
+  if (!match) {
+    return null;
+  }
+
+  return { mimeType: match[1], bytes: Buffer.from(match[2], 'base64') };
+}
+
+/** Persist a base64 image data URL and return the reference URL to put
+ * in its place. Returns null when the input isn't a data URL. */
+export async function saveImage(user, dataUrl) {
+  const parsed = parseDataUrl(dataUrl);
+  if (!parsed) {
+    return null;
+  }
+
+  await ensureUserRecord(user);
+  const pool = getPool();
+  const id = `img_${crypto.randomBytes(12).toString('hex')}`;
+  await pool.query(
+    'insert into promptlab_images (id, user_id, mime_type, bytes) values ($1, $2, $3, $4)',
+    [id, user.id, parsed.mimeType, parsed.bytes],
+  );
+
+  return `${IMAGE_URL_PREFIX}${id}`;
+}
+
+export async function readImage(user, id) {
+  await ensureSchema();
+  const pool = getPool();
+  const result = await pool.query(
+    'select mime_type, bytes from promptlab_images where id = $1 and user_id = $2 limit 1',
+    [id, user.id],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  return { mimeType: row.mime_type, bytes: row.bytes };
+}
+
+/** Round-trip a stored image back into a data URL — providers need the
+ * bytes inline, they can't fetch a session-gated URL. */
+export async function readImageAsDataUrl(user, url) {
+  if (!isStoredImageUrl(url)) {
+    return null;
+  }
+
+  const image = await readImage(user, url.slice(IMAGE_URL_PREFIX.length));
+  if (!image) {
+    return null;
+  }
+
+  return `data:${image.mimeType};base64,${image.bytes.toString('base64')}`;
 }

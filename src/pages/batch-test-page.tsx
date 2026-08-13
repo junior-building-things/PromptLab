@@ -43,6 +43,7 @@ function BoxIcon({ children }: { children: ReactNode }) {
     </span>
   );
 }
+import { isRenderableImage, toDataUrl } from '../lib/image-source';
 import { getProviderLabel } from '../lib/model-brand';
 import type {
   AssetRecord,
@@ -221,7 +222,7 @@ function buildSummary(selectedIds: string[], options: DropdownOption[], emptyLab
 }
 
 function isImageOutput(value?: string) {
-  return Boolean(value && (/^data:image\//.test(value) || /^https?:\/\//.test(value)));
+  return isRenderableImage(value);
 }
 
 function getImageExtension(value?: string) {
@@ -363,7 +364,15 @@ function generateBatchHtmlReport(
     google: '',
     xai: '',
   },
+  /** Stored-image URL → data URI. Images live behind the session-gated
+   * `/api/images` route, so the report has to carry its own copy to
+   * survive being opened offline or off-origin. */
+  inlinedImages: Record<string, string> = {},
 ): string {
+  function imageSrc(source: string) {
+    return inlinedImages[source] ?? source;
+  }
+
   /** Inline a provider mark for the given model id. Returns empty string
    * when the model can't be resolved or its provider doesn't ship a
    * logo asset. For OpenAI we use the dark-mode (white) mark since the
@@ -575,7 +584,7 @@ function generateBatchHtmlReport(
         if (asset) {
           labelContentHtml += `
             <div style="display: flex; flex-direction: column; gap: 8px;">
-              <img class="input-thumb" src="${asset.source}" alt="${asset.name}" title="${asset.name}" />
+              <img class="input-thumb" src="${imageSrc(asset.source)}" alt="${asset.name}" title="${asset.name}" />
               ${row.userInput ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${row.userInput}</div>` : ''}
             </div>
           `;
@@ -599,8 +608,8 @@ function generateBatchHtmlReport(
             if (isImageOutput(result.outputImage)) {
               outputHtml = `
                 <div style="margin-bottom: 8px;">
-                  <a href="${result.outputImage}" download="output-image.png" style="display: block;">
-                    <img class="output-image" src="${result.outputImage}" alt="Output Image" />
+                  <a href="${imageSrc(result.outputImage!)}" download="output-image.png" style="display: block;">
+                    <img class="output-image" src="${imageSrc(result.outputImage!)}" alt="Output Image" />
                   </a>
                 </div>
               `;
@@ -1223,6 +1232,19 @@ export function BatchTestPage() {
     // offline / on any origin — the live UI's /assets/* paths would
     // 404 once the file is opened outside the dev server.
     const providerLogos = await loadProviderLogoDataUris();
+    // Same reason as the provider marks: outputs and reference images
+    // are session-gated URLs, so the report gets its own inline copies.
+    const storedSources = [
+      ...new Set(
+        [
+          ...run.results.map((result) => result.outputImage),
+          ...run.results.map((result) => getAsset(result.assetId)?.source),
+        ].filter((source): source is string => Boolean(source)),
+      ),
+    ];
+    const inlinedImages = Object.fromEntries(
+      await Promise.all(storedSources.map(async (source) => [source, await toDataUrl(source)] as const)),
+    );
     const htmlContent = generateBatchHtmlReport(
       run,
       assets,
@@ -1230,6 +1252,7 @@ export function BatchTestPage() {
       promptVersions,
       models,
       providerLogos,
+      inlinedImages,
     );
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const downloadUrl = URL.createObjectURL(blob);
@@ -1792,7 +1815,7 @@ export function BatchTestPage() {
                                           borderRadius: 6,
                                           background: 'var(--bg-elev-3)',
                                           border: '1px solid var(--hairline)',
-                                          backgroundImage: asset.source.startsWith('data:image') || asset.source.startsWith('http') ? `url(${asset.source})` : undefined,
+                                          backgroundImage: isRenderableImage(asset.source) ? `url(${asset.source})` : undefined,
                                           backgroundSize: 'cover',
                                           backgroundPosition: 'center',
                                           flexShrink: 0,

@@ -11,12 +11,12 @@
   - [src/pages/](src/pages/) — top-level routed pages (`prompts`, `assets`, `models`, `batch-test`)
   - [src/components/](src/components/) — `app-layout.tsx`, `login-screen.tsx`, `modal.tsx`, `multi-select-dropdown.tsx`, `icons.tsx`
   - [src/context/](src/context/) — `AppProvider` (workspace state, keyed per-user) and `AuthProvider` (Lark session)
-  - [src/lib/](src/lib/) — `types.ts` (shared data shapes), `auth.ts`, `model-brand.ts`
+  - [src/lib/](src/lib/) — `types.ts` (shared data shapes), `auth.ts`, `model-brand.ts`, `image-source.ts` (image-store URLs: predicates + upload / inline helpers)
   - [src/data/seed.ts](src/data/seed.ts) — default seed data for a fresh workspace
   - [src/styles.css](src/styles.css) — single global stylesheet + design tokens (`--bg-elev-*`, `--hairline*`, …)
 - [api/](api/) — Vercel serverless handlers (one file per route)
   - [api/batch-run.js](api/batch-run.js) — fans out to OpenAI Responses / Gemini Generate Content / xAI Chat Completions
-  - [api/provider-keys.js](api/provider-keys.js), [api/user-state.js](api/user-state.js)
+  - [api/provider-keys.js](api/provider-keys.js), [api/user-state.js](api/user-state.js), [api/images.js](api/images.js)
   - [api/auth/](api/auth/) — `lark/login.js`, `lark/callback.js`, `session.js`, `logout.js`
   - [api/_lib/](api/_lib/) — shared helpers: `auth.js` (session cookie + email allowlist), `store.js` (Postgres + AES-256-GCM key encryption)
 - [public/](public/) — static assets served as-is
@@ -36,6 +36,9 @@ Lark / Feishu OAuth (mirrors Hamlet's pattern). Flow lives in [api/auth/lark/](a
 
 ## Provider Execution
 Batch tests POST to [api/batch-run.js](api/batch-run.js). Provider API keys are stored encrypted at rest (AES-256-GCM via `ENCRYPTION_SECRET`) in Postgres through [api/_lib/store.js](api/_lib/store.js) and never round-trip through the frontend.
+
+## Image Persistence
+Binary payloads never live in the workspace JSON — base64 data URLs there blow past both the browser's localStorage quota and Vercel's 4.5 MB request-body limit. Generated outputs and uploaded image references are stored as rows in `promptlab_images` (Postgres `bytea`, keyed per user) and the state only carries a `/api/images?id=…` reference. [api/batch-run.js](api/batch-run.js) parks outputs on the way out and resolves reference images back to data URLs on the way in (providers can't fetch a session-gated URL). Client-side helpers — the `isRenderableImage` predicate, `uploadImage`, and the `toDataUrl` inliner used by the downloadable HTML report — live in [src/lib/image-source.ts](src/lib/image-source.ts). Legacy inline images are lifted into the store by a one-time pass in [AppProvider](src/context/app-context.tsx) after hydration.
 
 ## Environment Variables
 See [.env.example](.env.example) for the full list. Required: `LARK_APP_ID`, `LARK_APP_SECRET`, `SESSION_SECRET`, `DATABASE_URL`. Recommended in prod: `ENCRYPTION_SECRET` (separate from `SESSION_SECRET`). Optional: `LARK_BASE_URL`, `APP_URL`, `LARK_REDIRECT_URI`, `BRIA_API_TOKEN`.
@@ -80,58 +83,7 @@ Rules of thumb when editing:
 ---
 
 ## Behavioral Guardrails
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with the project-specific instructions above as needed.
 
-**Tradeoff:** these guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
-### 1. Think Before Coding
-Don't assume. Don't hide confusion. Surface tradeoffs.
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them — don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-### 2. Simplicity First
-Minimum code that solves the problem. Nothing speculative.
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-### 3. Surgical Changes
-Touch only what you must. Clean up only your own mess.
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it — don't delete it.
-
-When your changes create orphans:
-- Remove imports / variables / functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: every changed line should trace directly to the user's request.
-
-### 4. Goal-Driven Execution
-Define success criteria. Loop until verified.
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+The general working rules — think before coding, simplicity first, surgical changes, goal-driven
+execution — live in `~/.claude/CLAUDE.md` and apply here. They bias toward caution over speed; for
+trivial tasks, use judgment. Everything above this line is what's specific to PromptLab.

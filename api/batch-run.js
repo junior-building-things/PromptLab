@@ -1,6 +1,11 @@
 import { PNG } from 'pngjs';
 import { readSession } from './_lib/auth.js';
-import { getProviderApiKey } from './_lib/store.js';
+import {
+  getProviderApiKey,
+  isStoredImageUrl,
+  readImageAsDataUrl,
+  saveImage,
+} from './_lib/store.js';
 
 // OpenAI image generation via the Responses API regularly takes 30-90s
 // at quality:'high'. Vercel's default function timeout is 10s on the
@@ -761,6 +766,18 @@ async function callXAI({ prompt, userInput, asset, model, apiKey, thinkingLevel 
   };
 }
 
+/** Reference images live in the image store, not in the workspace
+ * JSON, so their `source` is a session-gated URL that no provider can
+ * fetch. Pull the bytes back inline before building the request. */
+async function resolveAssetImage(user, asset) {
+  if (!asset || !isStoredImageUrl(asset.source)) {
+    return asset;
+  }
+
+  const dataUrl = await readImageAsDataUrl(user, asset.source);
+  return dataUrl ? { ...asset, source: dataUrl } : asset;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return json(res, 405, { error: 'Method not allowed' });
@@ -786,27 +803,35 @@ export default async function handler(req, res) {
       return json(res, 400, { error: 'Missing prompt or models in request body.' });
     }
 
+    const resolvedAsset = await resolveAssetImage(user, asset);
+
     const executions = await Promise.all(
       models.map(async (model) => {
         try {
           let execution;
           const apiKey = await getProviderApiKey(user, model.provider);
           if (model.provider === 'openai') {
-            execution = await callOpenAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey, thinkingLevel });
+            execution = await callOpenAI({ prompt, userInput: normalizedUserInput, asset: resolvedAsset, model, apiKey, thinkingLevel });
           } else if (model.provider === 'gemini') {
-            execution = await callGemini({ prompt, userInput: normalizedUserInput, asset, model, apiKey, thinkingLevel });
+            execution = await callGemini({ prompt, userInput: normalizedUserInput, asset: resolvedAsset, model, apiKey, thinkingLevel });
           } else {
-            execution = await callXAI({ prompt, userInput: normalizedUserInput, asset, model, apiKey, thinkingLevel });
+            execution = await callXAI({ prompt, userInput: normalizedUserInput, asset: resolvedAsset, model, apiKey, thinkingLevel });
           }
 
           execution = await postProcessOutputImage(execution, { stickerize });
+          // Park the bytes in the image store and hand back a reference
+          // instead — a base64 data URL here would end up inlined in the
+          // workspace JSON on every save.
+          const storedImage = execution.outputImage
+            ? await saveImage(user, execution.outputImage)
+            : null;
 
           return {
             ok: true,
             result: {
               modelId: model.id,
               output: execution.output,
-              outputImage: execution.outputImage,
+              outputImage: storedImage || execution.outputImage,
               latencyMs: execution.latencyMs,
               score: scoreOutput(execution.output),
             },

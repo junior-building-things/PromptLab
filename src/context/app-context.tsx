@@ -16,6 +16,7 @@ import {
   initialPromptProjects,
   initialPromptVersions,
 } from '../data/seed';
+import { uploadImage } from '../lib/image-source';
 import type {
   AppStatePayload,
   AssetRecord,
@@ -354,6 +355,7 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
   const [toasts, setToasts] = useState<AppToast[]>([]);
   const [loadingDots, setLoadingDots] = useState('.');
   const lastSavedSnapshot = useRef(JSON.stringify(initialLocalState));
+  const imagesMigratedRef = useRef(false);
   const persistQueueRef = useRef(Promise.resolve());
   const toastTimeoutsRef = useRef(new Map<string, number>());
 
@@ -530,6 +532,71 @@ export function AppProvider({ children, storageKey }: AppProviderProps) {
 
     return () => window.clearTimeout(timeoutId);
   }, [persistStateNow, state, storageReady]);
+
+  // One-time lift of legacy inline images. Workspaces saved before the
+  // image store existed carry base64 data URLs inside `assets` and
+  // `history`, which is exactly what pushes the state past the
+  // localStorage quota and the 4.5 MB request-body limit — so a state
+  // that big can no longer be saved at all. Upload each one, swap in
+  // the reference, and the next debounced save shrinks the payload.
+  useEffect(() => {
+    if (!storageReady || imagesMigratedRef.current) {
+      return undefined;
+    }
+
+    imagesMigratedRef.current = true;
+    let active = true;
+
+    async function migrateInlineImages() {
+      const inlineSources = new Set<string>();
+      state.assets.forEach((asset) => {
+        if (asset.source.startsWith('data:image/')) inlineSources.add(asset.source);
+      });
+      state.history.forEach((run) =>
+        run.results.forEach((result) => {
+          if (result.outputImage?.startsWith('data:image/')) inlineSources.add(result.outputImage);
+        }),
+      );
+
+      if (inlineSources.size === 0) {
+        return;
+      }
+
+      const uploaded = new Map<string, string>();
+      for (const source of inlineSources) {
+        const url = await uploadImage(source);
+        if (url !== source) uploaded.set(source, url);
+        if (!active) return;
+      }
+
+      if (uploaded.size === 0) {
+        return;
+      }
+
+      setState((current) => ({
+        ...current,
+        assets: current.assets.map((asset) =>
+          uploaded.has(asset.source) ? { ...asset, source: uploaded.get(asset.source)! } : asset,
+        ),
+        history: current.history.map((run) => ({
+          ...run,
+          results: run.results.map((result) =>
+            result.outputImage && uploaded.has(result.outputImage)
+              ? { ...result, outputImage: uploaded.get(result.outputImage)! }
+              : result,
+          ),
+        })),
+      }));
+    }
+
+    void migrateInlineImages();
+
+    return () => {
+      active = false;
+    };
+    // Runs once, on the state as it stands right after hydration.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageReady]);
 
   const createPromptProject = useCallback((draft?: Partial<PromptProjectDraft>) => {
     const projectId = makeId('project');

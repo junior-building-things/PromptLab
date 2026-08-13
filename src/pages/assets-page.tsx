@@ -11,6 +11,7 @@ import {
 } from '../components/icons';
 import { Modal } from '../components/modal';
 import { useAppContext } from '../context/app-context';
+import { isRenderableImage, uploadImage } from '../lib/image-source';
 import type { AssetKind } from '../lib/types';
 
 /**
@@ -119,10 +120,13 @@ export function AssetsPage() {
     let kind: AssetKind = 'text-inputs';
     let source = draftPaste.trim();
     if (draftFile) {
-      const isImage = /\.(png|jpe?g|gif|webp)$/i.test(draftFile.name);
+      const isImage =
+        draftFile.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(draftFile.name);
       kind = isImage ? 'image-reference' : 'text-inputs';
+      // Image bytes go to the image store; the asset only keeps the
+      // reference so the workspace JSON stays small enough to persist.
       source = isImage
-        ? await readImageAsDataUrl(draftFile)
+        ? await uploadImage(await readImageAsDataUrl(draftFile))
         : await readTextFile(draftFile);
     }
     createAsset({ name: draftName.trim(), kind, source });
@@ -187,7 +191,7 @@ export function AssetsPage() {
               <div key={asset.id} className="asset-row">
                 <div className="a-name">{asset.name}</div>
                 <div className="a-preview">
-                  {asset.source.startsWith('data:image') ? (
+                  {isRenderableImage(asset.source) ? (
                     <div
                       className="a-thumb"
                       style={{
