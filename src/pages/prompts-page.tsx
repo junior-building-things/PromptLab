@@ -1,7 +1,8 @@
 import { format, formatDistanceToNowStrict } from 'date-fns';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { setPageChrome } from '../components/app-layout';
 import {
+  IconCheck,
   IconChev,
   IconCopy,
   IconEdit,
@@ -13,6 +14,7 @@ import {
 } from '../components/icons';
 import { Modal } from '../components/modal';
 import { useAppContext } from '../context/app-context';
+import type { PromptVersion } from '../lib/types';
 
 type ComposerMode =
   // "Create project" — full form including project type, project name
@@ -22,7 +24,12 @@ type ComposerMode =
   // existing project, project-type field hidden, only the system
   // prompt is captured. handleCreate routes the submit through
   // createPromptVersion(projectId, ...) instead of createPromptProject.
-  | { kind: 'add-prompt'; projectId: string };
+  | { kind: 'add-prompt'; projectId: string }
+  // "Edit prompt" — same chrome again, but the system prompt is
+  // pre-filled with the version's current body and handleCreate routes
+  // the submit through updatePromptVersion(versionId, ...). Title /
+  // summary / tags are carried over untouched.
+  | { kind: 'edit-prompt'; versionId: string; version: number };
 
 type ComposerState = {
   projectName: string;
@@ -58,6 +65,7 @@ export function PromptsPage() {
     promptVersions,
     createPromptProject,
     createPromptVersion,
+    updatePromptVersion,
     removePromptProject,
   } = useAppContext();
 
@@ -71,6 +79,15 @@ export function PromptsPage() {
   });
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
   const [projectTypeOpen, setProjectTypeOpen] = useState(false);
+  const [copiedVersionId, setCopiedVersionId] = useState<string | null>(null);
+  const copyResetRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
+    },
+    [],
+  );
 
   const cards = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -149,7 +166,19 @@ export function PromptsPage() {
 
   const handleCreate = () => {
     if (!composer.projectName.trim() || !composer.systemPrompt.trim()) return;
-    if (composer.mode.kind === 'add-prompt') {
+    if (composer.mode.kind === 'edit-prompt') {
+      // Editing in place — only the body is editable in this modal, so
+      // the version's title / summary / tags ride along unchanged.
+      const { versionId } = composer.mode;
+      const existing = promptVersions.find((v) => v.id === versionId);
+      if (!existing) return;
+      updatePromptVersion(existing.id, {
+        title: existing.title,
+        summary: existing.summary,
+        systemPrompt: composer.systemPrompt.trim(),
+        tags: existing.tags,
+      });
+    } else if (composer.mode.kind === 'add-prompt') {
       // Appending a new version to an existing project — project name
       // is locked in the form so we trust the mode payload's id rather
       // than re-resolving by name.
@@ -180,6 +209,28 @@ export function PromptsPage() {
       mode: { kind: 'add-prompt', projectId },
     });
     setComposerOpen(true);
+  };
+
+  const handleEditPrompt = (version: PromptVersion, projectName: string) => {
+    setComposer({
+      projectName,
+      projectType: '',
+      systemPrompt: version.systemPrompt,
+      mode: { kind: 'edit-prompt', versionId: version.id, version: version.version },
+    });
+    setComposerOpen(true);
+  };
+
+  const handleCopyPrompt = async (version: PromptVersion) => {
+    try {
+      await navigator.clipboard.writeText(version.systemPrompt);
+    } catch {
+      return;
+    }
+
+    if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
+    setCopiedVersionId(version.id);
+    copyResetRef.current = window.setTimeout(() => setCopiedVersionId(null), 1600);
   };
 
   const handleRemoveProject = (projectId: string, projectName: string) => {
@@ -264,10 +315,24 @@ export function PromptsPage() {
                                 {formatStamp(version.updatedAt)}
                               </span>
                               <div className="version-actions">
-                                <button type="button" className="icon-btn naked">
-                                  <IconBox><IconCopy /></IconBox>
+                                <button
+                                  type="button"
+                                  className="icon-btn naked"
+                                  onClick={() => void handleCopyPrompt(version)}
+                                  aria-label={`Copy prompt v${version.version}`}
+                                  title="Copy prompt"
+                                >
+                                  <IconBox>
+                                    {copiedVersionId === version.id ? <IconCheck /> : <IconCopy />}
+                                  </IconBox>
                                 </button>
-                                <button type="button" className="icon-btn naked">
+                                <button
+                                  type="button"
+                                  className="icon-btn naked"
+                                  onClick={() => handleEditPrompt(version, project.name)}
+                                  aria-label={`Edit prompt v${version.version}`}
+                                  title="Edit prompt"
+                                >
                                   <IconBox><IconEdit /></IconBox>
                                 </button>
                               </div>
@@ -291,11 +356,19 @@ export function PromptsPage() {
       <Modal
         open={composerOpen}
         onClose={() => setComposerOpen(false)}
-        title={composer.mode.kind === 'add-prompt' ? 'Add prompt' : 'Create project'}
+        title={
+          composer.mode.kind === 'edit-prompt'
+            ? `Edit prompt v${composer.mode.version}`
+            : composer.mode.kind === 'add-prompt'
+              ? 'Add prompt'
+              : 'Create project'
+        }
         sub={
-          composer.mode.kind === 'add-prompt'
-            ? 'New version for an existing project'
-            : 'New prompt workspace'
+          composer.mode.kind === 'edit-prompt'
+            ? 'Edit this version in place'
+            : composer.mode.kind === 'add-prompt'
+              ? 'New version for an existing project'
+              : 'New prompt workspace'
         }
         headerActions={
           <>
@@ -308,8 +381,14 @@ export function PromptsPage() {
               disabled={!canCreate}
               onClick={handleCreate}
             >
-              <IconBox><IconPlus /></IconBox>
-              {composer.mode.kind === 'add-prompt' ? 'Add prompt' : 'Create project'}
+              <IconBox>
+                {composer.mode.kind === 'edit-prompt' ? <IconEdit /> : <IconPlus />}
+              </IconBox>
+              {composer.mode.kind === 'edit-prompt'
+                ? 'Save changes'
+                : composer.mode.kind === 'add-prompt'
+                  ? 'Add prompt'
+                  : 'Create project'}
             </button>
           </>
         }
@@ -325,8 +404,8 @@ export function PromptsPage() {
             // Project name is fixed when adding a prompt to an existing
             // project — the user chose the target by clicking "New
             // prompt" on a specific card.
-            readOnly={composer.mode.kind === 'add-prompt'}
-            disabled={composer.mode.kind === 'add-prompt'}
+            readOnly={composer.mode.kind !== 'create-project'}
+            disabled={composer.mode.kind !== 'create-project'}
             onChange={(event) =>
               setComposer((c) => ({ ...c, projectName: event.target.value }))
             }
