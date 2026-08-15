@@ -52,7 +52,24 @@ Split of configuration:
 - **Secrets** come from Secret Manager, wired in the workflow: `promptlab-database-url`, `promptlab-session-secret`, `promptlab-encryption-secret`, `promptlab-lark-app-secret`, `promptlab-bria-api-token`. Rotating a value only needs a redeploy — the workflow pins `:latest`.
 - **Non-secret env** (`LARK_APP_ID`, `APP_URL`, optionally `LARK_BASE_URL`) is set once on the service and persists across deploys; it is deliberately not in the workflow so a redeploy can't drop it.
 
+Service URL: **https://promptlab-416594255546.asia-southeast1.run.app**
+
 `APP_URL` must match the service URL, and that same origin's `/api/auth/lark/callback` has to be on the Lark app's redirect allowlist or sign-in fails with `invalid_state`. GitHub Actions needs a `GCP_SA_KEY` repo secret (the same deployer service-account JSON Hamlet uses).
+
+**Deploying from a laptop on the ByteDance network does not work.** `gcloud run deploy --source .` and `gcloud builds submit` both die uploading the source to `storage.googleapis.com` — `SSLV3_ALERT_HANDSHAKE_FAILURE`, or a stall that never returns. Small requests through the same gcloud are fine, and so is `curl`, so it is gcloud's bundled Python TLS stack that the network rejects, not GCP access. CI is unaffected. To deploy by hand anyway, keep the big transfer in `curl` and let the API calls do the rest:
+
+```bash
+git archive --format=tar.gz -o /tmp/src.tgz <branch> -- . ':!public/assets/app-icon.png'
+TOK=$(gcloud auth print-access-token)
+curl -X POST -H "Authorization: Bearer $TOK" -H 'Content-Type: application/gzip' --data-binary @/tmp/src.tgz \
+  'https://storage.googleapis.com/upload/storage/v1/b/run-sources-tiktok-im-asia-southeast1/o?uploadType=media&name=promptlab/source.tgz'
+gcloud builds submit gs://run-sources-tiktok-im-asia-southeast1/promptlab/source.tgz \
+  --tag asia-southeast1-docker.pkg.dev/tiktok-im/cloud-run-source-deploy/promptlab:manual
+gcloud run deploy promptlab --image asia-southeast1-docker.pkg.dev/tiktok-im/cloud-run-source-deploy/promptlab:manual \
+  --region asia-southeast1
+```
+
+`public/assets/app-icon.png` is 9 MB, unreferenced, and excluded from build uploads via [.gcloudignore](.gcloudignore) — hence the pathspec above.
 
 ## Context Engineering Commands
 
