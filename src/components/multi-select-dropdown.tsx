@@ -114,13 +114,19 @@ export function MultiSelectDropdown({
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
+  const optionById = useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
+
+  // Walk `selectedIds`, not `options` — the summary should read back in
+  // the order the user picked, which is also the order the columns come
+  // out in downstream. Filtering the option list would silently re-sort
+  // it into whatever order the dropdown happens to list.
   const triggerLabel = useMemo(() => {
     if (selectedIds.length === 0) return emptyLabel;
-    return options
-      .filter((o) => selectedIdSet.has(o.id))
-      .map((o) => o.label)
+    return selectedIds
+      .map((id) => optionById.get(id)?.label)
+      .filter(Boolean)
       .join(', ');
-  }, [selectedIds, selectedIdSet, options, emptyLabel]);
+  }, [selectedIds, optionById, emptyLabel]);
 
   // Filter + group.
   const visibleGroups = useMemo(() => {

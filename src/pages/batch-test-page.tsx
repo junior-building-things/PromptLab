@@ -1108,19 +1108,31 @@ export function BatchTestPage() {
     () => models.filter((model) => model.status === 'ready' && providerKeys[model.provider]?.hasKey),
     [models, providerKeys],
   );
-  const versionOptions = useMemo(
-    () =>
-      promptVersions
-        .map((version) => {
-          const project = promptProjects.find((entry) => entry.id === version.projectId);
-          return {
-            ...version,
-            projectName: project?.name ?? 'Unknown Project',
-          };
-        })
-        .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
-    [promptProjects, promptVersions],
-  );
+  const versionOptions = useMemo(() => {
+    // Projects stay ordered by most recent activity, but versions read
+    // v1 → vN inside each one; sorting the flat list by `updatedAt`
+    // interleaved projects and put the newest version on top.
+    const projectRecency = new Map<string, number>();
+    promptVersions.forEach((version) => {
+      const stamp = new Date(version.updatedAt).getTime();
+      projectRecency.set(version.projectId, Math.max(projectRecency.get(version.projectId) ?? 0, stamp));
+    });
+
+    return promptVersions
+      .map((version) => {
+        const project = promptProjects.find((entry) => entry.id === version.projectId);
+        return {
+          ...version,
+          projectName: project?.name ?? 'Unknown Project',
+        };
+      })
+      .sort((left, right) => {
+        if (left.projectId !== right.projectId) {
+          return (projectRecency.get(right.projectId) ?? 0) - (projectRecency.get(left.projectId) ?? 0);
+        }
+        return left.version - right.version;
+      });
+  }, [promptProjects, promptVersions]);
   const imageReferenceAssets = useMemo(
     () => assets.filter((asset) => asset.kind === 'image-reference'),
     [assets],
@@ -1522,11 +1534,14 @@ export function BatchTestPage() {
   }
 
   async function runBatch() {
-    const selectedPrompts = versionOptions.filter((prompt) => selectedPromptIds.includes(prompt.id));
-    const selectedModels = readyModels.filter((model) => selectedModelIds.includes(model.id));
-    const selectedImageReferences = imageReferenceAssets.filter((asset) =>
-      selectedImageReferenceIds.includes(asset.id),
-    );
+    // Selection order, not list order — `selectedIds` is append-ordered
+    // and the dropdown summary reads back the same way.
+    const pickInSelectionOrder = <T extends { id: string }>(ids: string[], pool: T[]) =>
+      ids.map((id) => pool.find((entry) => entry.id === id)).filter((entry): entry is T => Boolean(entry));
+
+    const selectedPrompts = pickInSelectionOrder(selectedPromptIds, versionOptions);
+    const selectedModels = pickInSelectionOrder(selectedModelIds, readyModels);
+    const selectedImageReferences = pickInSelectionOrder(selectedImageReferenceIds, imageReferenceAssets);
     const selectedUserInputs = textInputAssets
       .filter((asset) => selectedTextInputAssetIds.includes(asset.id))
       .flatMap((asset) => parseTextInputs(asset.source));
