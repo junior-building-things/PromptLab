@@ -18,10 +18,12 @@ const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 // The withoutbg open-weights model runs on CPU in this container
 // (tools/bg-server.py); nothing about a cutout leaves localhost.
 const BG_SERVER_URL = `http://127.0.0.1:${process.env.BG_SERVER_PORT || 8091}`;
-// A cold instance has to load 455 MB of weights before the first
-// cutout, and Cloud Run only gives the sidecar CPU while a request is
-// in flight — so the first call waits rather than silently skipping.
-const BG_SERVER_READY_TIMEOUT_MS = 180_000;
+// Only covers the sidecar binding its port, which happens at container
+// start without touching the model — so if it is not up in a few
+// seconds it is not coming (e.g. `npm start` with no Python locally).
+// The 455 MB weight load happens inside /remove on the first cutout and
+// is bounded by the Cloud Run request timeout, not by this.
+const BG_SERVER_READY_TIMEOUT_MS = 15_000;
 const OUTLINE_RADIUS = 20;
 const OUTLINE_ALPHA_THRESHOLD = 16;
 const EDGE_WHITE_ALPHA_LIMIT = 252;
@@ -383,7 +385,7 @@ async function removeBackgroundLocally(source) {
   }
 
   if (!(await waitForBgServer())) {
-    throw new Error('Background-removal service never came up.');
+    throw new Error('Background-removal sidecar is not listening; is tools/bg-server.py running?');
   }
 
   const response = await fetch(`${BG_SERVER_URL}/remove`, {

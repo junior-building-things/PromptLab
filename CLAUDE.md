@@ -22,7 +22,8 @@
 - [tools/](tools/) — `bg-server.py`, the CPU background-removal sidecar (see Background Removal)
 - [public/](public/) — static assets served as-is
 - [server.js](server.js) — Cloud Run entrypoint: route table, static `dist/`, SPA fallback
-- [Dockerfile](Dockerfile) — two-stage build (Vite build → slim runtime with `--omit=dev`)
+- [Dockerfile](Dockerfile) — two-stage build: Vite build → slim runtime (`--omit=dev`) plus Python, onnxruntime and the baked cutout model
+- [docker-entrypoint.sh](docker-entrypoint.sh) — starts the Python sidecar, then `exec`s Node as PID 1
 - [.github/workflows/deploy.yml](.github/workflows/deploy.yml) — deploys to Cloud Run on push to `main`
 
 ## Local Conventions (project-specific)
@@ -31,23 +32,31 @@
 - **Modals** route through [src/components/modal.tsx](src/components/modal.tsx); **dropdowns** through [src/components/multi-select-dropdown.tsx](src/components/multi-select-dropdown.tsx). Don't reinvent the chrome.
 - **Shared types** for prompts / assets / models / batch scenarios live in [src/lib/types.ts](src/lib/types.ts). New persisted shapes go there, not next to the consumer.
 - **Provider thinking-effort knob** is the union `ThinkingLevel` in [src/lib/types.ts](src/lib/types.ts:63). Map per-provider quirks at the API layer, not in the UI.
-- **API handlers** in `api/` are self-contained; share code only via [api/_lib/](api/_lib/). Each file exports a default `(req, res) => …` handler and keeps the Vercel-era signature (`req.query` / `req.body` pre-parsed) because Express supplies the same shape. **A new file under `api/` is not routed until it's added to the `ROUTES` table in [server.js](server.js).**
+- **API handlers** in `api/` are self-contained; share code only via [api/_lib/](api/_lib/). Each file exports a default `(req, res) => …` handler taking `req.query` / `req.body` pre-parsed, which is what Express supplies. **A new file under `api/` is not routed until it's added to the `ROUTES` table in [server.js](server.js).**
 - **Workspace state** is keyed per-user via `AppProvider`'s `storageKey={\`promptlab-state-user:${user.id}\`}` ([src/App.tsx:19](src/App.tsx#L19)) — never reach across users.
 
 ## Auth
 Lark / Feishu OAuth (mirrors Hamlet's pattern). Flow lives in [api/auth/lark/](api/auth/lark/) and the email allowlist is `ALLOWED_EMAILS` in [api/_lib/auth.js](api/_lib/auth.js). Add yourself there before first sign-in. Session cookie is `promptlab-session`, signed HMAC-SHA256 with `SESSION_SECRET`.
 
+The Lark app is **`cli_a911076bd5f8dbde`, shared with sa-outfit** — rotating its secret means updating both `promptlab-lark-app-secret` and `sa-outfit-lark-secret`. Its redirect allowlist must contain `https://promptlab-416594255546.asia-southeast1.run.app/api/auth/lark/callback`; without it the callback bounces and sign-in fails.
+
 ## Provider Execution
 Batch tests POST to [api/batch-run.js](api/batch-run.js). Provider API keys are stored encrypted at rest (AES-256-GCM via `ENCRYPTION_SECRET`) in Postgres through [api/_lib/store.js](api/_lib/store.js) and never round-trip through the frontend.
 
 ## Image Persistence
-Binary payloads never live in the workspace JSON — base64 data URLs there blow past both the browser's localStorage quota and the old 4.5 MB Vercel body limit (now `express.json({ limit: '12mb' })`). Generated outputs and uploaded image references are stored as rows in `promptlab_images` (Postgres `bytea`, keyed per user) and the state only carries a `/api/images?id=…` reference. [api/batch-run.js](api/batch-run.js) parks outputs on the way out and resolves reference images back to data URLs on the way in (providers can't fetch a session-gated URL). Client-side helpers — the `isRenderableImage` predicate, `uploadImage`, and the `toDataUrl` inliner used by the downloadable HTML report — live in [src/lib/image-source.ts](src/lib/image-source.ts). Legacy inline images are lifted into the store by a one-time pass in [AppProvider](src/context/app-context.tsx) after hydration.
+Postgres holds two tables, both created on demand by `ensureSchema` in [api/_lib/store.js](api/_lib/store.js) — `promptlab_users` (workspace JSON + encrypted provider keys) and `promptlab_images`. There is no migration tool; adding a column means editing that one `create table if not exists` block.
+
+Binary payloads never live in the workspace JSON — base64 data URLs there blow past the browser's localStorage quota and bloat every save (the request cap is `express.json({ limit: '12mb' })`). Generated outputs and uploaded image references are stored as rows in `promptlab_images` (Postgres `bytea`, keyed per user) and the state only carries a `/api/images?id=…` reference. [api/batch-run.js](api/batch-run.js) parks outputs on the way out and resolves reference images back to data URLs on the way in (providers can't fetch a session-gated URL). Client-side helpers — the `isRenderableImage` predicate, `uploadImage`, and the `toDataUrl` inliner used by the downloadable HTML report — live in [src/lib/image-source.ts](src/lib/image-source.ts). Legacy inline images are lifted into the store by a one-time pass in [AppProvider](src/context/app-context.tsx) after hydration.
 
 ## Environment Variables
 See [.env.example](.env.example) for the full list. Required: `LARK_APP_ID`, `LARK_APP_SECRET`, `SESSION_SECRET`, `DATABASE_URL`. Recommended in prod: `ENCRYPTION_SECRET` (separate from `SESSION_SECRET`). Optional: `LARK_BASE_URL`, `APP_URL`, `LARK_REDIRECT_URI`, `BG_SERVER_PORT`. `PORT` is supplied by Cloud Run (8080 locally).
 
 ## Deployment
 Cloud Run service `promptlab` in project `tiktok-im`, region `asia-southeast1` — same pattern as Hamlet and sa-outfit. Push to `main` → [deploy.yml](.github/workflows/deploy.yml) → `gcloud run deploy --source .` (Cloud Build picks up the [Dockerfile](Dockerfile)).
+
+Service shape: `--allow-unauthenticated` (public URL; access control is the Lark OAuth allowlist, not IAM), **2 vCPU / 2 GiB**, request timeout 600s. The memory and CPU are sized for the resident cutout model, not the web app — don't trim them without reading Background Removal below. Note that CPU inference is real work on the instance, so several concurrent batches contend for those 2 vCPUs.
+
+**This app was migrated off Vercel (2026-08-16); nothing runs there any more.** No `vercel.json`, no `vercel dev` — [server.js](server.js) is the only runtime. If you find yourself reaching for a platform-specific config file, you want the Dockerfile or the workflow instead.
 
 Split of configuration:
 - **Secrets** come from Secret Manager, wired in the workflow: `promptlab-database-url`, `promptlab-session-secret`, `promptlab-encryption-secret`, `promptlab-lark-app-secret`. Rotating a value only needs a redeploy — the workflow pins `:latest`.
@@ -75,7 +84,11 @@ gcloud run deploy promptlab --image asia-southeast1-docker.pkg.dev/tiktok-im/clo
 ## Background Removal
 The sticker flow's cutout step runs the **withoutbg open-weights ONNX model locally on CPU** — no SaaS call, no API key, no image leaving the container. [tools/bg-server.py](tools/bg-server.py) holds the model in memory behind a localhost-only HTTP server (`/remove`, `/health`); [api/batch-run.js](api/batch-run.js) posts the generated image to it and applies the white keyline to the returned cutout. [docker-entrypoint.sh](docker-entrypoint.sh) starts it alongside Node.
 
-The 455 MB weights are baked into the image at build time from Hugging Face (`WITHOUTBG_MODEL_PATH`), so cold starts don't download them. The model loads **lazily on the first cutout**, not at boot — Cloud Run throttles CPU outside a request, so eager loading would crawl. That makes the first sticker request after a cold start slow (weight load + inference); Node waits up to 180s for the sidecar rather than silently skipping the cutout. The Dockerfile runs a real cutout as a build step, so a bad model or a changed SDK call shape fails the build instead of production.
+The 455 MB weights are baked into the image at build time from Hugging Face (`WITHOUTBG_MODEL_PATH`), so cold starts don't download them. The model loads **lazily on the first cutout**, not at boot — Cloud Run throttles CPU outside a request, so eager loading would crawl. The first sticker request after a cold start therefore pays for the weight load; that wait happens inside `/remove` and is bounded by the 600s request timeout. Node's own readiness poll (15s) only covers the sidecar binding its port, which happens at container start.
+
+The Dockerfile runs a real cutout as a build step, so a bad model or a changed SDK call shape fails the build instead of production. End-to-end generation including background removal was verified on Cloud Run on 2026-08-16.
+
+**Locally the sidecar is usually not running** — `npm start` only starts Node. Batches still work; the cutout step fails fast (~15s) and [postProcessOutputImage](api/batch-run.js) falls back to the un-stickerized image. To exercise it for real: `pip install withoutbg && python3 tools/bg-server.py` alongside the app, or just test the cutout in a Cloud Run revision.
 
 ## Context Engineering Commands
 

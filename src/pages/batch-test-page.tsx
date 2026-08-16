@@ -1454,10 +1454,10 @@ export function BatchTestPage() {
     // Fan out one /api/batch-run request per model rather than batching
     // them all into a single POST. The server-side handler used to
     // Promise.all over the model list, which meant a slow provider
-    // (e.g. OpenAI image-gen) blocked the response until Vercel's
-    // serverless function timeout aborted the entire request — taking
-    // a fast Gemini result down with it. With per-model requests, each
-    // one's timeout / error is independent: GPT can fail and Gemini
+    // (e.g. OpenAI image-gen) blocked the response until the request
+    // timeout aborted the whole thing — taking a fast Gemini result
+    // down with it. With per-model requests, each one's timeout /
+    // error is independent: GPT can fail and Gemini
     // still surfaces its result.
     const singleModelRequest = async (model: typeof selectedModels[number]) => {
       const controller = new AbortController();

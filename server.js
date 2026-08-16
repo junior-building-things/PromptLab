@@ -12,12 +12,12 @@ import logout from './api/auth/logout.js';
 import session from './api/auth/session.js';
 
 /**
- * Cloud Run entrypoint. The `api/` handlers keep the Vercel signature —
- * `(req, res)` with `req.query` / `req.body` already parsed — because
- * Express supplies exactly the same shape; only the routing table moved
- * in here from the platform. Static SPA files come out of `dist/`, with
- * everything unmatched falling through to `index.html` (the job
- * `vercel.json`'s rewrite used to do).
+ * Cloud Run entrypoint. The `api/` handlers take `(req, res)` with
+ * `req.query` / `req.body` already parsed, which is what Express hands
+ * them; the routing table lives here rather than being inferred from
+ * the filesystem. Static SPA files come out of `dist/`, and everything
+ * unmatched falls through to `index.html` so client-side deep links
+ * resolve.
  */
 
 const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dist');
@@ -35,9 +35,9 @@ const ROUTES = {
 
 const app = express();
 
-// Vercel capped request bodies at 4.5 MB. Images no longer ride inside
-// the workspace JSON (see the image store in api/_lib/store.js), but a
-// single upload still has to fit, so keep real headroom.
+// Images no longer ride inside the workspace JSON (see the image store
+// in api/_lib/store.js), but a single upload still has to fit, so keep
+// real headroom.
 app.use(express.json({ limit: '12mb' }));
 
 for (const [route, handler] of Object.entries(ROUTES)) {
