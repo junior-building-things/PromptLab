@@ -38,5 +38,5 @@ jobs:
             --cpu 1 \
             --timeout 600 \
             --update-secrets \
-              DATABASE_URL=promptlab-database-url:latest,SESSION_SECRET=promptlab-session-secret:latest,ENCRYPTION_SECRET=promptlab-encryption-secret:latest,LARK_APP_SECRET=promptlab-lark-app-secret:latest,BRIA_API_TOKEN=promptlab-bria-api-token:latest \
+              DATABASE_URL=promptlab-database-url:latest,SESSION_SECRET=promptlab-session-secret:latest,ENCRYPTION_SECRET=promptlab-encryption-secret:latest,LARK_APP_SECRET=promptlab-lark-app-secret:latest,WITHOUTBG_API_KEY=promptlab-withoutbg-api-key:latest \
             --quiet

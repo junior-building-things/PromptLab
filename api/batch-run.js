@@ -15,7 +15,7 @@ import {
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
-const BRIA_REMOVE_BG_URL = 'https://engine.prod.bria-api.com/v2/image/edit/remove_background';
+const WITHOUTBG_REMOVE_BG_URL = 'https://api.withoutbg.com/v1.0/image-without-background-base64';
 const OUTLINE_RADIUS = 20;
 const OUTLINE_ALPHA_THRESHOLD = 16;
 const EDGE_WHITE_ALPHA_LIMIT = 252;
@@ -59,7 +59,9 @@ function parseImageDataUrl(source) {
   };
 }
 
-function normalizeBriaImageInput(source) {
+/** withoutbg's base64 endpoint takes raw base64 only, so a provider that
+ * handed back a URL (Gemini `fileUri`) has to be downloaded first. */
+async function toBase64Image(source) {
   if (!source) {
     return null;
   }
@@ -70,7 +72,12 @@ function normalizeBriaImageInput(source) {
   }
 
   if (/^https?:\/\//.test(source)) {
-    return source;
+    const response = await fetch(source);
+    if (!response.ok) {
+      throw new Error('Failed to download the generated image for background removal.');
+    }
+
+    return Buffer.from(await response.arrayBuffer()).toString('base64');
   }
 
   return null;
@@ -342,52 +349,37 @@ function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
   return PNG.sync.write(createPngWithData(width, height, outlinedData));
 }
 
-async function fetchImageAsDataUrl(source) {
-  const response = await fetch(source);
-  if (!response.ok) {
-    throw new Error('Failed to download Bria background-removal result.');
-  }
+async function removeBackgroundWithoutBg(source) {
+  const apiKey = process.env.WITHOUTBG_API_KEY?.trim();
+  const image = await toBase64Image(source);
 
-  const contentType = response.headers.get('content-type') || 'image/png';
-  const originalBuffer = Buffer.from(await response.arrayBuffer());
-  const processedBuffer =
-    contentType.startsWith('image/png') ? addWhiteOutlineToPng(originalBuffer) : originalBuffer;
-
-  return toDataUrl(contentType, processedBuffer.toString('base64'));
-}
-
-async function removeBackgroundWithBria(source) {
-  const apiToken = process.env.BRIA_API_TOKEN?.trim();
-  const image = normalizeBriaImageInput(source);
-
-  if (!apiToken || !image) {
+  if (!apiKey || !image) {
     return source;
   }
 
-  const response = await fetch(BRIA_REMOVE_BG_URL, {
+  const response = await fetch(WITHOUTBG_REMOVE_BG_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      api_token: apiToken,
+      'X-API-Key': apiKey,
     },
-    body: JSON.stringify({
-      image,
-      preserve_alpha: true,
-      sync: true,
-    }),
+    body: JSON.stringify({ image_base64: image }),
   });
 
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error?.message || payload.message || 'Bria background removal failed.');
+    throw new Error(payload.detail || payload.message || 'withoutbg background removal failed.');
   }
 
-  const imageUrl = payload.result?.image_url;
-  if (!imageUrl) {
-    throw new Error('Bria returned no processed image URL.');
+  const cutout = payload.img_without_background_base64;
+  if (!cutout) {
+    throw new Error('withoutbg returned no image.');
   }
 
-  return fetchImageAsDataUrl(imageUrl);
+  // The sticker look is the cutout plus the white keyline; withoutbg
+  // hands back the PNG inline, so it goes straight through the outliner.
+  const outlined = addWhiteOutlineToPng(Buffer.from(cutout, 'base64'));
+  return toDataUrl('image/png', outlined.toString('base64'));
 }
 
 async function postProcessOutputImage(execution, { stickerize } = { stickerize: true }) {
@@ -396,7 +388,7 @@ async function postProcessOutputImage(execution, { stickerize } = { stickerize: 
   }
 
   try {
-    const cleanedImage = await removeBackgroundWithBria(execution.outputImage);
+    const cleanedImage = await removeBackgroundWithoutBg(execution.outputImage);
     return {
       ...execution,
       outputImage: cleanedImage || execution.outputImage,
