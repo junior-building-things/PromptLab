@@ -19,6 +19,7 @@
   - [api/provider-keys.js](api/provider-keys.js), [api/user-state.js](api/user-state.js), [api/images.js](api/images.js)
   - [api/auth/](api/auth/) — `lark/login.js`, `lark/callback.js`, `session.js`, `logout.js`
   - [api/_lib/](api/_lib/) — shared helpers: `auth.js` (session cookie + email allowlist), `store.js` (Postgres + AES-256-GCM key encryption)
+- [tools/](tools/) — `bg-server.py`, the CPU background-removal sidecar (see Background Removal)
 - [public/](public/) — static assets served as-is
 - [server.js](server.js) — Cloud Run entrypoint: route table, static `dist/`, SPA fallback
 - [Dockerfile](Dockerfile) — two-stage build (Vite build → slim runtime with `--omit=dev`)
@@ -43,13 +44,13 @@ Batch tests POST to [api/batch-run.js](api/batch-run.js). Provider API keys are 
 Binary payloads never live in the workspace JSON — base64 data URLs there blow past both the browser's localStorage quota and the old 4.5 MB Vercel body limit (now `express.json({ limit: '12mb' })`). Generated outputs and uploaded image references are stored as rows in `promptlab_images` (Postgres `bytea`, keyed per user) and the state only carries a `/api/images?id=…` reference. [api/batch-run.js](api/batch-run.js) parks outputs on the way out and resolves reference images back to data URLs on the way in (providers can't fetch a session-gated URL). Client-side helpers — the `isRenderableImage` predicate, `uploadImage`, and the `toDataUrl` inliner used by the downloadable HTML report — live in [src/lib/image-source.ts](src/lib/image-source.ts). Legacy inline images are lifted into the store by a one-time pass in [AppProvider](src/context/app-context.tsx) after hydration.
 
 ## Environment Variables
-See [.env.example](.env.example) for the full list. Required: `LARK_APP_ID`, `LARK_APP_SECRET`, `SESSION_SECRET`, `DATABASE_URL`. Recommended in prod: `ENCRYPTION_SECRET` (separate from `SESSION_SECRET`). Optional: `LARK_BASE_URL`, `APP_URL`, `LARK_REDIRECT_URI`, `WITHOUTBG_API_KEY`. `PORT` is supplied by Cloud Run (8080 locally).
+See [.env.example](.env.example) for the full list. Required: `LARK_APP_ID`, `LARK_APP_SECRET`, `SESSION_SECRET`, `DATABASE_URL`. Recommended in prod: `ENCRYPTION_SECRET` (separate from `SESSION_SECRET`). Optional: `LARK_BASE_URL`, `APP_URL`, `LARK_REDIRECT_URI`, `BG_SERVER_PORT`. `PORT` is supplied by Cloud Run (8080 locally).
 
 ## Deployment
 Cloud Run service `promptlab` in project `tiktok-im`, region `asia-southeast1` — same pattern as Hamlet and sa-outfit. Push to `main` → [deploy.yml](.github/workflows/deploy.yml) → `gcloud run deploy --source .` (Cloud Build picks up the [Dockerfile](Dockerfile)).
 
 Split of configuration:
-- **Secrets** come from Secret Manager, wired in the workflow: `promptlab-database-url`, `promptlab-session-secret`, `promptlab-encryption-secret`, `promptlab-lark-app-secret`, `promptlab-withoutbg-api-key`. Rotating a value only needs a redeploy — the workflow pins `:latest`.
+- **Secrets** come from Secret Manager, wired in the workflow: `promptlab-database-url`, `promptlab-session-secret`, `promptlab-encryption-secret`, `promptlab-lark-app-secret`. Rotating a value only needs a redeploy — the workflow pins `:latest`.
 - **Non-secret env** (`LARK_APP_ID`, `APP_URL`, optionally `LARK_BASE_URL`) is set once on the service and persists across deploys; it is deliberately not in the workflow so a redeploy can't drop it.
 
 Service URL: **https://promptlab-416594255546.asia-southeast1.run.app**
@@ -71,6 +72,11 @@ gcloud run deploy promptlab --image asia-southeast1-docker.pkg.dev/tiktok-im/clo
 
 `public/assets/app-icon.png` is 9 MB, unreferenced, and excluded from build uploads via [.gcloudignore](.gcloudignore) — hence the pathspec above.
 
+## Background Removal
+The sticker flow's cutout step runs the **withoutbg open-weights ONNX model locally on CPU** — no SaaS call, no API key, no image leaving the container. [tools/bg-server.py](tools/bg-server.py) holds the model in memory behind a localhost-only HTTP server (`/remove`, `/health`); [api/batch-run.js](api/batch-run.js) posts the generated image to it and applies the white keyline to the returned cutout. [docker-entrypoint.sh](docker-entrypoint.sh) starts it alongside Node.
+
+The 455 MB weights are baked into the image at build time from Hugging Face (`WITHOUTBG_MODEL_PATH`), so cold starts don't download them. The model loads **lazily on the first cutout**, not at boot — Cloud Run throttles CPU outside a request, so eager loading would crawl. That makes the first sticker request after a cold start slow (weight load + inference); Node waits up to 180s for the sidecar rather than silently skipping the cutout. The Dockerfile runs a real cutout as a build step, so a bad model or a changed SDK call shape fails the build instead of production.
+
 ## Context Engineering Commands
 
 ### Build & Compilation
@@ -89,7 +95,7 @@ gcloud run deploy promptlab --image asia-southeast1-docker.pkg.dev/tiktok-im/clo
 
 ## Agentic Execution Protocol
 1. **Plan Phase.** Before touching UI, scan existing pages under [src/pages/](src/pages/) and the shared chrome in [src/components/app-layout.tsx](src/components/app-layout.tsx) so new screens reuse the shell. Before touching the API layer, read [api/_lib/](api/_lib/) so you reuse session + store helpers rather than re-implementing.
-2. **Write Phase.** Touch design tokens in [src/styles.css](src/styles.css), not inline color strings. Keep new shared types in [src/lib/types.ts](src/lib/types.ts). Never commit secrets (`LARK_APP_SECRET`, `SESSION_SECRET`, `DATABASE_URL`, `ENCRYPTION_SECRET`, `WITHOUTBG_API_KEY`) — they live in Secret Manager (see Deployment) + local `.env.local`.
+2. **Write Phase.** Touch design tokens in [src/styles.css](src/styles.css), not inline color strings. Keep new shared types in [src/lib/types.ts](src/lib/types.ts). Never commit secrets (`LARK_APP_SECRET`, `SESSION_SECRET`, `DATABASE_URL`, `ENCRYPTION_SECRET`) — they live in Secret Manager (see Deployment) + local `.env.local`.
 3. **Verify Phase.** After any functional or UI change, run `npx tsc -b --noEmit` and `npm run build`. For changes to [api/batch-run.js](api/batch-run.js), [api/_lib/store.js](api/_lib/store.js), or anything in [api/auth/](api/auth/), also run a manual login + happy-path batch against a tagged Cloud Run revision before merging to `main`.
 4. **Ship Phase.** After completing any code change, automatically `git add` the touched files, `git commit` with a terse imperative subject line that matches the repo style (see `git log` — e.g. "Reuse the project composer modal for the Add prompt flow"), and `git push` to GitHub **without asking for confirmation**. This applies to every code change, including CLAUDE.md updates. Preconditions: Verify Phase must be green (`npx tsc -b --noEmit` and `npm run build` both pass) — if either fails, stop and fix before committing. Never stage with `git add -A` / `git add .` — name the changed files explicitly so stray local artifacts (`.env.local`, build output, untracked experiments) don't ride along. **Note:** `main` is the deployed branch — every push runs [deploy.yml](.github/workflows/deploy.yml) and ships to Cloud Run. If a change is risky (auth, batch-run, store, schema), branch first instead of pushing straight to `main`.
 

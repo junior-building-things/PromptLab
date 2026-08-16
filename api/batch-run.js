@@ -15,7 +15,13 @@ import {
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
-const WITHOUTBG_REMOVE_BG_URL = 'https://api.withoutbg.com/v1.0/image-without-background-base64';
+// The withoutbg open-weights model runs on CPU in this container
+// (tools/bg-server.py); nothing about a cutout leaves localhost.
+const BG_SERVER_URL = `http://127.0.0.1:${process.env.BG_SERVER_PORT || 8091}`;
+// A cold instance has to load 455 MB of weights before the first
+// cutout, and Cloud Run only gives the sidecar CPU while a request is
+// in flight — so the first call waits rather than silently skipping.
+const BG_SERVER_READY_TIMEOUT_MS = 180_000;
 const OUTLINE_RADIUS = 20;
 const OUTLINE_ALPHA_THRESHOLD = 16;
 const EDGE_WHITE_ALPHA_LIMIT = 252;
@@ -349,37 +355,54 @@ function addWhiteOutlineToPng(buffer, radius = OUTLINE_RADIUS) {
   return PNG.sync.write(createPngWithData(width, height, outlinedData));
 }
 
-async function removeBackgroundWithoutBg(source) {
-  const apiKey = process.env.WITHOUTBG_API_KEY?.trim();
-  const image = await toBase64Image(source);
+async function waitForBgServer() {
+  const deadline = Date.now() + BG_SERVER_READY_TIMEOUT_MS;
 
-  if (!apiKey || !image) {
+  for (;;) {
+    try {
+      const response = await fetch(`${BG_SERVER_URL}/health`);
+      if (response.ok) {
+        return true;
+      }
+    } catch {
+      // not listening yet
+    }
+
+    if (Date.now() > deadline) {
+      return false;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+async function removeBackgroundLocally(source) {
+  const image = await toBase64Image(source);
+  if (!image) {
     return source;
   }
 
-  const response = await fetch(WITHOUTBG_REMOVE_BG_URL, {
+  if (!(await waitForBgServer())) {
+    throw new Error('Background-removal service never came up.');
+  }
+
+  const response = await fetch(`${BG_SERVER_URL}/remove`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': apiKey,
-    },
-    body: JSON.stringify({ image_base64: image }),
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: Buffer.from(image, 'base64'),
   });
 
-  const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.detail || payload.message || 'withoutbg background removal failed.');
+    throw new Error((await response.text()) || 'Background removal failed.');
   }
 
-  const cutout = payload.img_without_background_base64;
-  if (!cutout) {
-    throw new Error('withoutbg returned no image.');
+  const cutout = Buffer.from(await response.arrayBuffer());
+  if (!cutout.length) {
+    throw new Error('Background removal returned an empty image.');
   }
 
-  // The sticker look is the cutout plus the white keyline; withoutbg
-  // hands back the PNG inline, so it goes straight through the outliner.
-  const outlined = addWhiteOutlineToPng(Buffer.from(cutout, 'base64'));
-  return toDataUrl('image/png', outlined.toString('base64'));
+  // The sticker look is the cutout plus the white keyline.
+  return toDataUrl('image/png', addWhiteOutlineToPng(cutout).toString('base64'));
 }
 
 async function postProcessOutputImage(execution, { stickerize } = { stickerize: true }) {
@@ -388,7 +411,7 @@ async function postProcessOutputImage(execution, { stickerize } = { stickerize: 
   }
 
   try {
-    const cleanedImage = await removeBackgroundWithoutBg(execution.outputImage);
+    const cleanedImage = await removeBackgroundLocally(execution.outputImage);
     return {
       ...execution,
       outputImage: cleanedImage || execution.outputImage,

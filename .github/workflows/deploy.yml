@@ -34,9 +34,9 @@ jobs:
             --source . \
             --region asia-southeast1 \
             --allow-unauthenticated \
-            --memory 1Gi \
-            --cpu 1 \
+            --memory 2Gi \
+            --cpu 2 \
             --timeout 600 \
             --update-secrets \
-              DATABASE_URL=promptlab-database-url:latest,SESSION_SECRET=promptlab-session-secret:latest,ENCRYPTION_SECRET=promptlab-encryption-secret:latest,LARK_APP_SECRET=promptlab-lark-app-secret:latest,WITHOUTBG_API_KEY=promptlab-withoutbg-api-key:latest \
+              DATABASE_URL=promptlab-database-url:latest,SESSION_SECRET=promptlab-session-secret:latest,ENCRYPTION_SECRET=promptlab-encryption-secret:latest,LARK_APP_SECRET=promptlab-lark-app-secret:latest \
             --quiet
