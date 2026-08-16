@@ -54,6 +54,8 @@ See [.env.example](.env.example) for the full list. Required: `LARK_APP_ID`, `LA
 ## Deployment
 Cloud Run service `promptlab` in project `tiktok-im`, region `asia-southeast1` — same pattern as Hamlet and sa-outfit. Push to `main` → [deploy.yml](.github/workflows/deploy.yml) → `gcloud run deploy --source .` (Cloud Build picks up the [Dockerfile](Dockerfile)).
 
+A CI deploy takes **~30 minutes** — most of it baking the 455 MB model into the image on a small regional worker. It is not hung; watch it with `gcloud builds list --region asia-southeast1` (CI's builds are regional, so a plain `gcloud builds list` shows nothing and looks like a failure).
+
 Service shape: `--allow-unauthenticated` (public URL; access control is the Lark OAuth allowlist, not IAM), **2 vCPU / 2 GiB**, request timeout 600s. The memory and CPU are sized for the resident cutout model, not the web app — don't trim them without reading Background Removal below. Note that CPU inference is real work on the instance, so several concurrent batches contend for those 2 vCPUs.
 
 **This app was migrated off Vercel (2026-08-16); nothing runs there any more.** No `vercel.json`, no `vercel dev` — [server.js](server.js) is the only runtime. If you find yourself reaching for a platform-specific config file, you want the Dockerfile or the workflow instead.
