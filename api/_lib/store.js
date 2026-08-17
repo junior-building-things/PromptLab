@@ -201,6 +201,11 @@ export async function getProviderApiKey(user, provider) {
 
 const IMAGE_URL_PREFIX = '/api/images?id=';
 
+/** Owner of the sticker images referenced by [src/data/seed.ts] — every
+ * new workspace points at the same rows rather than each user getting a
+ * copy. Reserved: real ids come from Lark and can never be this. */
+const SEED_IMAGE_OWNER = '__seed__';
+
 /** Binary payloads (generated outputs, uploaded reference images) are
  * kept out of the workspace JSON — a handful of base64 data URLs blows
  * past both the browser's localStorage quota and the 4.5 MB serverless
@@ -241,9 +246,10 @@ export async function saveImage(user, dataUrl) {
 export async function readImage(user, id) {
   await ensureSchema();
   const pool = getPool();
+  // Own images, plus the shared seed set — nothing else is readable.
   const result = await pool.query(
-    'select mime_type, bytes from promptlab_images where id = $1 and user_id = $2 limit 1',
-    [id, user.id],
+    'select mime_type, bytes from promptlab_images where id = $1 and user_id in ($2, $3) limit 1',
+    [id, user.id, SEED_IMAGE_OWNER],
   );
   const row = result.rows[0];
   if (!row) {
