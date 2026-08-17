@@ -1271,6 +1271,46 @@ button { cursor: pointer; }
 }
 
 /* ============== MODAL ============== */
+/* Full-size image preview. These class names were already in use by the
+ * batch-test output preview but had no styling at all, so the overlay
+ * rendered inline; the assets tab uses the same chrome. */
+.composer-backdrop {
+  position: fixed; inset: 0; z-index: 110;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: grid; place-items: center;
+  padding: 40px;
+  animation: fadeIn 0.18s ease-out;
+}
+.image-preview-sheet {
+  position: relative;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.4);
+  animation: modalIn 0.18s ease-out;
+}
+.image-preview-sheet-image {
+  display: block;
+  max-width: min(78vw, 900px);
+  max-height: 78vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.image-preview-close {
+  position: absolute; top: -12px; right: -12px;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.image-preview-close:hover { background: var(--bg-elev-3); }
+
 .modal-overlay {
   position: fixed; inset: 0; z-index: 100;
   background: rgba(0, 0, 0, 0.45);
