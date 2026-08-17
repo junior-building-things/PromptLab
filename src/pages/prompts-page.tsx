@@ -48,7 +48,11 @@ const PROJECT_TYPES = [
 
 function formatRelative(value: string) {
   try {
-    return formatDistanceToNowStrict(new Date(value), { addSuffix: true });
+    const stamp = new Date(value);
+    // Under a minute, "43 seconds ago" is noise — and it reads oddly
+    // right after saving an edit.
+    if (Date.now() - stamp.getTime() < 60_000) return 'just now';
+    return formatDistanceToNowStrict(stamp, { addSuffix: true });
   } catch {
     return '';
   }
