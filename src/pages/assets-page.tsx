@@ -24,6 +24,10 @@ import type { AssetKind } from '../lib/types';
  * row-hover actions menu.
  */
 
+function isImageFile(file: File) {
+  return file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(file.name);
+}
+
 function readTextFile(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -42,6 +46,9 @@ function readImageAsDataUrl(file: File) {
   });
 }
 
+/** Thumbnails shown inline for an image set before it collapses to +N. */
+const PREVIEW_LIMIT = 10;
+
 function parseTextInputs(source: string) {
   return source
     .split(',')
@@ -56,8 +63,8 @@ export function AssetsPage() {
   const [draftName, setDraftName] = useState('');
   const [draftPaste, setDraftPaste] = useState('');
   const [draftFiles, setDraftFiles] = useState<File[]>([]);
-  const [draftFileLabel, setDraftFileLabel] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState('');
   const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -89,7 +96,6 @@ export function AssetsPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <span className="kbd">⌘K</span>
           </div>
         </div>
       ),
@@ -102,24 +108,42 @@ export function AssetsPage() {
     setDraftName('');
     setDraftPaste('');
     setDraftFiles([]);
-    setDraftFileLabel('');
+    setUploadNotice('');
   };
 
   const canSubmit =
     draftName.trim().length > 0 && (draftFiles.length > 0 || draftPaste.trim().length > 0);
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
-    if (files.length === 0) return;
-    setDraftFiles(files);
-    setDraftFileLabel(
-      files.length === 1 ? files[0].name : `${files.length} files selected`,
-    );
+    const picked = Array.from(event.target.files ?? []);
     event.target.value = '';
+    if (picked.length === 0) return;
+
+    // Appending rather than replacing means "Add more" can be clicked
+    // repeatedly instead of forcing one multi-select.
+    setDraftFiles((current) => {
+      const merged = [...current];
+      picked.forEach((file) => {
+        if (!merged.some((entry) => entry.name === file.name && entry.size === file.size)) {
+          merged.push(file);
+        }
+      });
+
+      // An asset is either an image set or a text file — a mixed pick has
+      // no meaning downstream, so the first file decides the kind.
+      const wantImages = isImageFile(merged[0]);
+      const filtered = merged.filter((file) => isImageFile(file) === wantImages);
+      setUploadNotice(
+        filtered.length < merged.length
+          ? `Skipped ${merged.length - filtered.length} file(s): an asset is either images or text, not both.`
+          : '',
+      );
+
+      // Only image sets are multi-file.
+      return wantImages ? filtered : filtered.slice(0, 1);
+    });
   };
 
-  const isImageFile = (file: File) =>
-    file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(file.name);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -169,7 +193,7 @@ export function AssetsPage() {
     <>
       <ConfirmDialog
         open={pendingRemoval !== null}
-        message={`Remove ${pendingRemoval?.name ?? ''}?`}
+        noun="asset"
         onConfirm={() => {
           if (pendingRemoval) removeAsset(pendingRemoval.id);
           setPendingRemoval(null);
@@ -210,7 +234,7 @@ export function AssetsPage() {
                   <div>
                     <span className="a-type">
                       <IconBox size={11}><IconText /></IconBox>
-                      TXT
+                      TEXT
                     </span>
                   </div>
                   <div className="a-actions">
@@ -231,7 +255,7 @@ export function AssetsPage() {
                 <div className="a-name">{asset.name}</div>
                 <div className="a-preview">
                   {getAssetSources(asset)
-                    .slice(0, 4)
+                    .slice(0, PREVIEW_LIMIT)
                     .map((source, index) =>
                       isRenderableImage(source) ? (
                         <div
@@ -247,14 +271,16 @@ export function AssetsPage() {
                         <div key={`${asset.id}-${index}`} className="a-thumb" />
                       ),
                     )}
-                  {isGroupedAsset(asset) ? (
-                    <span className="a-label">{getAssetSources(asset).length} images</span>
+                  {getAssetSources(asset).length > PREVIEW_LIMIT ? (
+                    <span className="a-label">
+                      +{getAssetSources(asset).length - PREVIEW_LIMIT}
+                    </span>
                   ) : null}
                 </div>
                 <div>
                   <span className="a-type">
                     <IconBox size={11}><IconImage /></IconBox>
-                    PNG
+                    IMAGE
                   </span>
                 </div>
                 <div className="a-actions">
@@ -321,8 +347,24 @@ export function AssetsPage() {
               onClick={() => fileInputRef.current?.click()}
             >
               <IconBox><IconUpload /></IconBox>
-              <span>{draftFileLabel || 'Choose file'}</span>
+              <span>
+                {draftFiles.length === 0
+                  ? 'Choose file'
+                  : draftFiles.length === 1
+                    ? draftFiles[0].name
+                    : `${draftFiles.length} images selected`}
+              </span>
             </button>
+            {draftFiles.length > 0 && isImageFile(draftFiles[0]) ? (
+              <button
+                type="button"
+                className="file-btn"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <IconBox><IconPlus /></IconBox>
+                <span>Add more</span>
+              </button>
+            ) : null}
             <input
               ref={fileInputRef}
               type="file"
@@ -333,6 +375,9 @@ export function AssetsPage() {
             />
             <span className="file-tag">TXT / PNG / JPG</span>
           </div>
+          {uploadNotice ? (
+            <div className="page-sub" style={{ fontSize: 11, paddingTop: 6 }}>{uploadNotice}</div>
+          ) : null}
         </div>
 
         <div className="field">

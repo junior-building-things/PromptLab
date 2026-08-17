@@ -9,8 +9,8 @@ import { Modal } from './modal';
 
 type ConfirmDialogProps = {
   open: boolean;
-  title?: string;
-  message: string;
+  /** What is being deleted, e.g. "prompt" — becomes "Delete prompt?". */
+  noun: string;
   confirmLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
@@ -18,9 +18,8 @@ type ConfirmDialogProps = {
 
 export function ConfirmDialog({
   open,
-  title = 'PromptLab says',
-  message,
-  confirmLabel = 'Remove',
+  noun,
+  confirmLabel = 'Delete',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -28,7 +27,7 @@ export function ConfirmDialog({
     <Modal
       open={open}
       onClose={onCancel}
-      title={title}
+      title={`Delete ${noun}?`}
       sub=""
       maxWidth={420}
       headerActions={
@@ -43,7 +42,7 @@ export function ConfirmDialog({
       }
     >
       <div className="page-sub" style={{ padding: '4px 0 8px' }}>
-        {message}
+        This action can't be undone.
       </div>
     </Modal>
   );

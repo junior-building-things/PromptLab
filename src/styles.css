@@ -252,7 +252,7 @@ button { cursor: pointer; }
 .status-meta { margin-top: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
 
 .user-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
-.avatar {
+.avatar { object-fit: cover;
   width: 26px; height: 26px; border-radius: 50%;
   background: linear-gradient(135deg, oklch(0.74 0.14 295), oklch(0.82 0.14 188));
   display: grid; place-items: center;
@@ -1423,6 +1423,22 @@ button { cursor: pointer; }
   overflow-y: auto;
   animation: dropFade 0.12s ease-out;
 }
+/* Theme picker — System / Light / Dark, mirroring Hamlet's control. */
+.theme-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 60;
+  min-width: 136px; padding: 5px;
+  background: var(--bg-elev-2); border: 1px solid var(--hairline);
+  border-radius: 10px; box-shadow: 0 12px 28px rgb(0 0 0 / 0.28);
+  animation: dropFade 0.12s ease;
+}
+.theme-menu-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 8px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.theme-menu-item:hover { background: var(--bg-elev-3); }
+
 @keyframes dropFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .dropdown-option {
   padding: 8px 10px;

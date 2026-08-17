@@ -1728,7 +1728,7 @@ export function BatchTestPage() {
     <>
       <ConfirmDialog
         open={pendingRemoval !== null}
-        message={`Remove ${pendingRemoval?.name ?? ''} and its results?`}
+        noun="batch job"
         onConfirm={() => {
           if (pendingRemoval) handleRemoveRun(pendingRemoval.id);
           setPendingRemoval(null);

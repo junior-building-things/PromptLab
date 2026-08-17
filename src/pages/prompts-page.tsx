@@ -146,7 +146,6 @@ export function PromptsPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <span className="kbd">⌘K</span>
           </div>
         </div>
       ),
@@ -247,7 +246,7 @@ export function PromptsPage() {
     <>
       <ConfirmDialog
         open={pendingRemoval !== null}
-        message={`Remove ${pendingRemoval?.name ?? ''} and all of its prompt versions?`}
+        noun="prompt"
         onConfirm={confirmRemoveProject}
         onCancel={() => setPendingRemoval(null)}
       />

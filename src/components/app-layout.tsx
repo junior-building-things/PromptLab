@@ -1,7 +1,8 @@
 import { Bot } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
+import { IconBox, IconCheck, IconMonitor, IconMoon, IconSun } from './icons';
 
 /**
  * App-shell ported verbatim from the Claude Design PromptLab.html mockup:
@@ -28,8 +29,9 @@ const NAV_ITEMS = [
     label: 'Prompts',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z" />
-        <path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" />
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+        <path d="M14 3v5h5" />
+        <path d="M9 13h6M9 17h4" />
       </svg>
     ),
   },
@@ -39,9 +41,9 @@ const NAV_ITEMS = [
     label: 'API Keys',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="6" y="6" width="12" height="12" rx="2" />
-        <rect x="9" y="9" width="6" height="6" rx="1" />
-        <path d="M10 2v3M14 2v3M10 19v3M14 19v3M2 10h3M2 14h3M19 10h3M19 14h3" />
+        <circle cx="7.5" cy="15.5" r="4.5" />
+        <path d="M10.7 12.3L21 2" />
+        <path d="M17 6l3 3M14.5 8.5l3 3" />
       </svg>
     ),
   },
@@ -76,7 +78,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   },
   '/models': {
     title: 'API Keys',
-    sub: 'Add your provider API keys, then prepare model presets before batch tests hit the network.',
+    sub: 'Add your provider API keys. All keys are stored encrypted.',
   },
   '/assets': {
     title: 'Assets',
@@ -126,24 +128,46 @@ function usePageChrome(): PageChromeSnapshot {
   return snapshot;
 }
 
+type ThemeMode = 'system' | 'dark' | 'light';
+
+const THEME_MODES: Array<{ id: ThemeMode; label: string; icon: ReactNode }> = [
+  { id: 'system', label: 'System', icon: <IconMonitor /> },
+  { id: 'light', label: 'Light', icon: <IconSun /> },
+  { id: 'dark', label: 'Dark', icon: <IconMoon /> },
+];
+
+/** PromptLab's palette is dark at `:root` and light behind
+ * `[data-theme="light"]`, so "dark" means removing the attribute. */
+function applyTheme(mode: ThemeMode) {
+  const dark =
+    mode === 'dark' ||
+    (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const root = document.documentElement;
+  if (dark) root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', 'light');
+}
+
 function useTheme() {
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window === 'undefined') return 'dark';
-    return window.localStorage.getItem('promptlab-theme') === 'light' ? 'light' : 'dark';
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    const stored = window.localStorage.getItem('promptlab-theme');
+    return stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'system';
   });
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'light') {
-      root.setAttribute('data-theme', 'light');
-      window.localStorage.setItem('promptlab-theme', 'light');
-    } else {
-      root.removeAttribute('data-theme');
-      window.localStorage.removeItem('promptlab-theme');
-    }
-  }, [theme]);
+    applyTheme(mode);
+    window.localStorage.setItem('promptlab-theme', mode);
+  }, [mode]);
 
-  return { theme, toggle: () => setTheme((c) => (c === 'light' ? 'dark' : 'light')) };
+  // On System, follow the OS as it flips (macOS auto-dark at dusk).
+  useEffect(() => {
+    if (mode !== 'system') return undefined;
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => applyTheme('system');
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, [mode]);
+
+  return { mode, setMode };
 }
 
 export function AppLayout() {
@@ -151,13 +175,28 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const chrome = usePageChrome();
-  const { theme, toggle: toggleTheme } = useTheme();
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  // Lark's CDN can refuse a hotlink; fall back to initials rather than a broken image.
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
 
   // Each page owns its own chrome lifecycle — its mount effect calls
   // setPageChrome({ … }) and the cleanup clears it. A parent-level
   // reset here would race against the child effects (parents run
   // *after* children in React) and wipe the just-set topbar buttons
   // on every navigation. Don't add one back.
+
+  useEffect(() => {
+    if (!themeMenuOpen) return undefined;
+    const onDown = (event: MouseEvent) => {
+      if (!themeMenuRef.current?.contains(event.target as Node)) setThemeMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [themeMenuOpen]);
+
+  const activeThemeMode = THEME_MODES.find((option) => option.id === themeMode) ?? THEME_MODES[0];
 
   const meta = PAGE_META[location.pathname] ?? PAGE_META['/'];
   const initials = useMemo(() => {
@@ -212,7 +251,17 @@ export function AppLayout() {
 
           <div className="sidebar-foot">
             <div className="user-row">
-              <div className="avatar">{initials}</div>
+              {user?.avatarUrl && !avatarFailed ? (
+                <img
+                  className="avatar"
+                  src={user.avatarUrl}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={() => setAvatarFailed(true)}
+                />
+              ) : (
+                <div className="avatar">{initials}</div>
+              )}
               <div>
                 <div className="user-name">{firstName}</div>
                 <button type="button" className="user-logout" onClick={() => void logout()}>
@@ -237,23 +286,38 @@ export function AppLayout() {
             </div>
             <div className="topbar-actions">
               {chrome.topbarRight}
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Toggle theme"
-                onClick={toggleTheme}
-              >
-                {theme === 'dark' ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="4" />
-                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-                  </svg>
-                )}
-              </button>
+              <div ref={themeMenuRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={`Theme: ${activeThemeMode.label}`}
+                  title={`Theme: ${activeThemeMode.label}`}
+                  onClick={() => setThemeMenuOpen((open) => !open)}
+                >
+                  <IconBox>{activeThemeMode.icon}</IconBox>
+                </button>
+                {themeMenuOpen ? (
+                  <div className="theme-menu">
+                    {THEME_MODES.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className="theme-menu-item"
+                        onClick={() => {
+                          setThemeMode(option.id);
+                          setThemeMenuOpen(false);
+                        }}
+                      >
+                        <IconBox>{option.icon}</IconBox>
+                        <span style={{ flex: 1, textAlign: 'left' }}>{option.label}</span>
+                        {themeMode === option.id ? (
+                          <IconBox size={11}><IconCheck /></IconBox>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </header>
           {chrome.toolbar}
