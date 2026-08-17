@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { setPageChrome } from '../components/app-layout';
 import { ConfirmDialog } from '../components/confirm-dialog';
 import {
@@ -473,10 +474,7 @@ function generateBatchHtmlReport(
                     ? `Prompt v${singlePromptVersion}`
                     : promptColumns[0]?.label ?? 'Results'
                   : modelColumns[0]?.label ?? 'Results',
-              titleModelId:
-                modelColumns.length === 1 && promptColumns.length <= 1
-                  ? modelColumns[0]?.id
-                  : undefined,
+              titleModelId: modelColumns.length === 1 ? modelColumns[0]?.id : undefined,
               scopeModelId: undefined,
               columns: usePromptColumns ? promptColumns : modelColumns,
             },
@@ -635,7 +633,8 @@ function generateBatchHtmlReport(
       --text-muted: #52525b;
       --text-dim: #71717a;
       --hairline: rgba(0, 0, 0, 0.10);
-      --output-code: #18181b;`
+      --output-code: #18181b;
+      --output-code-bg: rgba(0, 0, 0, 0.04);`
           : `--bg: #09090b;
       --bg-elev: #18181b;
       --bg-elev-2: #27272a;
@@ -643,7 +642,8 @@ function generateBatchHtmlReport(
       --text-muted: #a1a1aa;
       --text-dim: #71717a;
       --hairline: rgba(255, 255, 255, 0.08);
-      --output-code: oklch(0.82 0.08 195);`
+      --output-code: oklch(0.82 0.08 195);
+      --output-code-bg: rgba(0, 0, 0, 0.25);`
       }
       --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
       --font-mono: 'Fira Code', monospace;
@@ -809,7 +809,7 @@ function generateBatchHtmlReport(
       white-space: pre-wrap;
     }
     .output-json {
-      background: ${theme === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.25)'};
+      background: var(--output-code-bg);
       border: 1px solid var(--hairline);
       border-radius: 6px;
       padding: 10px;
@@ -987,7 +987,7 @@ function BatchResultCell({
                         lineHeight: '1.4',
                         margin: 0,
                         padding: '8px',
-                        background: 'var(--bg-elev-1)',
+                        background: 'var(--output-code-bg)',
                         border: '1px solid var(--hairline)',
                         borderRadius: '4px',
                         whiteSpace: 'pre-wrap',
@@ -1030,7 +1030,11 @@ export function BatchTestPage() {
   const { history, promptProjects, promptVersions, assets, models, providerKeys, removeRun, createRun, updateRun } =
     useAppContext();
   const [composerOpen, setComposerOpen] = useState(false);
-  const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
+  const location = useLocation();
+  const expandOnArrival = (location.state as { expandRunId?: string } | null)?.expandRunId;
+  const [expandedTests, setExpandedTests] = useState<Set<string>>(
+    () => new Set(expandOnArrival ? [expandOnArrival] : []),
+  );
   const [openRunMenuId, setOpenRunMenuId] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
   const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
@@ -1248,10 +1252,7 @@ export function BatchTestPage() {
               // The single-table fallback only carries a model in its
               // title when there's exactly one model — multi-model
               // single-prompt runs use the prompt version as title.
-              titleModelId:
-                modelColumns.length === 1 && promptColumns.length <= 1
-                  ? modelColumns[0]?.id
-                  : undefined,
+              titleModelId: modelColumns.length === 1 ? modelColumns[0]?.id : undefined,
               scopeModelId: undefined,
               columns: usePromptColumns ? promptColumns : modelColumns,
             },
@@ -1535,8 +1536,9 @@ export function BatchComposer({
   initialPromptIds?: string[];
   /** Fired with the new run's id as soon as it is queued. */
   onRunCreated?: (runId: string) => void;
-  /** Fired after a run starts — the Prompts tab uses it to switch tabs. */
-  onLaunched?: () => void;
+  /** Fired after a run starts, with its id — the Prompts tab uses it to
+   * switch tabs and expand the new job on arrival. */
+  onLaunched?: (runId: string) => void;
 }) {
   const { promptProjects, promptVersions, assets, models, providerKeys, createRun, updateRun } =
     useAppContext();
@@ -1862,7 +1864,7 @@ export function BatchComposer({
     onRunCreated?.(draftRun.id);
     // The Prompts tab switches to Batch Test at this point; the run
     // keeps streaming results into context either way.
-    onLaunched?.();
+    onLaunched?.(draftRun.id);
 
     try {
       const imageReferenceScenarios = selectedImageReferences.length > 0 ? selectedImageReferences : [undefined];

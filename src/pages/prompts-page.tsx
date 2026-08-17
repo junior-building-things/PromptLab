@@ -265,9 +265,9 @@ export function PromptsPage() {
         open={testingProjectId !== null}
         initialPromptIds={testingPromptIds}
         onClose={() => setTestingProjectId(null)}
-        onLaunched={() => {
+        onLaunched={(runId) => {
           setTestingProjectId(null);
-          navigate('/batch-test');
+          navigate('/batch-test', { state: { expandRunId: runId } });
         }}
       />
       <ConfirmDialog

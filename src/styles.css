@@ -2,6 +2,7 @@
   --brand-mark-fg: var(--text);
   /* Batch output code blocks — teal on dark, near-black on light. */
   --output-code: oklch(0.82 0.08 195);
+  --output-code-bg: rgba(0, 0, 0, 0.25);
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
@@ -42,6 +43,7 @@
   --brand-mark-fg: oklch(0.38 0.13 265);
   /* Teal-on-dark is barely legible here; near-black reads cleanly. */
   --output-code: oklch(0.22 0.01 260);
+  --output-code-bg: rgba(0, 0, 0, 0.04);
   --bg: #f6f7f8;
   --bg-elev-1: #ffffff;
   --bg-elev-2: #fafbfc;
@@ -1274,6 +1276,12 @@ button { cursor: pointer; }
 }
 
 /* ============== MODAL ============== */
+/* Batch result cells. Every output box fills its column so the boxes
+ * line up, and long output scrolls inside instead of stretching the row. */
+.batch-table-cell-stack { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 0; }
+.batch-table-result { width: 100%; min-width: 0; }
+.batch-table-output-fallback { width: 100%; min-width: 0; }
+
 /* Full-size image preview. These class names were already in use by the
  * batch-test output preview but had no styling at all, so the overlay
  * rendered inline; the assets tab uses the same chrome. */
