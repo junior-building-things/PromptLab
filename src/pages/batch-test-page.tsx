@@ -1092,6 +1092,24 @@ export function BatchTestPage() {
     () => models.filter((model) => model.status === 'ready' && providerKeys[model.provider]?.hasKey),
     [models, providerKeys],
   );
+  const orderPromptSelection = (ids: string[]) => {
+    const byId = new Map(versionOptions.map((version) => [version.id, version]));
+    const projectOrder = new Map<string, number>();
+    ids.forEach((id) => {
+      const projectId = byId.get(id)?.projectId ?? id;
+      if (!projectOrder.has(projectId)) projectOrder.set(projectId, projectOrder.size);
+    });
+
+    return [...ids].sort((left, right) => {
+      const a = byId.get(left);
+      const b = byId.get(right);
+      const aProject = projectOrder.get(a?.projectId ?? left) ?? 0;
+      const bProject = projectOrder.get(b?.projectId ?? right) ?? 0;
+      if (aProject !== bProject) return aProject - bProject;
+      return (a?.version ?? 0) - (b?.version ?? 0);
+    });
+  };
+
   const versionOptions = useMemo(() => {
     // Projects stay ordered by most recent activity, but versions read
     // v1 → vN inside each one; sorting the flat list by `updatedAt`
@@ -1545,11 +1563,13 @@ export function BatchTestPage() {
       return;
     }
 
+    const expandedImageReferenceIds = selectedImageReferences.map((entry) => entry.id);
+
     const draftScenario = {
       promptId: selectedPrompts[0].id,
       promptIds: selectedPrompts.map((prompt) => prompt.id),
-      assetIds: selectedImageReferenceIds.length > 0 ? selectedImageReferenceIds : undefined,
-      assetId: selectedImageReferenceIds[0],
+      assetIds: expandedImageReferenceIds.length > 0 ? expandedImageReferenceIds : undefined,
+      assetId: expandedImageReferenceIds[0],
       userInputAssetIds: selectedTextInputAssetIds.length > 0 ? selectedTextInputAssetIds : undefined,
       modelIds: selectedModelIds,
       userInput: selectedUserInputs.length > 0 ? selectedUserInputs.join(' | ') : undefined,
@@ -1982,7 +2002,9 @@ export function BatchTestPage() {
               <MultiSelectDropdown
                 options={promptDropdownOptions}
                 selectedIds={selectedPromptIds}
-                onToggle={(id) => setSelectedPromptIds((current) => toggleSelection(current, id))}
+                onToggle={(id) =>
+                  setSelectedPromptIds((current) => orderPromptSelection(toggleSelection(current, id)))
+                }
                 emptyLabel="Select prompts…"
                 searchPlaceholder="Search prompts…"
                 groups={promptGroups}
