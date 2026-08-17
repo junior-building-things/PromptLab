@@ -295,6 +295,18 @@ function TextIcon({ Icon }: { Icon: LucideIcon }) {
   );
 }
 
+/** Reveal the scrollbar thumb while a box is being scrolled, then fade
+ * it out once scrolling stops — the timer id rides on the element so no
+ * per-cell state or ref is needed. */
+function markScrolling(event: React.UIEvent<HTMLElement>) {
+  const el = event.currentTarget;
+  el.classList.add('is-scrolling');
+  window.clearTimeout(Number(el.dataset.scrollTimer));
+  el.dataset.scrollTimer = String(
+    window.setTimeout(() => el.classList.remove('is-scrolling'), 700),
+  );
+}
+
 function tryParseJSON(text?: string): any {
   if (!text) return null;
   let trimmed = text.trim();
@@ -989,6 +1001,8 @@ function BatchResultCell({
                 if (jsonObject) {
                   return (
                     <pre
+                      className="batch-output-scroll"
+                      onScroll={markScrolling}
                       style={{
                         fontFamily: 'var(--font-mono)',
                         fontSize: '11px',
@@ -1015,7 +1029,11 @@ function BatchResultCell({
                   );
                 }
                 return (
-                  <p style={{ maxHeight: 280, overflow: 'auto', textAlign: 'left', width: '100%' }}>
+                  <p
+                    className="batch-output-scroll"
+                    onScroll={markScrolling}
+                    style={{ maxHeight: 280, overflow: 'auto', textAlign: 'left', width: '100%' }}
+                  >
                     {result.output || 'No image output returned.'}
                   </p>
                 );

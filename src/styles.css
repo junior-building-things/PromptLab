@@ -3,6 +3,7 @@
   /* Batch output code blocks — teal on dark, near-black on light. */
   --output-code: oklch(0.82 0.08 195);
   --output-code-bg: rgba(0, 0, 0, 0.25);
+  --scroll-thumb: rgba(255, 255, 255, 0.18);
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
@@ -44,6 +45,7 @@
   /* Teal-on-dark is barely legible here; near-black reads cleanly. */
   --output-code: oklch(0.22 0.01 260);
   --output-code-bg: rgba(0, 0, 0, 0.04);
+  --scroll-thumb: rgba(0, 0, 0, 0.22);
   --bg: #f6f7f8;
   --bg-elev-1: #ffffff;
   --bg-elev-2: #fafbfc;
@@ -1111,6 +1113,31 @@ button { cursor: pointer; }
   width: 14px; height: 14px; display: block;
 }
 .batch-cell-th .batch-provider-img { width: 12px; height: 12px; margin-right: 4px; }
+/* Output scrollers. Same treatment as the downloadable report: the
+ * track is invisible and the thumb only materialises while the user is
+ * actually scrolling (JS adds .is-scrolling) or hovering the box, so a
+ * resting cell reads as a clean panel instead of a chunky grey bar. */
+.batch-output-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.batch-output-scroll:hover,
+.batch-output-scroll.is-scrolling {
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+.batch-output-scroll::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+.batch-output-scroll::-webkit-scrollbar-track { background: transparent; }
+.batch-output-scroll::-webkit-scrollbar-corner { background: transparent; }
+.batch-output-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.15s ease;
+}
+.batch-output-scroll:hover::-webkit-scrollbar-thumb,
+.batch-output-scroll.is-scrolling::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+}
+
 /* Anthropic has no logo asset in the repo — these monogram marks stand
  * in wherever the other providers render a PNG. */
 .provider-monogram,
