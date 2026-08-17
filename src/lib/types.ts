@@ -32,7 +32,14 @@ export type AssetRecord = {
   id: string;
   name: string;
   kind: AssetKind;
+  /** First image of the set, or the whole value for `text-inputs`.
+   * Kept as a plain string so single-image assets and every run that
+   * already references one keep working untouched. */
   source: string;
+  /** Present when an image-reference asset holds a set (a bulk upload).
+   * `source` is always `sources[0]`. A batch expands the set into one
+   * row per image — see `expandImageAsset` in lib/asset-images.ts. */
+  sources?: string[];
   updatedAt: string;
 };
 

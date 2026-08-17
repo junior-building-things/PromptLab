@@ -43,6 +43,7 @@ function BoxIcon({ children }: { children: ReactNode }) {
     </span>
   );
 }
+import { expandImageAsset, resolveAssetEntry } from '../lib/asset-images';
 import { isRenderableImage, toDataUrl } from '../lib/image-source';
 import { getProviderLabel } from '../lib/model-brand';
 import type {
@@ -409,12 +410,11 @@ function generateBatchHtmlReport(
   }
 
   function getAsset(id: string) {
-    return assets.find((entry) => entry.id === id);
+    return resolveAssetEntry(assets, id);
   }
 
   function getAssetName(id?: string) {
-    if (!id) return undefined;
-    return assets.find((entry) => entry.id === id)?.name;
+    return resolveAssetEntry(assets, id)?.name;
   }
 
   function getRowLabels(run: BatchRun) {
@@ -1291,7 +1291,7 @@ export function BatchTestPage() {
   }
 
   function getAsset(id?: string) {
-    return assets.find((entry) => entry.id === id);
+    return resolveAssetEntry(assets, id);
   }
 
   function getAssetName(id?: string) {
@@ -1541,7 +1541,12 @@ export function BatchTestPage() {
 
     const selectedPrompts = pickInSelectionOrder(selectedPromptIds, versionOptions);
     const selectedModels = pickInSelectionOrder(selectedModelIds, readyModels);
-    const selectedImageReferences = pickInSelectionOrder(selectedImageReferenceIds, imageReferenceAssets);
+    // A grouped asset is a set of images: run every one of them, in
+    // order, as its own row.
+    const selectedImageReferences = pickInSelectionOrder(
+      selectedImageReferenceIds,
+      imageReferenceAssets,
+    ).flatMap((asset) => expandImageAsset(asset));
     const selectedUserInputs = textInputAssets
       .filter((asset) => selectedTextInputAssetIds.includes(asset.id))
       .flatMap((asset) => parseTextInputs(asset.source));

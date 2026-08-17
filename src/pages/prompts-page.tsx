@@ -6,7 +6,6 @@ import {
   IconChev,
   IconCopy,
   IconEdit,
-  IconFilter,
   IconPlay,
   IconPlus,
   IconSearch,
@@ -146,10 +145,6 @@ export function PromptsPage() {
             />
             <span className="kbd">⌘K</span>
           </div>
-          <button type="button" className="chip">
-            <IconBox size={12}><IconFilter /></IconBox>
-            All projects
-          </button>
         </div>
       ),
     });
@@ -247,12 +242,10 @@ export function PromptsPage() {
       <div className="body">
         <div className="section" style={{ marginTop: 0 }}>
           {cards.length === 0 ? (
-            <div className="hero" style={{ padding: 32, textAlign: 'center' }}>
-              <div className="page-sub">
-                {query
-                  ? `No matches for "${query}".`
-                  : 'No projects yet — hit "New project" to create the first one.'}
-              </div>
+            <div style={{ padding: '32px 20px', textAlign: 'center' }} className="page-sub">
+              {query
+                ? `No projects match "${query}".`
+                : 'No projects yet — hit "New project" to create the first one.'}
             </div>
           ) : (
             cards.map(({ project, versions }) => {

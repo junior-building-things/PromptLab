@@ -1,7 +1,6 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { setPageChrome } from '../components/app-layout';
 import {
-  IconFilter,
   IconImage,
   IconMore,
   IconPlus,
@@ -11,6 +10,7 @@ import {
 } from '../components/icons';
 import { Modal } from '../components/modal';
 import { useAppContext } from '../context/app-context';
+import { getAssetSources, isGroupedAsset } from '../lib/asset-images';
 import { isRenderableImage, uploadImage } from '../lib/image-source';
 import type { AssetKind } from '../lib/types';
 
@@ -53,8 +53,9 @@ export function AssetsPage() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [draftPaste, setDraftPaste] = useState('');
-  const [draftFile, setDraftFile] = useState<File | null>(null);
+  const [draftFiles, setDraftFiles] = useState<File[]>([]);
   const [draftFileLabel, setDraftFileLabel] = useState('');
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const sortedAssets = useMemo(() => {
@@ -87,10 +88,6 @@ export function AssetsPage() {
             />
             <span className="kbd">⌘K</span>
           </div>
-          <button type="button" className="chip">
-            <IconBox size={12}><IconFilter /></IconBox>
-            All assets
-          </button>
         </div>
       ),
     });
@@ -101,36 +98,68 @@ export function AssetsPage() {
     setComposerOpen(false);
     setDraftName('');
     setDraftPaste('');
-    setDraftFile(null);
+    setDraftFiles([]);
     setDraftFileLabel('');
   };
 
-  const canSubmit = draftName.trim().length > 0 && (draftFile !== null || draftPaste.trim().length > 0);
+  const canSubmit =
+    draftName.trim().length > 0 && (draftFiles.length > 0 || draftPaste.trim().length > 0);
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setDraftFile(file);
-    setDraftFileLabel(file.name);
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    setDraftFiles(files);
+    setDraftFileLabel(
+      files.length === 1 ? files[0].name : `${files.length} files selected`,
+    );
     event.target.value = '';
   };
 
+  const isImageFile = (file: File) =>
+    file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(file.name);
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    let kind: AssetKind = 'text-inputs';
-    let source = draftPaste.trim();
-    if (draftFile) {
-      const isImage =
-        draftFile.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(draftFile.name);
-      kind = isImage ? 'image-reference' : 'text-inputs';
-      // Image bytes go to the image store; the asset only keeps the
-      // reference so the workspace JSON stays small enough to persist.
-      source = isImage
-        ? await uploadImage(await readImageAsDataUrl(draftFile))
-        : await readTextFile(draftFile);
+
+    if (draftFiles.length === 0) {
+      createAsset({ name: draftName.trim(), kind: 'text-inputs', source: draftPaste.trim() });
+      closeComposer();
+      return;
     }
-    createAsset({ name: draftName.trim(), kind, source });
-    closeComposer();
+
+    const kind: AssetKind = isImageFile(draftFiles[0]) ? 'image-reference' : 'text-inputs';
+
+    if (kind === 'text-inputs') {
+      // Text assets stay single-file; a bulk pick only makes sense for
+      // images, where the set becomes one row per image in a batch.
+      createAsset({
+        name: draftName.trim(),
+        kind,
+        source: await readTextFile(draftFiles[0]),
+      });
+      closeComposer();
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Image bytes go to the image store; the asset only keeps the
+      // references so the workspace JSON stays small enough to persist.
+      const sources: string[] = [];
+      for (const file of draftFiles.filter(isImageFile)) {
+        sources.push(await uploadImage(await readImageAsDataUrl(file)));
+      }
+
+      createAsset({
+        name: draftName.trim(),
+        kind,
+        source: sources[0],
+        sources: sources.length > 1 ? sources : undefined,
+      });
+      closeComposer();
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -191,19 +220,28 @@ export function AssetsPage() {
               <div key={asset.id} className="asset-row">
                 <div className="a-name">{asset.name}</div>
                 <div className="a-preview">
-                  {isRenderableImage(asset.source) ? (
-                    <div
-                      className="a-thumb"
-                      style={{
-                        backgroundImage: `url(${asset.source})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }}
-                    />
-                  ) : (
-                    <div className="a-thumb" />
-                  )}
-                  <span className="a-label">{asset.name}</span>
+                  {getAssetSources(asset)
+                    .slice(0, 4)
+                    .map((source, index) =>
+                      isRenderableImage(source) ? (
+                        <div
+                          key={`${asset.id}-${index}`}
+                          className="a-thumb"
+                          style={{
+                            backgroundImage: `url(${source})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                          }}
+                        />
+                      ) : (
+                        <div key={`${asset.id}-${index}`} className="a-thumb" />
+                      ),
+                    )}
+                  <span className="a-label">
+                    {isGroupedAsset(asset)
+                      ? `${getAssetSources(asset).length} images`
+                      : asset.name}
+                  </span>
                 </div>
                 <div>
                   <span className="a-type">
@@ -242,11 +280,13 @@ export function AssetsPage() {
             <button
               type="button"
               className="btn btn-primary"
-              disabled={!canSubmit}
+              disabled={!canSubmit || uploading}
               onClick={() => void handleSubmit()}
             >
               <IconBox><IconPlus /></IconBox>
-              Upload asset
+              {uploading
+                ? `Uploading ${draftFiles.length} image${draftFiles.length === 1 ? '' : 's'}…`
+                : 'Upload asset'}
             </button>
           </>
         }
@@ -281,6 +321,7 @@ export function AssetsPage() {
               ref={fileInputRef}
               type="file"
               accept=".txt,image/*"
+              multiple
               hidden
               onChange={(event) => void handleFileChange(event)}
             />
