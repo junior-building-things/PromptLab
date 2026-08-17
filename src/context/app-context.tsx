@@ -150,6 +150,10 @@ function normalizeAsset(asset: AssetRecord & { note?: string; kind?: string }): 
     name: asset.name,
     kind: normalizeAssetKind(asset.kind),
     source: asset.source,
+    // Carried explicitly: this normalizer rebuilds the record field by
+    // field, so anything omitted here is dropped on hydration *and* on
+    // the next save. `sources` holds every image of a set.
+    ...(asset.sources && asset.sources.length > 0 ? { sources: asset.sources } : {}),
     updatedAt: asset.updatedAt,
   };
 }

@@ -4,6 +4,14 @@ on:
   push:
     branches: [main]
 
+# Two overlapping `gcloud run deploy --source` runs stage to the same
+# path and clobber each other (one already failed that way), and a slow
+# earlier run could otherwise land *after* a newer one and leave the
+# service behind main. Newest push wins.
+concurrency:
+  group: deploy-cloud-run
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

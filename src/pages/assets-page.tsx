@@ -238,11 +238,9 @@ export function AssetsPage() {
                         <div key={`${asset.id}-${index}`} className="a-thumb" />
                       ),
                     )}
-                  <span className="a-label">
-                    {isGroupedAsset(asset)
-                      ? `${getAssetSources(asset).length} images`
-                      : asset.name}
-                  </span>
+                  {isGroupedAsset(asset) ? (
+                    <span className="a-label">{getAssetSources(asset).length} images</span>
+                  ) : null}
                 </div>
                 <div>
                   <span className="a-type">
