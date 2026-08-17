@@ -117,6 +117,10 @@ function toProviderStatuses(providerKeys) {
       hasKey: Boolean(providerKeys?.xai?.encrypted),
       updatedAt: providerKeys?.xai?.updatedAt || null,
     },
+    anthropic: {
+      hasKey: Boolean(providerKeys?.anthropic?.encrypted),
+      updatedAt: providerKeys?.anthropic?.updatedAt || null,
+    },
   };
 }
 

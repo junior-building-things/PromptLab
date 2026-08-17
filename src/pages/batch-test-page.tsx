@@ -125,6 +125,11 @@ function ProviderMarkInline({ model }: { model: ModelRecord | undefined }) {
       </span>
     );
   }
+  if (provider === 'anthropic') {
+    // No PNG asset in the repo for Anthropic — a monogram keeps the
+    // column headers consistent without shipping a look-alike logo.
+    return <span className="batch-provider-mark batch-provider-monogram">A</span>;
+  }
   const file = provider === 'gemini' ? 'google.png' : `${provider}.png`;
   // The Google mark renders heavier than OpenAI / xAI at the same box
   // size (the asset has almost no inner padding), so it visually
@@ -342,6 +347,9 @@ function generateBatchHtmlReport(
     if (!modelId) return '';
     const model = getModel(modelId);
     if (!model) return '';
+    if (model.provider === 'anthropic') {
+      return '<span class="provider-monogram">A</span>';
+    }
     const key: ProviderLogoKey | null =
       model.provider === 'openai'
         ? 'openai_darkmode'

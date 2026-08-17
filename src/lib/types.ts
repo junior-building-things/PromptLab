@@ -1,4 +1,4 @@
-export type Provider = 'openai' | 'gemini' | 'xai';
+export type Provider = 'openai' | 'gemini' | 'xai' | 'anthropic';
 
 export type ProviderKeyStatus = {
   hasKey: boolean;

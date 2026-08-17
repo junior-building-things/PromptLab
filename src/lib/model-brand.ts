@@ -6,10 +6,13 @@ import xaiLogo from '../assets/xai.png';
 export const providerLabel: Record<Provider, string> = {
   openai: 'OpenAI',
   gemini: 'Google DeepMind',
+  anthropic: 'Anthropic',
   xai: 'xAI',
 };
 
-const providerIconSrc: Record<Provider, string> = {
+/** Anthropic has no PNG asset in the repo — it renders as a monogram
+ * mark instead (see ProviderMarkInline), so this map is partial. */
+const providerIconSrc: Partial<Record<Provider, string>> = {
   openai: openaiLogo,
   gemini: geminiLogo,
   xai: xaiLogo,

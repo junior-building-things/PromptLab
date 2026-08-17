@@ -36,6 +36,7 @@ const SAVE_DEBOUNCE_MS = 350;
 const defaultProviderKeys: ProviderKeyMap = {
   openai: { hasKey: false, updatedAt: null },
   gemini: { hasKey: false, updatedAt: null },
+  anthropic: { hasKey: false, updatedAt: null },
   xai: { hasKey: false, updatedAt: null },
 };
 
@@ -220,6 +221,10 @@ function normalizeProviderKeys(value?: Partial<ProviderKeyMap>): ProviderKeyMap 
     openai: {
       hasKey: Boolean(value?.openai?.hasKey),
       updatedAt: value?.openai?.updatedAt ?? null,
+    },
+    anthropic: {
+      hasKey: Boolean(value?.anthropic?.hasKey),
+      updatedAt: value?.anthropic?.updatedAt ?? null,
     },
     gemini: {
       hasKey: Boolean(value?.gemini?.hasKey),

@@ -3,6 +3,8 @@ import { getUserWorkspace, saveProviderKey } from './_lib/store.js';
 
 const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models';
 const GEMINI_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const ANTHROPIC_MODELS_URL = 'https://api.anthropic.com/v1/models?limit=1';
+const ANTHROPIC_VERSION = '2023-06-01';
 const XAI_MODELS_URL = 'https://api.x.ai/v1/models';
 
 class HttpError extends Error {
@@ -67,6 +69,14 @@ async function validateProviderApiKey(provider, apiKey) {
             Authorization: `Bearer ${apiKey}`,
           },
         }
+      : provider === 'anthropic'
+        ? {
+            url: ANTHROPIC_MODELS_URL,
+            headers: {
+              'x-api-key': apiKey,
+              'anthropic-version': ANTHROPIC_VERSION,
+            },
+          }
       : provider === 'gemini'
         ? {
             url: `${GEMINI_MODELS_URL}?key=${encodeURIComponent(apiKey)}`,
@@ -108,7 +118,7 @@ export default async function handler(req, res) {
       const provider = body?.provider;
       const apiKey = typeof body?.apiKey === 'string' ? body.apiKey : '';
 
-      if (!provider || !['openai', 'gemini', 'xai'].includes(provider)) {
+      if (!provider || !['openai', 'gemini', 'xai', 'anthropic'].includes(provider)) {
         return json(res, 400, { error: 'Missing or invalid provider.' });
       }
 

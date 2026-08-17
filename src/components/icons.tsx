@@ -189,7 +189,16 @@ export const IconStickerize = () => (
  * ships two assets: the dark-on-light original plus a `_darkmode` white
  * variant — we render both and let CSS toggle visibility by theme so we
  * avoid the lossy `filter: invert(1)` hack. */
-export function ProviderMark({ provider }: { provider: 'openai' | 'google' | 'xai' | 'alibaba' }) {
+export function ProviderMark({
+  provider,
+}: {
+  provider: 'openai' | 'google' | 'xai' | 'alibaba' | 'anthropic';
+}) {
+  // Anthropic ships no PNG in this repo — render a monogram so the card
+  // has a mark without inventing a look-alike logo.
+  if (provider === 'anthropic') {
+    return <span className="provider-monogram">A</span>;
+  }
   if (provider === 'openai') {
     return (
       <>

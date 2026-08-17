@@ -34,14 +34,15 @@ type ProviderConfig = {
 const PROVIDERS_ORDER: ProviderConfig[] = [
   { id: 'gemini', name: 'Google', accent: 'oklch(0.74 0.14 250)' },
   { id: 'openai', name: 'OpenAI', accent: 'oklch(0.78 0.14 165)' },
+  { id: 'anthropic', name: 'Anthropic', accent: 'oklch(0.72 0.13 55)' },
   { id: 'xai', name: 'xAI', accent: 'oklch(0.78 0.14 30)' },
 ];
 
 /** Maps our `Provider` enum to the design's PNG asset filename. We use
  * `gemini` internally but the design ships `google.png`. */
-function providerToMark(p: Provider): 'openai' | 'google' | 'xai' | 'alibaba' {
+function providerToMark(p: Provider): 'openai' | 'google' | 'xai' | 'alibaba' | 'anthropic' {
   if (p === 'gemini') return 'google';
-  return p as 'openai' | 'xai';
+  return p as 'openai' | 'xai' | 'anthropic';
 }
 
 const hiddenKeyMask = '••••••••••••••••';

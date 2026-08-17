@@ -15,7 +15,7 @@
   - [src/data/seed.ts](src/data/seed.ts) — default seed data for a fresh workspace
   - [src/styles.css](src/styles.css) — single global stylesheet + design tokens (`--bg-elev-*`, `--hairline*`, …)
 - [api/](api/) — HTTP handlers (one file per route)
-  - [api/batch-run.js](api/batch-run.js) — fans out to OpenAI Responses / Gemini Generate Content / xAI Chat Completions
+  - [api/batch-run.js](api/batch-run.js) — fans out to OpenAI Responses / Gemini Generate Content / Anthropic Messages / xAI Chat Completions
   - [api/provider-keys.js](api/provider-keys.js), [api/user-state.js](api/user-state.js), [api/images.js](api/images.js)
   - [api/auth/](api/auth/) — `lark/login.js`, `lark/callback.js`, `session.js`, `logout.js`
   - [api/_lib/](api/_lib/) — shared helpers: `auth.js` (session cookie + email allowlist), `store.js` (Postgres + AES-256-GCM key encryption)

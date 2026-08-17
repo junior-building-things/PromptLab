@@ -14,6 +14,8 @@ import {
 
 const OPENAI_URL = 'https://api.openai.com/v1/responses';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 // The withoutbg open-weights model runs on CPU in this container
 // (tools/bg-server.py); nothing about a cutout leaves localhost.
@@ -113,6 +115,15 @@ function openAiReasoning(level) {
   if (!level || level === 'dynamic') return null;
   // OpenAI Responses API documents 'minimal' | 'low' | 'medium' | 'high'.
   return { effort: level };
+}
+
+/** Map the app's ThinkingLevel onto Anthropic's effort scale. Returns
+ * undefined for 'dynamic' so the request carries no effort hint. */
+function anthropicEffort(level) {
+  if (!level || level === 'dynamic') return undefined;
+  if (level === 'minimal' || level === 'low') return 'low';
+  if (level === 'medium') return 'medium';
+  return 'high';
 }
 
 function geminiThinkingConfig(level) {
@@ -698,6 +709,78 @@ async function callGemini({ prompt, userInput, asset, model, apiKey, thinkingLev
   };
 }
 
+/** Anthropic Messages API. Unlike the other providers the system prompt
+ * is a top-level field rather than a message, images are inline base64
+ * blocks, and sampling parameters are rejected outright on the current
+ * models — so temperature is deliberately never sent. */
+async function callAnthropic({ prompt, userInput, asset, model, apiKey, thinkingLevel }) {
+  if (!apiKey) {
+    throw new Error('Missing Anthropic API key. Add it in the Models view before running a batch test.');
+  }
+
+  const content = [];
+  const imageReferenceAttached = canAttachImageReference(asset);
+  const userText = buildUserText({ prompt, userInput, asset: imageReferenceAttached ? undefined : asset });
+
+  if (imageReferenceAttached) {
+    const inlineImage = parseImageDataUrl(asset.source);
+    if (inlineImage) {
+      content.push({
+        type: 'image',
+        source: { type: 'base64', media_type: inlineImage.mimeType, data: inlineImage.data },
+      });
+    } else {
+      content.push({ type: 'image', source: { type: 'url', url: asset.source } });
+    }
+  } else if (asset) {
+    const assetContext = buildAssetContext(asset);
+    if (assetContext && !userText) {
+      content.push({ type: 'text', text: `Asset context:\n${assetContext}` });
+    }
+  }
+
+  if (userText) {
+    content.push({ type: 'text', text: userText });
+  }
+
+  if (content.length === 0) {
+    content.push({ type: 'text', text: 'Follow the system prompt.' });
+  }
+
+  const effort = anthropicEffort(thinkingLevel);
+
+  const started = Date.now();
+  const response = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
+    },
+    body: JSON.stringify({
+      model: model.apiModel,
+      max_tokens: model.maxTokens || 4096,
+      system: prompt.systemPrompt,
+      thinking: { type: 'adaptive' },
+      ...(effort ? { output_config: { effort } } : {}),
+      messages: [{ role: 'user', content }],
+    }),
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error?.message || 'Anthropic request failed.');
+  }
+
+  const text = (payload.content || [])
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n')
+    .trim();
+
+  return { output: text, outputImage: undefined, latencyMs: Date.now() - started };
+}
+
 async function callXAI({ prompt, userInput, asset, model, apiKey, thinkingLevel }) {
   if (!apiKey) {
     throw new Error('Missing xAI API key. Add it in the Models view before running a batch test.');
@@ -827,6 +910,8 @@ export default async function handler(req, res) {
             execution = await callOpenAI({ prompt, userInput: normalizedUserInput, asset: resolvedAsset, model, apiKey, thinkingLevel });
           } else if (model.provider === 'gemini') {
             execution = await callGemini({ prompt, userInput: normalizedUserInput, asset: resolvedAsset, model, apiKey, thinkingLevel });
+          } else if (model.provider === 'anthropic') {
+            execution = await callAnthropic({ prompt, userInput: normalizedUserInput, asset: resolvedAsset, model, apiKey, thinkingLevel });
           } else {
             execution = await callXAI({ prompt, userInput: normalizedUserInput, asset: resolvedAsset, model, apiKey, thinkingLevel });
           }
