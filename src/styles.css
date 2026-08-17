@@ -1,4 +1,5 @@
 :root {
+  --brand-mark-fg: var(--text);
   /* Batch output code blocks — teal on dark, near-black on light. */
   --output-code: oklch(0.82 0.08 195);
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -37,6 +38,8 @@
 }
 
 [data-theme="light"] {
+  /* Brand glyph — near-black looks flat against the violet tint. */
+  --brand-mark-fg: oklch(0.38 0.13 265);
   /* Teal-on-dark is barely legible here; near-black reads cleanly. */
   --output-code: oklch(0.22 0.01 260);
   --bg: #f6f7f8;
@@ -123,13 +126,13 @@ button { cursor: pointer; }
   flex-shrink: 0;
   position: relative;
   animation: brand-glow-pulse 3.2s ease-in-out infinite;
-  /* Holds the lucide `Bot` glyph (white-on-violet). Tinted accent
-   * background + thin hairline border + flex centering for the SVG. */
+  /* Holds the lucide `Bot` glyph. Tinted accent background, no border —
+   * the pulsing halo is the only edge treatment. */
   background: var(--ai-soft);
-  border: 1px solid oklch(0.65 0.17 var(--ai-h) / 0.3);
+  border: 0;
   display: grid;
   place-items: center;
-  color: var(--text);
+  color: var(--brand-mark-fg);
 }
 .brand-mark svg {
   width: 60%;

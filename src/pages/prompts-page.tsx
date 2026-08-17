@@ -1,5 +1,6 @@
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { setPageChrome } from '../components/app-layout';
 import {
   IconBox,
@@ -15,6 +16,7 @@ import {
 import { ConfirmDialog } from '../components/confirm-dialog';
 import { Modal } from '../components/modal';
 import { useAppContext } from '../context/app-context';
+import { BatchComposer } from './batch-test-page';
 import type { PromptVersion } from '../lib/types';
 
 type ComposerMode =
@@ -70,6 +72,7 @@ export function PromptsPage() {
     removePromptProject,
   } = useAppContext();
 
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
   const [composer, setComposer] = useState<ComposerState>({
@@ -82,6 +85,8 @@ export function PromptsPage() {
   const [projectTypeOpen, setProjectTypeOpen] = useState(false);
   const [copiedVersionId, setCopiedVersionId] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
+  // Which project's "Test" button opened the batch composer, if any.
+  const [testingProjectId, setTestingProjectId] = useState<string | null>(null);
   const copyResetRef = useRef<number | null>(null);
 
   useEffect(
@@ -90,6 +95,14 @@ export function PromptsPage() {
     },
     [],
   );
+
+  const testingPromptIds = useMemo(() => {
+    if (!testingProjectId) return [];
+    return promptVersions
+      .filter((version) => version.projectId === testingProjectId)
+      .sort((left, right) => left.version - right.version)
+      .map((version) => version.id);
+  }, [promptVersions, testingProjectId]);
 
   const cards = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -244,6 +257,15 @@ export function PromptsPage() {
 
   return (
     <>
+      <BatchComposer
+        open={testingProjectId !== null}
+        initialPromptIds={testingPromptIds}
+        onClose={() => setTestingProjectId(null)}
+        onLaunched={() => {
+          setTestingProjectId(null);
+          navigate('/batch-test');
+        }}
+      />
       <ConfirmDialog
         open={pendingRemoval !== null}
         noun="prompt"
@@ -276,9 +298,13 @@ export function PromptsPage() {
                     <div className="project-meta">Updated {formatRelative(project.updatedAt)}</div>
                     <div className="project-spacer" />
                     <div className="project-actions" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" className="btn">
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setTestingProjectId(project.id)}
+                      >
                         <IconBox><IconPlay /></IconBox>
-                        Test latest
+                        Test
                       </button>
                       <button
                         type="button"

@@ -212,36 +212,6 @@ function isImageOutput(value?: string) {
   return isRenderableImage(value);
 }
 
-function getImageExtension(value?: string) {
-  if (!value) {
-    return 'png';
-  }
-
-  const dataUrlMatch = /^data:image\/([a-zA-Z0-9.+-]+);base64,/.exec(value);
-  if (dataUrlMatch) {
-    const extension = dataUrlMatch[1].toLowerCase();
-    if (extension === 'jpeg') return 'jpg';
-    return extension;
-  }
-
-  try {
-    const url = new URL(value);
-    const pathname = url.pathname.toLowerCase();
-    if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) return 'jpg';
-    if (pathname.endsWith('.webp')) return 'webp';
-    if (pathname.endsWith('.gif')) return 'gif';
-    if (pathname.endsWith('.png')) return 'png';
-  } catch {
-    return 'png';
-  }
-
-  return 'png';
-}
-
-function getResultDownloadName(result: TestResult) {
-  return `promptlab-sticker-${result.id}.${getImageExtension(result.outputImage)}`;
-}
-
 function buildCellKey(rowId: string, columnId: string) {
   return `${rowId}::${columnId}`;
 }
@@ -991,15 +961,6 @@ function BatchResultCell({
         <div key={result.id} className="batch-table-result">
           {isImageOutput(result.outputImage) ? (
             <div className={`batch-table-image-wrap${stickerize ? ' is-stickerized' : ''}`}>
-              <a
-                className="batch-table-download-link"
-                href={result.outputImage}
-                download={getResultDownloadName(result)}
-                aria-label="Download generated sticker"
-                title="Download"
-              >
-                <Download size={16} />
-              </a>
               <button
                 type="button"
                 className="batch-table-image-preview-button"
@@ -1072,18 +1033,6 @@ export function BatchTestPage() {
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
   const [openRunMenuId, setOpenRunMenuId] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
-  const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
-  const [selectedImageReferenceIds, setSelectedImageReferenceIds] = useState<string[]>([]);
-  const [selectedTextInputAssetIds, setSelectedTextInputAssetIds] = useState<string[]>([]);
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
-  const [stickerize, setStickerize] = useState(false);
-  // Default to 'dynamic' — each provider's silent default kicks in, which
-  // is roughly what every run before this knob existed used. Users can
-  // pin a specific effort with the dropdown.
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>('dynamic');
-  const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1115,139 +1064,9 @@ export function BatchTestPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [previewImageSrc]);
 
-  const readyModels = useMemo(
-    () => models.filter((model) => model.status === 'ready' && providerKeys[model.provider]?.hasKey),
-    [models, providerKeys],
-  );
-  const orderPromptSelection = (ids: string[]) => {
-    const byId = new Map(versionOptions.map((version) => [version.id, version]));
-    const projectOrder = new Map<string, number>();
-    ids.forEach((id) => {
-      const projectId = byId.get(id)?.projectId ?? id;
-      if (!projectOrder.has(projectId)) projectOrder.set(projectId, projectOrder.size);
-    });
-
-    return [...ids].sort((left, right) => {
-      const a = byId.get(left);
-      const b = byId.get(right);
-      const aProject = projectOrder.get(a?.projectId ?? left) ?? 0;
-      const bProject = projectOrder.get(b?.projectId ?? right) ?? 0;
-      if (aProject !== bProject) return aProject - bProject;
-      return (a?.version ?? 0) - (b?.version ?? 0);
-    });
-  };
-
-  const versionOptions = useMemo(() => {
-    // Projects stay ordered by most recent activity, but versions read
-    // v1 → vN inside each one; sorting the flat list by `updatedAt`
-    // interleaved projects and put the newest version on top.
-    const projectRecency = new Map<string, number>();
-    promptVersions.forEach((version) => {
-      const stamp = new Date(version.updatedAt).getTime();
-      projectRecency.set(version.projectId, Math.max(projectRecency.get(version.projectId) ?? 0, stamp));
-    });
-
-    return promptVersions
-      .map((version) => {
-        const project = promptProjects.find((entry) => entry.id === version.projectId);
-        return {
-          ...version,
-          projectName: project?.name ?? 'Unknown Project',
-        };
-      })
-      .sort((left, right) => {
-        if (left.projectId !== right.projectId) {
-          return (projectRecency.get(right.projectId) ?? 0) - (projectRecency.get(left.projectId) ?? 0);
-        }
-        return left.version - right.version;
-      });
-  }, [promptProjects, promptVersions]);
-  const imageReferenceAssets = useMemo(
-    () => assets.filter((asset) => asset.kind === 'image-reference'),
-    [assets],
-  );
-  const textInputAssets = useMemo(
-    () => assets.filter((asset) => asset.kind === 'text-inputs'),
-    [assets],
-  );
-
-  // Prompt dropdown options — grouped by project name. The design uses
-  // mono uppercase project names as section headers; we lowercase to
-  // match the design's `dropdown-group-head` styling rule.
-  const promptDropdownOptions = useMemo<DropdownOption[]>(
-    () =>
-      versionOptions.map((prompt) => ({
-        id: prompt.id,
-        label: `v${prompt.version} · ${prompt.systemPrompt.slice(0, 64)}${
-          prompt.systemPrompt.length > 64 ? '…' : ''
-        }`,
-        searchText: `${prompt.projectName.toLowerCase()} v${prompt.version} ${prompt.systemPrompt.toLowerCase()}`,
-        group: prompt.projectId,
-      })),
-    [versionOptions],
-  );
-
-  // Project-name groups for the prompt dropdown.
-  const promptGroups = useMemo<DropdownGroup[]>(
-    () =>
-      versionOptions
-        .map((v) => ({ key: v.projectId, label: v.projectName }))
-        .filter(
-          (g, i, arr) => arr.findIndex((x) => x.key === g.key) === i,
-        ),
-    [versionOptions],
-  );
-
-  const imageReferenceDropdownOptions = useMemo<DropdownOption[]>(
-    () =>
-      imageReferenceAssets.map((asset) => ({
-        id: asset.id,
-        label: asset.name,
-        searchText: asset.name.toLowerCase(),
-      })),
-    [imageReferenceAssets],
-  );
-
-  const textInputDropdownOptions = useMemo<DropdownOption[]>(
-    () =>
-      textInputAssets.map((asset) => ({
-        id: asset.id,
-        label: asset.name,
-        searchText: asset.name.toLowerCase(),
-      })),
-    [textInputAssets],
-  );
-
-  // Model dropdown options — grouped by inferred type (text / image /
-  // video). Type is inferred from the API model id since the catalog
-  // doesn't carry an explicit `type` field.
-  const modelDropdownOptions = useMemo<DropdownOption[]>(
-    () =>
-      readyModels.map((model) => {
-        const id = model.apiModel.toLowerCase();
-        const type = id.includes('image')
-          ? 'image'
-          : id.includes('sora') || id.includes('veo') || id.includes('video')
-            ? 'video'
-            : 'text';
-        return {
-          id: model.id,
-          label: model.name,
-          searchText: `${model.name.toLowerCase()} ${getProviderLabel(model.provider).toLowerCase()}`,
-          group: type,
-          // Reuse the dark-mode-aware ProviderMarkInline so the dropdown
-          // icon swaps to openai_darkmode.png in dark theme — the older
-          // getProviderIconSrc returned a single static asset that read
-          // as a dark blob on the dark dropdown background.
-          icon: <ProviderMarkInline model={model} />,
-        };
-      }),
-    [readyModels],
-  );
-
-  useEffect(() => {
-    setSelectedModelIds((current) => current.filter((id) => readyModels.some((model) => model.id === id)));
-  }, [readyModels]);
+  function openComposer() {
+    setComposerOpen(true);
+  }
 
   function toggleExpand(id: string) {
     setExpandedTests((current) => {
@@ -1472,270 +1291,6 @@ export function BatchTestPage() {
     });
   }
 
-  function openComposer() {
-    setComposerOpen(true);
-    setErrorMessage('');
-  }
-
-  function closeComposer() {
-    setComposerOpen(false);
-    setErrorMessage('');
-    // Close any open dropdown panels the user left expanded — the
-    // selected value itself is preserved so reopening the modal keeps
-    // the user's last pick.
-    setThinkingDropdownOpen(false);
-  }
-
-  async function executeScenario(
-    prompt: PromptVersion,
-    selectedModels: typeof models,
-    asset: AssetRecord | undefined,
-    userInput?: string,
-    shouldStickerize = true,
-  ) {
-    // Fan out one /api/batch-run request per model rather than batching
-    // them all into a single POST. The server-side handler used to
-    // Promise.all over the model list, which meant a slow provider
-    // (e.g. OpenAI image-gen) blocked the response until the request
-    // timeout aborted the whole thing — taking a fast Gemini result
-    // down with it. With per-model requests, each one's timeout /
-    // error is independent: GPT can fail and Gemini
-    // still surfaces its result.
-    const singleModelRequest = async (model: typeof selectedModels[number]) => {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), BATCH_REQUEST_TIMEOUT_MS);
-
-      try {
-        const response = await fetch('/api/batch-run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt,
-            asset,
-            models: [model],
-            userInput: userInput?.trim() ? userInput : undefined,
-            stickerize: shouldStickerize,
-            // Map the user's pick into the request body so the serverless
-            // function can route it to each provider's thinking knob.
-            // 'dynamic' is omitted (provider default kicks in).
-            thinkingLevel: thinkingLevel !== 'dynamic' ? thinkingLevel : undefined,
-          }),
-          signal: controller.signal,
-        });
-
-        const payload = (await response.json()) as
-          | { results: ApiResult[]; errors?: ApiError[] }
-          | { error?: string; details?: string };
-
-        if (!response.ok || !('results' in payload)) {
-          const failurePayload = payload as { error?: string; details?: string };
-          const message =
-            failurePayload.error || failurePayload.details || 'Batch run failed.';
-          return {
-            results: [] as ApiResult[],
-            errors: [{ modelId: model.id, message }],
-          };
-        }
-
-        return payload as { results: ApiResult[]; errors?: ApiError[] };
-      } catch (error) {
-        const message =
-          error instanceof DOMException && error.name === 'AbortError'
-            ? 'Batch job timed out before the provider returned a result.'
-            : error instanceof Error
-              ? error.message
-              : 'Batch run failed for an unknown reason.';
-        return {
-          results: [] as ApiResult[],
-          errors: [{ modelId: model.id, message }],
-        };
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-    };
-
-    const perModelResponses = await Promise.all(selectedModels.map(singleModelRequest));
-    const merged: { results: ApiResult[]; errors: ApiError[] } = { results: [], errors: [] };
-    perModelResponses.forEach((entry) => {
-      merged.results.push(...entry.results);
-      if (entry.errors) merged.errors.push(...entry.errors);
-    });
-    return merged;
-  }
-
-  async function runBatch() {
-    // Selection order, not list order — `selectedIds` is append-ordered
-    // and the dropdown summary reads back the same way.
-    const pickInSelectionOrder = <T extends { id: string }>(ids: string[], pool: T[]) =>
-      ids.map((id) => pool.find((entry) => entry.id === id)).filter((entry): entry is T => Boolean(entry));
-
-    const selectedPrompts = pickInSelectionOrder(selectedPromptIds, versionOptions);
-    const selectedModels = pickInSelectionOrder(selectedModelIds, readyModels);
-    // A grouped asset is a set of images: run every one of them, in
-    // order, as its own row.
-    const selectedImageReferences = pickInSelectionOrder(
-      selectedImageReferenceIds,
-      imageReferenceAssets,
-    ).flatMap((asset) => expandImageAsset(asset));
-    const selectedUserInputs = textInputAssets
-      .filter((asset) => selectedTextInputAssetIds.includes(asset.id))
-      .flatMap((asset) => parseTextInputs(asset.source));
-    const scenarioUserInputs = selectedUserInputs.length > 0 ? selectedUserInputs : [undefined];
-
-    if (selectedPrompts.length === 0 || selectedModels.length === 0) {
-      setErrorMessage(
-        readyModels.length === 0
-          ? 'Add at least one provider API key in the Models view before running a batch test.'
-          : 'Select at least one system prompt and model before running.',
-      );
-      return;
-    }
-
-    const expandedImageReferenceIds = selectedImageReferences.map((entry) => entry.id);
-
-    const draftScenario = {
-      promptId: selectedPrompts[0].id,
-      promptIds: selectedPrompts.map((prompt) => prompt.id),
-      assetIds: expandedImageReferenceIds.length > 0 ? expandedImageReferenceIds : undefined,
-      assetId: expandedImageReferenceIds[0],
-      userInputAssetIds: selectedTextInputAssetIds.length > 0 ? selectedTextInputAssetIds : undefined,
-      modelIds: selectedModelIds,
-      userInput: selectedUserInputs.length > 0 ? selectedUserInputs.join(' | ') : undefined,
-      stickerize,
-      // Persist the user's exact pick — including 'dynamic' — so the
-      // results header can render "GPT-5.5, Dynamic thinking" rather
-      // than falling back to the legacy inferThinkingLevel heuristic
-      // (which guesses "High" for gpt-5* and would mislabel the run).
-      // Older runs without a thinkingLevel field still flow through the
-      // inference fallback in formatModelLabel.
-      thinkingLevel,
-    };
-    // Run name is the prompt-project name(s) — no version, no timestamp.
-    // Sorted unique projects so the title stays stable across re-runs.
-    const projectNames = (() => {
-      const names = selectedPrompts
-        .map((prompt) => {
-          const project = promptProjects.find((entry) => entry.id === prompt.projectId);
-          return project?.name;
-        })
-        .filter((name): name is string => Boolean(name));
-      return Array.from(new Set(names));
-    })();
-    const draftRunName =
-      projectNames.length === 0
-        ? 'Batch run'
-        : projectNames.length === 1
-          ? projectNames[0]
-          : projectNames.join(', ');
-
-    const draftRun = createRun({
-      name: draftRunName,
-      status: 'running',
-      errorMessage: undefined,
-      scenario: draftScenario,
-      results: [],
-    });
-
-    setRunning(true);
-    setErrorMessage('');
-    closeComposer();
-    setExpandedTests((current) => new Set([draftRun.id, ...current]));
-
-    try {
-      const imageReferenceScenarios = selectedImageReferences.length > 0 ? selectedImageReferences : [undefined];
-      const scenarioQueue = selectedPrompts.flatMap((prompt) =>
-        imageReferenceScenarios.flatMap((imageReference) =>
-          scenarioUserInputs.map((userInput) => ({
-            prompt,
-            imageReference,
-            userInput,
-          })),
-        ),
-      );
-      const results: TestResult[] = [];
-      const errors: string[] = [];
-
-      await Promise.all(
-        scenarioQueue.map(async ({ prompt, imageReference, userInput }) => {
-          try {
-            const apiPayload = await executeScenario(
-              prompt,
-              selectedModels,
-              imageReference,
-              userInput,
-              stickerize,
-            );
-
-            const nextResults = apiPayload.results.map((result, index) => ({
-              id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
-              promptId: prompt.id,
-              modelId: result.modelId,
-              assetId: imageReference?.id,
-              userInput,
-              output: result.output,
-              outputImage: result.outputImage,
-              latencyMs: result.latencyMs,
-              score: result.score,
-            }));
-
-            results.push(...nextResults);
-
-            const errorResults =
-              apiPayload.errors?.map((error, index) => ({
-                id: `result-error-${prompt.id}-${error.modelId}-${Date.now()}-${results.length + nextResults.length + index}`,
-                promptId: prompt.id,
-                modelId: error.modelId,
-                assetId: imageReference?.id,
-                userInput,
-                output: `Error: ${error.message}`,
-                outputImage: undefined,
-                latencyMs: 0,
-                score: 0,
-              })) ?? [];
-
-            results.push(...errorResults);
-
-            apiPayload.errors?.forEach((error) => {
-              const model = getModel(error.modelId);
-              errors.push(`${model?.name ?? 'Unknown Model'}: ${error.message}`);
-            });
-
-            const uniqueErrors = [...new Set(errors)];
-            updateRun(draftRun.id, {
-              status: 'running',
-              errorMessage: uniqueErrors.length > 0 ? uniqueErrors.join(' | ') : undefined,
-              results: [...results],
-            });
-          } catch (error) {
-            errors.push(
-              error instanceof Error ? error.message : 'Batch run failed for an unknown reason.',
-            );
-            const uniqueErrors = [...new Set(errors)];
-            updateRun(draftRun.id, {
-              status: 'running',
-              errorMessage: uniqueErrors.join(' | '),
-              results: [...results],
-            });
-          }
-        }),
-      );
-
-      const uniqueErrors = [...new Set(errors)];
-
-      updateRun(draftRun.id, {
-        status: uniqueErrors.length > 0 ? 'failed' : 'completed',
-        errorMessage: uniqueErrors.length > 0 ? uniqueErrors.join(' | ') : undefined,
-        results: [...results],
-      });
-    } catch (error) {
-      updateRun(draftRun.id, {
-        status: 'failed',
-        errorMessage: error instanceof Error ? error.message : 'Batch run failed for an unknown reason.',
-      });
-    } finally {
-      setRunning(false);
-    }
-  }
 
   // Inject the new "New Batch Test" CTA into the layout topbar.
   useEffect(() => {
@@ -1925,8 +1480,489 @@ export function BatchTestPage() {
         </div>
       </div>
 
+      <BatchComposer
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        onRunCreated={(runId) => setExpandedTests((current) => new Set([runId, ...current]))}
+      />
+
+      {previewImageSrc ? (
+        <div className="composer-backdrop" onClick={() => setPreviewImageSrc(null)}>
+          <section
+            className="surface-card image-preview-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="image-preview-close"
+              onClick={() => setPreviewImageSrc(null)}
+              aria-label="Close image preview"
+            >
+              <X size={18} />
+            </button>
+            <img
+              className="image-preview-sheet-image"
+              src={previewImageSrc}
+              alt="Generated output preview"
+            />
+          </section>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * The New Batch Test modal, split out of `BatchTestPage` so the Prompts
+ * tab can launch a run without navigating first. It owns every field in
+ * the form plus the fan-out in `runBatch`; the host page only says when
+ * it is open and what to do once a run has been created.
+ *
+ * Kept in this module rather than `components/` so the module-level
+ * helpers it leans on (executeScenario's request shapes, toggleSelection,
+ * the thinking-level options) stay in scope for both consumers.
+ */
+export function BatchComposer({
+  open,
+  onClose,
+  initialPromptIds,
+  onRunCreated,
+  onLaunched,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Pre-selected prompt versions, e.g. every version of one project. */
+  initialPromptIds?: string[];
+  /** Fired with the new run's id as soon as it is queued. */
+  onRunCreated?: (runId: string) => void;
+  /** Fired after a run starts — the Prompts tab uses it to switch tabs. */
+  onLaunched?: () => void;
+}) {
+  const { promptProjects, promptVersions, assets, models, providerKeys, createRun, updateRun } =
+    useAppContext();
+  const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
+  const [selectedImageReferenceIds, setSelectedImageReferenceIds] = useState<string[]>([]);
+  const [selectedTextInputAssetIds, setSelectedTextInputAssetIds] = useState<string[]>([]);
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+  const [stickerize, setStickerize] = useState(false);
+  // Default to 'dynamic' — each provider's silent default kicks in, which
+  // is roughly what every run before this knob existed used. Users can
+  // pin a specific effort with the dropdown.
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>('dynamic');
+  const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  function getModel(id: string) {
+    return models.find((model) => model.id === id);
+  }
+
+  // Re-seed the selection each time the modal is opened from a project.
+  useEffect(() => {
+    if (open && initialPromptIds && initialPromptIds.length > 0) {
+      setSelectedPromptIds(initialPromptIds);
+    }
+  }, [open, initialPromptIds]);
+
+  const readyModels = useMemo(
+    () => models.filter((model) => model.status === 'ready' && providerKeys[model.provider]?.hasKey),
+    [models, providerKeys],
+  );
+  const orderPromptSelection = (ids: string[]) => {
+    const byId = new Map(versionOptions.map((version) => [version.id, version]));
+    const projectOrder = new Map<string, number>();
+    ids.forEach((id) => {
+      const projectId = byId.get(id)?.projectId ?? id;
+      if (!projectOrder.has(projectId)) projectOrder.set(projectId, projectOrder.size);
+    });
+
+    return [...ids].sort((left, right) => {
+      const a = byId.get(left);
+      const b = byId.get(right);
+      const aProject = projectOrder.get(a?.projectId ?? left) ?? 0;
+      const bProject = projectOrder.get(b?.projectId ?? right) ?? 0;
+      if (aProject !== bProject) return aProject - bProject;
+      return (a?.version ?? 0) - (b?.version ?? 0);
+    });
+  };
+
+  const versionOptions = useMemo(() => {
+    // Projects stay ordered by most recent activity, but versions read
+    // v1 → vN inside each one; sorting the flat list by `updatedAt`
+    // interleaved projects and put the newest version on top.
+    const projectRecency = new Map<string, number>();
+    promptVersions.forEach((version) => {
+      const stamp = new Date(version.updatedAt).getTime();
+      projectRecency.set(version.projectId, Math.max(projectRecency.get(version.projectId) ?? 0, stamp));
+    });
+
+    return promptVersions
+      .map((version) => {
+        const project = promptProjects.find((entry) => entry.id === version.projectId);
+        return {
+          ...version,
+          projectName: project?.name ?? 'Unknown Project',
+        };
+      })
+      .sort((left, right) => {
+        if (left.projectId !== right.projectId) {
+          return (projectRecency.get(right.projectId) ?? 0) - (projectRecency.get(left.projectId) ?? 0);
+        }
+        return left.version - right.version;
+      });
+  }, [promptProjects, promptVersions]);
+  const imageReferenceAssets = useMemo(
+    () => assets.filter((asset) => asset.kind === 'image-reference'),
+    [assets],
+  );
+  const textInputAssets = useMemo(
+    () => assets.filter((asset) => asset.kind === 'text-inputs'),
+    [assets],
+  );
+
+  // Prompt dropdown options — grouped by project name. The design uses
+  // mono uppercase project names as section headers; we lowercase to
+  // match the design's `dropdown-group-head` styling rule.
+  const promptDropdownOptions = useMemo<DropdownOption[]>(
+    () =>
+      versionOptions.map((prompt) => ({
+        id: prompt.id,
+        label: `v${prompt.version} · ${prompt.systemPrompt.slice(0, 64)}${
+          prompt.systemPrompt.length > 64 ? '…' : ''
+        }`,
+        searchText: `${prompt.projectName.toLowerCase()} v${prompt.version} ${prompt.systemPrompt.toLowerCase()}`,
+        group: prompt.projectId,
+      })),
+    [versionOptions],
+  );
+
+  // Project-name groups for the prompt dropdown.
+  const promptGroups = useMemo<DropdownGroup[]>(
+    () =>
+      versionOptions
+        .map((v) => ({ key: v.projectId, label: v.projectName }))
+        .filter(
+          (g, i, arr) => arr.findIndex((x) => x.key === g.key) === i,
+        ),
+    [versionOptions],
+  );
+
+  const imageReferenceDropdownOptions = useMemo<DropdownOption[]>(
+    () =>
+      imageReferenceAssets.map((asset) => ({
+        id: asset.id,
+        label: asset.name,
+        searchText: asset.name.toLowerCase(),
+      })),
+    [imageReferenceAssets],
+  );
+
+  const textInputDropdownOptions = useMemo<DropdownOption[]>(
+    () =>
+      textInputAssets.map((asset) => ({
+        id: asset.id,
+        label: asset.name,
+        searchText: asset.name.toLowerCase(),
+      })),
+    [textInputAssets],
+  );
+
+  // Model dropdown options — grouped by inferred type (text / image /
+  // video). Type is inferred from the API model id since the catalog
+  // doesn't carry an explicit `type` field.
+  const modelDropdownOptions = useMemo<DropdownOption[]>(
+    () =>
+      readyModels.map((model) => {
+        const id = model.apiModel.toLowerCase();
+        const type = id.includes('image')
+          ? 'image'
+          : id.includes('sora') || id.includes('veo') || id.includes('video')
+            ? 'video'
+            : 'text';
+        return {
+          id: model.id,
+          label: model.name,
+          searchText: `${model.name.toLowerCase()} ${getProviderLabel(model.provider).toLowerCase()}`,
+          group: type,
+          // Reuse the dark-mode-aware ProviderMarkInline so the dropdown
+          // icon swaps to openai_darkmode.png in dark theme — the older
+          // getProviderIconSrc returned a single static asset that read
+          // as a dark blob on the dark dropdown background.
+          icon: <ProviderMarkInline model={model} />,
+        };
+      }),
+    [readyModels],
+  );
+
+  useEffect(() => {
+    setSelectedModelIds((current) => current.filter((id) => readyModels.some((model) => model.id === id)));
+  }, [readyModels]);
+
+  function closeComposer() {
+    onClose();
+    setErrorMessage('');
+    // Close any open dropdown panels the user left expanded — the
+    // selected value itself is preserved so reopening the modal keeps
+    // the user's last pick.
+    setThinkingDropdownOpen(false);
+  }
+
+  async function executeScenario(
+    prompt: PromptVersion,
+    selectedModels: typeof models,
+    asset: AssetRecord | undefined,
+    userInput?: string,
+    shouldStickerize = true,
+  ) {
+    // Fan out one /api/batch-run request per model rather than batching
+    // them all into a single POST. The server-side handler used to
+    // Promise.all over the model list, which meant a slow provider
+    // (e.g. OpenAI image-gen) blocked the response until the request
+    // timeout aborted the whole thing — taking a fast Gemini result
+    // down with it. With per-model requests, each one's timeout /
+    // error is independent: GPT can fail and Gemini
+    // still surfaces its result.
+    const singleModelRequest = async (model: typeof selectedModels[number]) => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), BATCH_REQUEST_TIMEOUT_MS);
+
+      try {
+        const response = await fetch('/api/batch-run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            asset,
+            models: [model],
+            userInput: userInput?.trim() ? userInput : undefined,
+            stickerize: shouldStickerize,
+            // Map the user's pick into the request body so the serverless
+            // function can route it to each provider's thinking knob.
+            // 'dynamic' is omitted (provider default kicks in).
+            thinkingLevel: thinkingLevel !== 'dynamic' ? thinkingLevel : undefined,
+          }),
+          signal: controller.signal,
+        });
+
+        const payload = (await response.json()) as
+          | { results: ApiResult[]; errors?: ApiError[] }
+          | { error?: string; details?: string };
+
+        if (!response.ok || !('results' in payload)) {
+          const failurePayload = payload as { error?: string; details?: string };
+          const message =
+            failurePayload.error || failurePayload.details || 'Batch run failed.';
+          return {
+            results: [] as ApiResult[],
+            errors: [{ modelId: model.id, message }],
+          };
+        }
+
+        return payload as { results: ApiResult[]; errors?: ApiError[] };
+      } catch (error) {
+        const message =
+          error instanceof DOMException && error.name === 'AbortError'
+            ? 'Batch job timed out before the provider returned a result.'
+            : error instanceof Error
+              ? error.message
+              : 'Batch run failed for an unknown reason.';
+        return {
+          results: [] as ApiResult[],
+          errors: [{ modelId: model.id, message }],
+        };
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    };
+
+    const perModelResponses = await Promise.all(selectedModels.map(singleModelRequest));
+    const merged: { results: ApiResult[]; errors: ApiError[] } = { results: [], errors: [] };
+    perModelResponses.forEach((entry) => {
+      merged.results.push(...entry.results);
+      if (entry.errors) merged.errors.push(...entry.errors);
+    });
+    return merged;
+  }
+
+  async function runBatch() {
+    // Selection order, not list order — `selectedIds` is append-ordered
+    // and the dropdown summary reads back the same way.
+    const pickInSelectionOrder = <T extends { id: string }>(ids: string[], pool: T[]) =>
+      ids.map((id) => pool.find((entry) => entry.id === id)).filter((entry): entry is T => Boolean(entry));
+
+    const selectedPrompts = pickInSelectionOrder(selectedPromptIds, versionOptions);
+    const selectedModels = pickInSelectionOrder(selectedModelIds, readyModels);
+    // A grouped asset is a set of images: run every one of them, in
+    // order, as its own row.
+    const selectedImageReferences = pickInSelectionOrder(
+      selectedImageReferenceIds,
+      imageReferenceAssets,
+    ).flatMap((asset) => expandImageAsset(asset));
+    const selectedUserInputs = textInputAssets
+      .filter((asset) => selectedTextInputAssetIds.includes(asset.id))
+      .flatMap((asset) => parseTextInputs(asset.source));
+    const scenarioUserInputs = selectedUserInputs.length > 0 ? selectedUserInputs : [undefined];
+
+    if (selectedPrompts.length === 0 || selectedModels.length === 0) {
+      setErrorMessage(
+        readyModels.length === 0
+          ? 'Add at least one provider API key in the Models view before running a batch test.'
+          : 'Select at least one system prompt and model before running.',
+      );
+      return;
+    }
+
+    const expandedImageReferenceIds = selectedImageReferences.map((entry) => entry.id);
+
+    const draftScenario = {
+      promptId: selectedPrompts[0].id,
+      promptIds: selectedPrompts.map((prompt) => prompt.id),
+      assetIds: expandedImageReferenceIds.length > 0 ? expandedImageReferenceIds : undefined,
+      assetId: expandedImageReferenceIds[0],
+      userInputAssetIds: selectedTextInputAssetIds.length > 0 ? selectedTextInputAssetIds : undefined,
+      modelIds: selectedModelIds,
+      userInput: selectedUserInputs.length > 0 ? selectedUserInputs.join(' | ') : undefined,
+      stickerize,
+      // Persist the user's exact pick — including 'dynamic' — so the
+      // results header can render "GPT-5.5, Dynamic thinking" rather
+      // than falling back to the legacy inferThinkingLevel heuristic
+      // (which guesses "High" for gpt-5* and would mislabel the run).
+      // Older runs without a thinkingLevel field still flow through the
+      // inference fallback in formatModelLabel.
+      thinkingLevel,
+    };
+    // Run name is the prompt-project name(s) — no version, no timestamp.
+    // Sorted unique projects so the title stays stable across re-runs.
+    const projectNames = (() => {
+      const names = selectedPrompts
+        .map((prompt) => {
+          const project = promptProjects.find((entry) => entry.id === prompt.projectId);
+          return project?.name;
+        })
+        .filter((name): name is string => Boolean(name));
+      return Array.from(new Set(names));
+    })();
+    const draftRunName =
+      projectNames.length === 0
+        ? 'Batch run'
+        : projectNames.length === 1
+          ? projectNames[0]
+          : projectNames.join(', ');
+
+    const draftRun = createRun({
+      name: draftRunName,
+      status: 'running',
+      errorMessage: undefined,
+      scenario: draftScenario,
+      results: [],
+    });
+
+    setRunning(true);
+    setErrorMessage('');
+    closeComposer();
+    onRunCreated?.(draftRun.id);
+    // The Prompts tab switches to Batch Test at this point; the run
+    // keeps streaming results into context either way.
+    onLaunched?.();
+
+    try {
+      const imageReferenceScenarios = selectedImageReferences.length > 0 ? selectedImageReferences : [undefined];
+      const scenarioQueue = selectedPrompts.flatMap((prompt) =>
+        imageReferenceScenarios.flatMap((imageReference) =>
+          scenarioUserInputs.map((userInput) => ({
+            prompt,
+            imageReference,
+            userInput,
+          })),
+        ),
+      );
+      const results: TestResult[] = [];
+      const errors: string[] = [];
+
+      await Promise.all(
+        scenarioQueue.map(async ({ prompt, imageReference, userInput }) => {
+          try {
+            const apiPayload = await executeScenario(
+              prompt,
+              selectedModels,
+              imageReference,
+              userInput,
+              stickerize,
+            );
+
+            const nextResults = apiPayload.results.map((result, index) => ({
+              id: `result-${prompt.id}-${result.modelId}-${Date.now()}-${results.length + index}`,
+              promptId: prompt.id,
+              modelId: result.modelId,
+              assetId: imageReference?.id,
+              userInput,
+              output: result.output,
+              outputImage: result.outputImage,
+              latencyMs: result.latencyMs,
+              score: result.score,
+            }));
+
+            results.push(...nextResults);
+
+            const errorResults =
+              apiPayload.errors?.map((error, index) => ({
+                id: `result-error-${prompt.id}-${error.modelId}-${Date.now()}-${results.length + nextResults.length + index}`,
+                promptId: prompt.id,
+                modelId: error.modelId,
+                assetId: imageReference?.id,
+                userInput,
+                output: `Error: ${error.message}`,
+                outputImage: undefined,
+                latencyMs: 0,
+                score: 0,
+              })) ?? [];
+
+            results.push(...errorResults);
+
+            apiPayload.errors?.forEach((error) => {
+              const model = getModel(error.modelId);
+              errors.push(`${model?.name ?? 'Unknown Model'}: ${error.message}`);
+            });
+
+            const uniqueErrors = [...new Set(errors)];
+            updateRun(draftRun.id, {
+              status: 'running',
+              errorMessage: uniqueErrors.length > 0 ? uniqueErrors.join(' | ') : undefined,
+              results: [...results],
+            });
+          } catch (error) {
+            errors.push(
+              error instanceof Error ? error.message : 'Batch run failed for an unknown reason.',
+            );
+            const uniqueErrors = [...new Set(errors)];
+            updateRun(draftRun.id, {
+              status: 'running',
+              errorMessage: uniqueErrors.join(' | '),
+              results: [...results],
+            });
+          }
+        }),
+      );
+
+      const uniqueErrors = [...new Set(errors)];
+
+      updateRun(draftRun.id, {
+        status: uniqueErrors.length > 0 ? 'failed' : 'completed',
+        errorMessage: uniqueErrors.length > 0 ? uniqueErrors.join(' | ') : undefined,
+        results: [...results],
+      });
+    } catch (error) {
+      updateRun(draftRun.id, {
+        status: 'failed',
+        errorMessage: error instanceof Error ? error.message : 'Batch run failed for an unknown reason.',
+      });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
       <div
-        className={`modal-overlay ${composerOpen ? '' : 'hidden'}`}
+        className={`modal-overlay ${open ? '' : 'hidden'}`}
         role="presentation"
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) closeComposer();
@@ -2113,28 +2149,5 @@ export function BatchTestPage() {
         </div>
       </div>
 
-      {previewImageSrc ? (
-        <div className="composer-backdrop" onClick={() => setPreviewImageSrc(null)}>
-          <section
-            className="surface-card image-preview-sheet"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="image-preview-close"
-              onClick={() => setPreviewImageSrc(null)}
-              aria-label="Close image preview"
-            >
-              <X size={18} />
-            </button>
-            <img
-              className="image-preview-sheet-image"
-              src={previewImageSrc}
-              alt="Generated output preview"
-            />
-          </section>
-        </div>
-      ) : null}
-    </>
   );
 }
