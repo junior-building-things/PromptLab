@@ -2,6 +2,7 @@ import { format, formatDistanceToNowStrict } from 'date-fns';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { setPageChrome } from '../components/app-layout';
 import {
+  IconBox,
   IconCheck,
   IconChev,
   IconCopy,
@@ -477,18 +478,3 @@ export function PromptsPage() {
 /** Small wrapper to give each inline SVG icon component an explicit
  * pixel size — the icon components themselves stretch to 100%/100% so
  * their container determines the rendered dimensions. */
-function IconBox({ children, size = 13 }: { children: React.ReactNode; size?: number }) {
-  return (
-    <span
-      style={{
-        display: 'inline-grid',
-        placeItems: 'center',
-        width: size,
-        height: size,
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </span>
-  );
-}

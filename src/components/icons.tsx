@@ -11,6 +11,25 @@ import type { CSSProperties } from 'react';
 
 const baseStyle: CSSProperties = { width: '100%', height: '100%' };
 
+/** Fixed-size slot so every icon lands on the same optical box
+ * regardless of which glyph it holds. Pages used to each carry their own
+ * copy of this. */
+export function IconBox({ children, size = 13 }: { children: React.ReactNode; size?: number }) {
+  return (
+    <span
+      style={{
+        display: 'inline-grid',
+        placeItems: 'center',
+        width: size,
+        height: size,
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 export const IconPlus = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={baseStyle}>
     <path d="M12 5v14M5 12h14" />

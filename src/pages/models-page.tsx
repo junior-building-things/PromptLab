@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  IconBox,
   IconImage,
   IconKey,
   IconText,
@@ -192,18 +193,3 @@ export function ModelsPage() {
   );
 }
 
-function IconBox({ children, size = 13 }: { children: React.ReactNode; size?: number }) {
-  return (
-    <span
-      style={{
-        display: 'inline-grid',
-        placeItems: 'center',
-        width: size,
-        height: size,
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </span>
-  );
-}

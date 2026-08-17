@@ -28,7 +28,7 @@
 
 ## Local Conventions (project-specific)
 - **Design tokens live in [src/styles.css](src/styles.css)** as CSS custom properties. Extend tokens instead of introducing new color literals.
-- **Icons** come from `lucide-react` or [src/components/icons.tsx](src/components/icons.tsx). Don't hand-roll SVG inline elsewhere.
+- **Icons** come from [src/components/icons.tsx](src/components/icons.tsx) — prefer it over `lucide-react`, which is only for glyphs the set doesn't have (download, close, alert, history). Every icon sits in the shared `IconBox` from the same file so glyphs share one optical box; don't re-declare that wrapper per page and don't hand-roll SVG inline.
 - **Modals** route through [src/components/modal.tsx](src/components/modal.tsx); **dropdowns** through [src/components/multi-select-dropdown.tsx](src/components/multi-select-dropdown.tsx). Don't reinvent the chrome.
 - **Shared types** for prompts / assets / models / batch scenarios live in [src/lib/types.ts](src/lib/types.ts). New persisted shapes go there, not next to the consumer.
 - **Provider thinking-effort knob** is the union `ThinkingLevel` in [src/lib/types.ts](src/lib/types.ts:63). Map per-provider quirks at the API layer, not in the UI.

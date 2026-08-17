@@ -1,6 +1,7 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { setPageChrome } from '../components/app-layout';
 import {
+  IconBox,
   IconImage,
   IconMore,
   IconPlus,
@@ -343,18 +344,3 @@ export function AssetsPage() {
   );
 }
 
-function IconBox({ children, size = 13 }: { children: React.ReactNode; size?: number }) {
-  return (
-    <span
-      style={{
-        display: 'inline-grid',
-        placeItems: 'center',
-        width: size,
-        height: size,
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </span>
-  );
-}

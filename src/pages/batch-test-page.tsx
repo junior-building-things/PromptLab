@@ -1,19 +1,9 @@
 import { format } from 'date-fns';
 import {
-  AlertCircle,
-  CheckCircle,
   ChevronDown,
-  ChevronRight,
   Download,
-  Cpu,
   CircleAlert,
-  FileText,
   History as HistoryIcon,
-  ImageIcon,
-  LoaderCircle,
-  MoreHorizontal,
-  Play,
-  Trash2,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -26,23 +16,17 @@ import {
 } from '../components/multi-select-dropdown';
 import { useAppContext } from '../context/app-context';
 
-// Small inline helper for the topbar button — gives a lucide icon a
-// fixed pixel footprint that matches the design's `.btn svg { 13px }`.
-function BoxIcon({ children }: { children: ReactNode }) {
-  return (
-    <span
-      style={{
-        display: 'inline-grid',
-        placeItems: 'center',
-        width: 13,
-        height: 13,
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </span>
-  );
-}
+import {
+  IconBox,
+  IconCheck,
+  IconChev,
+  IconCpu,
+  IconDoc,
+  IconImage,
+  IconPlay,
+  IconSpinner,
+  IconTrash,
+} from '../components/icons';
 import { expandImageAsset, resolveAssetEntry } from '../lib/asset-images';
 import { isRenderableImage, toDataUrl } from '../lib/image-source';
 import { getProviderLabel } from '../lib/model-brand';
@@ -1710,7 +1694,7 @@ export function BatchTestPage() {
     setPageChrome({
       topbarRight: (
         <button type="button" className="btn btn-primary" onClick={openComposer}>
-          <BoxIcon><Play size={13} /></BoxIcon>
+          <IconBox><IconPlay /></IconBox>
           New Batch Test
         </button>
       ),
@@ -1736,7 +1720,7 @@ export function BatchTestPage() {
                 <div key={run.id} className={`batch-job ${isOpen ? 'open' : ''}`}>
                   <div className="batch-head" onClick={() => toggleExpand(run.id)}>
                     <div className="project-chev">
-                      <ChevronRight size={12} />
+                      <IconBox size={12}><IconChev /></IconBox>
                     </div>
                     <div className="batch-titlewrap">
                       <div className="batch-title">{run.name}</div>
@@ -1746,7 +1730,7 @@ export function BatchTestPage() {
                         </span>
                         {run.status === 'running' ? (
                           <span className="batch-pill running">
-                            <span className="spin"><LoaderCircle size={11} /></span>
+                            <span className="spin"><IconBox size={11}><IconSpinner /></IconBox></span>
                             In progress
                           </span>
                         ) : run.status === 'failed' ? (
@@ -1756,7 +1740,7 @@ export function BatchTestPage() {
                           </span>
                         ) : (
                           <span className="batch-pill ok">
-                            <CheckCircle size={11} />
+                            <IconBox size={11}><IconCheck /></IconBox>
                             Complete
                           </span>
                         )}
@@ -1787,7 +1771,7 @@ export function BatchTestPage() {
                           handleRemoveRun(run.id);
                         }}
                       >
-                        <Trash2 size={14} />
+                        <IconBox size={14}><IconTrash /></IconBox>
                       </button>
                     </div>
                   </div>
@@ -1908,7 +1892,11 @@ export function BatchTestPage() {
                 onClick={runBatch}
                 disabled={running}
               >
-                {running ? <LoaderCircle size={13} className="spin" /> : <Play size={13} />}
+                {running ? (
+                  <span className="spin"><IconBox><IconSpinner /></IconBox></span>
+                ) : (
+                  <IconBox><IconPlay /></IconBox>
+                )}
                 {running ? 'Running…' : 'New Job'}
               </button>
             </div>
@@ -1916,7 +1904,7 @@ export function BatchTestPage() {
           <div className="modal-body">
             <div className="field">
               <label className="field-label">
-                <Cpu size={11} />
+                <IconBox size={11}><IconCpu /></IconBox>
                 Model<span className="req">*</span>
               </label>
               <MultiSelectDropdown
@@ -1935,7 +1923,7 @@ export function BatchTestPage() {
 
             <div className="field">
               <label className="field-label">
-                <Cpu size={11} />
+                <IconBox size={11}><IconCpu /></IconBox>
                 Thinking
               </label>
               <div
@@ -1988,7 +1976,7 @@ export function BatchTestPage() {
 
             <div className="field">
               <label className="field-label">
-                <FileText size={11} />
+                <IconBox size={11}><IconDoc /></IconBox>
                 System prompt<span className="req">*</span>
               </label>
               <MultiSelectDropdown
@@ -2003,7 +1991,7 @@ export function BatchTestPage() {
 
             <div className="field">
               <label className="field-label">
-                <ImageIcon size={11} />
+                <IconBox size={11}><IconImage /></IconBox>
                 Image reference
               </label>
               <MultiSelectDropdown
@@ -2019,7 +2007,7 @@ export function BatchTestPage() {
 
             <div className="field">
               <label className="field-label">
-                <FileText size={11} />
+                <IconBox size={11}><IconDoc /></IconBox>
                 Text input
               </label>
               <MultiSelectDropdown
