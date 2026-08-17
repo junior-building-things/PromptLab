@@ -2,11 +2,10 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { setPageChrome } from '../components/app-layout';
 import {
   IconBox,
-  IconImage,
+  IconClose,
   IconTrash,
   IconPlus,
   IconSearch,
-  IconText,
   IconUpload,
 } from '../components/icons';
 import { ConfirmDialog } from '../components/confirm-dialog';
@@ -65,6 +64,7 @@ export function AssetsPage() {
   const [draftFiles, setDraftFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState('');
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -200,11 +200,28 @@ export function AssetsPage() {
         }}
         onCancel={() => setPendingRemoval(null)}
       />
+      {previewSrc ? (
+        <div className="composer-backdrop" onClick={() => setPreviewSrc(null)}>
+          <section
+            className="surface-card image-preview-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="image-preview-close"
+              onClick={() => setPreviewSrc(null)}
+              aria-label="Close image preview"
+            >
+              <IconBox size={16}><IconClose /></IconBox>
+            </button>
+            <img className="image-preview-sheet-image" src={previewSrc} alt="" />
+          </section>
+        </div>
+      ) : null}
       <div className="screen">
         <div className="asset-thead">
           <div>Name</div>
           <div>Preview</div>
-          <div>Type</div>
           <div />
         </div>
         {sortedAssets.length === 0 ? (
@@ -231,12 +248,6 @@ export function AssetsPage() {
                       ))
                     )}
                   </div>
-                  <div>
-                    <span className="a-type">
-                      <IconBox size={11}><IconText /></IconBox>
-                      TEXT
-                    </span>
-                  </div>
                   <div className="a-actions">
                     <button
                       type="button"
@@ -258,9 +269,12 @@ export function AssetsPage() {
                     .slice(0, PREVIEW_LIMIT)
                     .map((source, index) =>
                       isRenderableImage(source) ? (
-                        <div
+                        <button
                           key={`${asset.id}-${index}`}
-                          className="a-thumb"
+                          type="button"
+                          className="a-thumb a-thumb-button"
+                          aria-label={`Preview ${asset.name} ${index + 1}`}
+                          onClick={() => setPreviewSrc(source)}
                           style={{
                             backgroundImage: `url(${source})`,
                             backgroundSize: 'cover',
@@ -276,12 +290,6 @@ export function AssetsPage() {
                       +{getAssetSources(asset).length - PREVIEW_LIMIT}
                     </span>
                   ) : null}
-                </div>
-                <div>
-                  <span className="a-type">
-                    <IconBox size={11}><IconImage /></IconBox>
-                    IMAGE
-                  </span>
                 </div>
                 <div className="a-actions">
                   <button

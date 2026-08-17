@@ -3,6 +3,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
 import { IconBox, IconCheck, IconMonitor, IconMoon, IconSun } from './icons';
+import {
+  applyTheme,
+  readThemeMode,
+  resolveTheme,
+  storeThemeMode,
+  type ThemeMode,
+} from '../lib/theme';
 
 /**
  * App-shell ported verbatim from the Claude Design PromptLab.html mockup:
@@ -128,34 +135,18 @@ function usePageChrome(): PageChromeSnapshot {
   return snapshot;
 }
 
-type ThemeMode = 'system' | 'dark' | 'light';
-
 const THEME_MODES: Array<{ id: ThemeMode; label: string; icon: ReactNode }> = [
   { id: 'system', label: 'System', icon: <IconMonitor /> },
   { id: 'light', label: 'Light', icon: <IconSun /> },
   { id: 'dark', label: 'Dark', icon: <IconMoon /> },
 ];
 
-/** PromptLab's palette is dark at `:root` and light behind
- * `[data-theme="light"]`, so "dark" means removing the attribute. */
-function applyTheme(mode: ThemeMode) {
-  const dark =
-    mode === 'dark' ||
-    (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  const root = document.documentElement;
-  if (dark) root.removeAttribute('data-theme');
-  else root.setAttribute('data-theme', 'light');
-}
-
 function useTheme() {
-  const [mode, setMode] = useState<ThemeMode>(() => {
-    const stored = window.localStorage.getItem('promptlab-theme');
-    return stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'system';
-  });
+  const [mode, setMode] = useState<ThemeMode>(() => readThemeMode());
 
   useEffect(() => {
     applyTheme(mode);
-    window.localStorage.setItem('promptlab-theme', mode);
+    storeThemeMode(mode);
   }, [mode]);
 
   // On System, follow the OS as it flips (macOS auto-dark at dusk).

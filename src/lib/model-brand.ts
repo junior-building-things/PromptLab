@@ -22,3 +22,11 @@ export function getProviderLabel(provider: Provider) {
 export function getProviderIconSrc(provider: Provider) {
   return providerIconSrc[provider];
 }
+
+/** Category names shared by the API Keys tab and the batch-test model
+ * dropdown, so the two can't drift apart. */
+export const MODEL_CATEGORY_LABELS = {
+  text: 'Text & Visual Reasoning',
+  image: 'Image Generation',
+  video: 'Video Generation',
+} as const;

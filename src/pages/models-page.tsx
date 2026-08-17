@@ -7,6 +7,7 @@ import {
   IconVideo,
   ProviderMark,
 } from '../components/icons';
+import { MODEL_CATEGORY_LABELS } from '../lib/model-brand';
 import { useAppContext } from '../context/app-context';
 import type { Provider } from '../lib/types';
 
@@ -56,9 +57,9 @@ function modelType(apiModel: string): 'text' | 'image' | 'video' {
 }
 
 const TYPE_GROUPS = [
-  { key: 'text' as const, label: 'Text & Visual Reasoning', icon: <IconText /> },
-  { key: 'image' as const, label: 'Image Generation', icon: <IconImage /> },
-  { key: 'video' as const, label: 'Video Generation', icon: <IconVideo /> },
+  { key: 'text' as const, label: MODEL_CATEGORY_LABELS.text, icon: <IconText /> },
+  { key: 'image' as const, label: MODEL_CATEGORY_LABELS.image, icon: <IconImage /> },
+  { key: 'video' as const, label: MODEL_CATEGORY_LABELS.video, icon: <IconVideo /> },
 ];
 
 export function ModelsPage() {

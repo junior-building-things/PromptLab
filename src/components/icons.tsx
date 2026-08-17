@@ -151,6 +151,12 @@ export const IconVideo = () => (
   </svg>
 );
 
+export const IconClose = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={baseStyle}>
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+);
+
 export const IconMonitor = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={baseStyle}>
     <rect x="2" y="3" width="20" height="14" rx="2" />

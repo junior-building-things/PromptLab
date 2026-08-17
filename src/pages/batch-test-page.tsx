@@ -29,8 +29,9 @@ import {
   IconTrash,
 } from '../components/icons';
 import { expandImageAsset, resolveAssetEntry } from '../lib/asset-images';
+import { readThemeMode, resolveTheme } from '../lib/theme';
 import { isRenderableImage, toDataUrl } from '../lib/image-source';
-import { getProviderLabel } from '../lib/model-brand';
+import { getProviderLabel, MODEL_CATEGORY_LABELS } from '../lib/model-brand';
 import type {
   AssetRecord,
   BatchRun,
@@ -354,6 +355,9 @@ function generateBatchHtmlReport(
    * `/api/images` route, so the report has to carry its own copy to
    * survive being opened offline or off-origin. */
   inlinedImages: Record<string, string> = {},
+  /** The report is a standalone file, so it bakes in whichever theme
+   * PromptLab is showing rather than following the reader's OS. */
+  theme: 'dark' | 'light' = 'dark',
 ): string {
   function imageSrc(source: string) {
     return inlinedImages[source] ?? source;
@@ -652,13 +656,25 @@ function generateBatchHtmlReport(
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #09090b;
+      ${
+        theme === 'light'
+          ? `--bg: #f6f7f8;
+      --bg-elev: #ffffff;
+      --bg-elev-2: #fafbfc;
+      --text: #18181b;
+      --text-muted: #52525b;
+      --text-dim: #71717a;
+      --hairline: rgba(0, 0, 0, 0.10);
+      --output-code: #18181b;`
+          : `--bg: #09090b;
       --bg-elev: #18181b;
       --bg-elev-2: #27272a;
       --text: #f4f4f5;
       --text-muted: #a1a1aa;
       --text-dim: #71717a;
       --hairline: rgba(255, 255, 255, 0.08);
+      --output-code: oklch(0.82 0.08 195);`
+      }
       --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
       --font-mono: 'Fira Code', monospace;
       --ai: #8b5cf6;
@@ -823,7 +839,7 @@ function generateBatchHtmlReport(
       white-space: pre-wrap;
     }
     .output-json {
-      background: rgba(0, 0, 0, 0.25);
+      background: ${theme === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.25)'};
       border: 1px solid var(--hairline);
       border-radius: 6px;
       padding: 10px;
@@ -831,7 +847,7 @@ function generateBatchHtmlReport(
       font-size: 11px;
       overflow-x: auto;
       max-height: 280px;
-      color: oklch(0.82 0.08 195);
+      color: var(--output-code);
       white-space: pre-wrap;
       word-break: break-all;
       /* Transparent scrollbar so the rounded panel reads as a clean
@@ -1015,16 +1031,25 @@ function BatchResultCell({
                         borderRadius: '4px',
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-all',
-                        color: 'oklch(0.82 0.08 195)', // elegant premium teal/blue
+                        color: 'var(--output-code)',
                         textAlign: 'left',
                         width: '100%',
+                        // Matches the downloadable report: long outputs
+                        // scroll inside the cell instead of stretching
+                        // the whole row.
+                        maxHeight: 280,
+                        overflow: 'auto',
                       }}
                     >
                       {JSON.stringify(jsonObject, null, 2)}
                     </pre>
                   );
                 }
-                return <p>{result.output || 'No image output returned.'}</p>;
+                return (
+                  <p style={{ maxHeight: 280, overflow: 'auto', textAlign: 'left', width: '100%' }}>
+                    {result.output || 'No image output returned.'}
+                  </p>
+                );
               })()}
             </div>
           )}
@@ -1269,6 +1294,7 @@ export function BatchTestPage() {
       models,
       providerLogos,
       inlinedImages,
+      resolveTheme(readThemeMode()),
     );
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const downloadUrl = URL.createObjectURL(blob);
@@ -1944,9 +1970,9 @@ export function BatchTestPage() {
                 emptyLabel="Select models…"
                 searchPlaceholder="Search models…"
                 groups={[
-                  { key: 'text', label: 'Text' },
-                  { key: 'image', label: 'Image' },
-                  { key: 'video', label: 'Video' },
+                  { key: 'text', label: MODEL_CATEGORY_LABELS.text },
+                  { key: 'image', label: MODEL_CATEGORY_LABELS.image },
+                  { key: 'video', label: MODEL_CATEGORY_LABELS.video },
                 ]}
               />
             </div>

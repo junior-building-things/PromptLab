@@ -1,4 +1,6 @@
 :root {
+  /* Batch output code blocks — teal on dark, near-black on light. */
+  --output-code: oklch(0.82 0.08 195);
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
@@ -35,6 +37,8 @@
 }
 
 [data-theme="light"] {
+  /* Teal-on-dark is barely legible here; near-black reads cleanly. */
+  --output-code: oklch(0.22 0.01 260);
   --bg: #f6f7f8;
   --bg-elev-1: #ffffff;
   --bg-elev-2: #fafbfc;
@@ -137,10 +141,10 @@ button { cursor: pointer; }
 }
 @keyframes brand-glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 4px 0 oklch(0.65 0.17 var(--ai-h) / 0.25);
+    box-shadow: 0 0 3px 0 oklch(0.65 0.17 var(--ai-h) / 0.25);
   }
   50% {
-    box-shadow: 0 0 13px 2px oklch(0.65 0.17 var(--ai-h) / 0.65);
+    box-shadow: 0 0 8px 1px oklch(0.65 0.17 var(--ai-h) / 0.65);
   }
 }
 @property --snake-a {
@@ -719,7 +723,7 @@ button { cursor: pointer; }
 /* ============== ASSETS (DictateAI table pattern) ============== */
 .asset-thead {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(280px, 1fr) 90px 40px;
+  grid-template-columns: minmax(180px, 220px) minmax(280px, 1fr) 40px;
   gap: 16px;
   padding: 10px 20px;
   position: sticky; top: 0;
@@ -760,7 +764,7 @@ button { cursor: pointer; }
 
 .asset-row {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(280px, 1fr) 90px 40px;
+  grid-template-columns: minmax(180px, 220px) minmax(280px, 1fr) 40px;
   gap: 16px;
   align-items: center;
   padding: 12px 20px;
@@ -811,6 +815,9 @@ button { cursor: pointer; }
   flex-shrink: 0;
   position: relative;
 }
+.asset-row .a-thumb-button { padding: 0; border: 0; cursor: zoom-in; }
+.asset-row .a-thumb-button:hover { outline: 1px solid var(--hairline-strong); }
+
 .asset-row .a-thumb::after {
   content: ""; position: absolute; inset: 0;
   background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);

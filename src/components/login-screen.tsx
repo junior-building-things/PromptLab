@@ -85,8 +85,7 @@ export function LoginScreen({ loading, errorMessage, onLogin }: LoginScreenProps
               Sign in to <span className="na-mono">PromptLab</span>
             </h1>
             <p className="na-lede">
-              PromptLab is your prompt engineering workspace — iterate on prompts, batch
-              test across models, and ship the best candidate.
+              Manage prompt projects, store reusable assets, and run batch testing.
             </p>
 
             {redirecting ? (
