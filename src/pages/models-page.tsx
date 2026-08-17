@@ -31,8 +31,8 @@ type ProviderConfig = {
 };
 
 const PROVIDERS_ORDER: ProviderConfig[] = [
-  { id: 'openai', name: 'OpenAI', accent: 'oklch(0.78 0.14 165)' },
   { id: 'gemini', name: 'Google', accent: 'oklch(0.74 0.14 250)' },
+  { id: 'openai', name: 'OpenAI', accent: 'oklch(0.78 0.14 165)' },
   { id: 'xai', name: 'xAI', accent: 'oklch(0.78 0.14 30)' },
 ];
 
@@ -56,9 +56,9 @@ function modelType(apiModel: string): 'text' | 'image' | 'video' {
 }
 
 const TYPE_GROUPS = [
-  { key: 'text' as const, label: 'Text', icon: <IconText /> },
-  { key: 'image' as const, label: 'Image', icon: <IconImage /> },
-  { key: 'video' as const, label: 'Video', icon: <IconVideo /> },
+  { key: 'text' as const, label: 'Text & Visual Reasoning', icon: <IconText /> },
+  { key: 'image' as const, label: 'Image Generation', icon: <IconImage /> },
+  { key: 'video' as const, label: 'Video Generation', icon: <IconVideo /> },
 ];
 
 export function ModelsPage() {

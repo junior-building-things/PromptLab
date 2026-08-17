@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { setPageChrome } from '../components/app-layout';
+import { ConfirmDialog } from '../components/confirm-dialog';
 import {
   MultiSelectDropdown,
   type DropdownGroup,
@@ -1045,6 +1046,7 @@ export function BatchTestPage() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
   const [openRunMenuId, setOpenRunMenuId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
   const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
   const [selectedImageReferenceIds, setSelectedImageReferenceIds] = useState<string[]>([]);
   const [selectedTextInputAssetIds, setSelectedTextInputAssetIds] = useState<string[]>([]);
@@ -1724,6 +1726,15 @@ export function BatchTestPage() {
 
   return (
     <>
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        message={`Remove ${pendingRemoval?.name ?? ''} and its results?`}
+        onConfirm={() => {
+          if (pendingRemoval) handleRemoveRun(pendingRemoval.id);
+          setPendingRemoval(null);
+        }}
+        onCancel={() => setPendingRemoval(null)}
+      />
       <div className="body">
         <div className="batch-list">
           {history.length === 0 ? (
@@ -1787,7 +1798,7 @@ export function BatchTestPage() {
                         title="Remove"
                         onClick={(event) => {
                           event.stopPropagation();
-                          handleRemoveRun(run.id);
+                          setPendingRemoval({ id: run.id, name: run.name });
                         }}
                       >
                         <IconBox size={14}><IconTrash /></IconBox>

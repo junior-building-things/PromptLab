@@ -12,6 +12,7 @@ import {
   IconSearch,
   IconTrash,
 } from '../components/icons';
+import { ConfirmDialog } from '../components/confirm-dialog';
 import { Modal } from '../components/modal';
 import { useAppContext } from '../context/app-context';
 import type { PromptVersion } from '../lib/types';
@@ -80,6 +81,7 @@ export function PromptsPage() {
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
   const [projectTypeOpen, setProjectTypeOpen] = useState(false);
   const [copiedVersionId, setCopiedVersionId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
   const copyResetRef = useRef<number | null>(null);
 
   useEffect(
@@ -230,9 +232,12 @@ export function PromptsPage() {
   };
 
   const handleRemoveProject = (projectId: string, projectName: string) => {
-    if (window.confirm(`Remove ${projectName} and all of its prompt versions?`)) {
-      removePromptProject(projectId);
-    }
+    setPendingRemoval({ id: projectId, name: projectName });
+  };
+
+  const confirmRemoveProject = () => {
+    if (pendingRemoval) removePromptProject(pendingRemoval.id);
+    setPendingRemoval(null);
   };
 
   const canCreate =
@@ -240,6 +245,12 @@ export function PromptsPage() {
 
   return (
     <>
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        message={`Remove ${pendingRemoval?.name ?? ''} and all of its prompt versions?`}
+        onConfirm={confirmRemoveProject}
+        onCancel={() => setPendingRemoval(null)}
+      />
       <div className="body">
         <div className="section" style={{ marginTop: 0 }}>
           {cards.length === 0 ? (

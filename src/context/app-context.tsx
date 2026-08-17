@@ -128,11 +128,13 @@ const defaultState: AppState = {
 const legacyModelIdMap: Record<string, string> = {
   'model-openai-4o': 'model-openai-gpt-image-1-5',
   'model-openai-gpt-image': 'model-openai-gpt-image-1-5',
-  'model-openai-gpt-image-2': 'model-openai-gpt-image-1-5',
   'model-gemini-2.5-pro': 'model-gemini-gemini-2-5-pro',
   'model-gemini-nano-banana': 'model-gemini-gemini-2-5-flash-image',
-  'model-gemini-nano-banana-2': 'model-gemini-gemini-3-1-flash-image-preview',
-  'model-gemini-nano-banana-pro': 'model-gemini-gemini-3-pro-image-preview',
+  'model-gemini-nano-banana-2': 'model-gemini-gemini-3-1-flash-image',
+  'model-gemini-nano-banana-pro': 'model-gemini-gemini-3-pro-image',
+  // Google dropped the -preview suffix on these once they went GA.
+  'model-gemini-gemini-3-1-flash-image-preview': 'model-gemini-gemini-3-1-flash-image',
+  'model-gemini-gemini-3-pro-image-preview': 'model-gemini-gemini-3-pro-image',
   'model-xai-aurora': 'model-xai-grok-4-3',
 };
 

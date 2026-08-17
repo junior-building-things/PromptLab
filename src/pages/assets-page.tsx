@@ -9,6 +9,7 @@ import {
   IconText,
   IconUpload,
 } from '../components/icons';
+import { ConfirmDialog } from '../components/confirm-dialog';
 import { Modal } from '../components/modal';
 import { useAppContext } from '../context/app-context';
 import { getAssetSources, isGroupedAsset } from '../lib/asset-images';
@@ -57,6 +58,7 @@ export function AssetsPage() {
   const [draftFiles, setDraftFiles] = useState<File[]>([]);
   const [draftFileLabel, setDraftFileLabel] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const sortedAssets = useMemo(() => {
@@ -165,6 +167,15 @@ export function AssetsPage() {
 
   return (
     <>
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        message={`Remove ${pendingRemoval?.name ?? ''}?`}
+        onConfirm={() => {
+          if (pendingRemoval) removeAsset(pendingRemoval.id);
+          setPendingRemoval(null);
+        }}
+        onCancel={() => setPendingRemoval(null)}
+      />
       <div className="screen">
         <div className="asset-thead">
           <div>Name</div>
@@ -207,9 +218,7 @@ export function AssetsPage() {
                       type="button"
                       className="icon-btn naked"
                       aria-label="Remove asset"
-                      onClick={() => {
-                        if (window.confirm(`Remove ${asset.name}?`)) removeAsset(asset.id);
-                      }}
+                      onClick={() => setPendingRemoval({ id: asset.id, name: asset.name })}
                     >
                       <IconBox><IconTrash /></IconBox>
                     </button>
@@ -253,9 +262,7 @@ export function AssetsPage() {
                     type="button"
                     className="icon-btn naked"
                     aria-label="Remove asset"
-                    onClick={() => {
-                      if (window.confirm(`Remove ${asset.name}?`)) removeAsset(asset.id);
-                    }}
+                    onClick={() => setPendingRemoval({ id: asset.id, name: asset.name })}
                   >
                     <IconBox><IconTrash /></IconBox>
                   </button>
