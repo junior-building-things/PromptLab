@@ -838,8 +838,7 @@ button { cursor: pointer; }
   font-family: var(--font-mono); font-size: 11px;
   color: var(--text-dim); letter-spacing: 0.04em;
 }
-.asset-row .a-actions { display: flex; justify-content: flex-end; opacity: 0; transition: opacity 0.12s ease; }
-.asset-row:hover .a-actions { opacity: 1; }
+.asset-row .a-actions { display: flex; justify-content: flex-end; }
 
 /* Stickerize toggle row in New Batch modal */
 .field-toggle-row {

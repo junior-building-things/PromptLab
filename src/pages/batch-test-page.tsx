@@ -1785,7 +1785,6 @@ export function BatchTestPage() {
                         className="icon-btn naked"
                         aria-label="Delete batch test"
                         title="Remove"
-                        style={{ color: 'var(--rose)' }}
                         onClick={(event) => {
                           event.stopPropagation();
                           handleRemoveRun(run.id);

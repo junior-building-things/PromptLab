@@ -3,7 +3,7 @@ import { setPageChrome } from '../components/app-layout';
 import {
   IconBox,
   IconImage,
-  IconMore,
+  IconTrash,
   IconPlus,
   IconSearch,
   IconText,
@@ -206,12 +206,12 @@ export function AssetsPage() {
                     <button
                       type="button"
                       className="icon-btn naked"
-                      aria-label="Asset actions"
+                      aria-label="Remove asset"
                       onClick={() => {
                         if (window.confirm(`Remove ${asset.name}?`)) removeAsset(asset.id);
                       }}
                     >
-                      <IconBox><IconMore /></IconBox>
+                      <IconBox><IconTrash /></IconBox>
                     </button>
                   </div>
                 </div>
@@ -252,12 +252,12 @@ export function AssetsPage() {
                   <button
                     type="button"
                     className="icon-btn naked"
-                    aria-label="Asset actions"
+                    aria-label="Remove asset"
                     onClick={() => {
                       if (window.confirm(`Remove ${asset.name}?`)) removeAsset(asset.id);
                     }}
                   >
-                    <IconBox><IconMore /></IconBox>
+                    <IconBox><IconTrash /></IconBox>
                   </button>
                 </div>
               </div>
