@@ -5,13 +5,6 @@ const STATE_COOKIE_NAME = 'promptlab-lark-state';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const STATE_MAX_AGE_SECONDS = 60 * 10;
 
-/**
- * Email allowlist gate. Mirrors Hamlet's auth callback — only addresses
- * in this set can mint a session. Extend as needed; consider lifting to
- * a comma-separated env var if the list grows beyond a handful.
- */
-const ALLOWED_EMAILS = new Set(['thomas.oefverstroem@bytedance.com']);
-
 function base64UrlEncode(value) {
   return Buffer.from(value).toString('base64url');
 }
@@ -153,11 +146,6 @@ export function hasRequiredAuthConfig() {
   return Boolean(
     process.env.LARK_APP_ID && process.env.LARK_APP_SECRET && process.env.SESSION_SECRET,
   );
-}
-
-export function isEmailAllowed(email) {
-  if (!email) return false;
-  return ALLOWED_EMAILS.has(email.toLowerCase());
 }
 
 function encodeSignedPayload(payload) {

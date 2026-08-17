@@ -2,7 +2,6 @@ import {
   clearStateCookie,
   getLarkConfig,
   hasRequiredAuthConfig,
-  isEmailAllowed,
   readStateCookie,
   redirect,
   setSessionCookie,
@@ -111,7 +110,9 @@ function normalizeUser(userInfo) {
  *   2. Mint an app_access_token.
  *   3. Exchange the user code for an access_token.
  *   4. Fetch the user profile.
- *   5. Gate on the email allowlist (`ALLOWED_EMAILS` in `_lib/auth.js`).
+ *   5. Mint the session. There is no per-address gate: the Lark app is
+ *      internal to the tenant, so completing this flow at all means the
+ *      user is a signed-in colleague.
  *   6. Set the session cookie and 302 back to `/`.
  *
  * Any failure short-circuits to `/?auth_error=<code>`; the React layer
@@ -152,11 +153,6 @@ export default async function handler(req, res) {
     const userAccessToken = await fetchUserAccessToken(config, appAccessToken, code);
     const userInfo = await fetchUserInfo(config, userAccessToken);
     const user = normalizeUser(userInfo);
-
-    if (!isEmailAllowed(user.email)) {
-      redirectWithError(res, 'access_limited');
-      return;
-    }
 
     setSessionCookie(res, user);
     clearStateCookie(res);

@@ -36,7 +36,7 @@
 - **Workspace state** is keyed per-user via `AppProvider`'s `storageKey={\`promptlab-state-user:${user.id}\`}` ([src/App.tsx:19](src/App.tsx#L19)) — never reach across users.
 
 ## Auth
-Lark / Feishu OAuth (mirrors Hamlet's pattern). Flow lives in [api/auth/lark/](api/auth/lark/) and the email allowlist is `ALLOWED_EMAILS` in [api/_lib/auth.js](api/_lib/auth.js). Add yourself there before first sign-in. Session cookie is `promptlab-session`, signed HMAC-SHA256 with `SESSION_SECRET`.
+Lark / Feishu OAuth (mirrors Hamlet's pattern). Flow lives in [api/auth/lark/](api/auth/lark/). **There is no per-address allowlist** — the Lark app is internal to the ByteDance tenant, so anyone who can complete the OAuth flow is a colleague and gets a session. Each user lands in their own workspace (state, images and provider keys are all keyed by user id), so opening access shares the tool, not the data. Session cookie is `promptlab-session`, signed HMAC-SHA256 with `SESSION_SECRET`.
 
 The Lark app is **`cli_a911076bd5f8dbde`, shared with sa-outfit** — rotating its secret means updating both `promptlab-lark-app-secret` and `sa-outfit-lark-secret`. Its redirect allowlist must contain `https://promptlab-416594255546.asia-southeast1.run.app/api/auth/lark/callback`; without it the callback bounces and sign-in fails.
 
@@ -56,7 +56,7 @@ Cloud Run service `promptlab` in project `tiktok-im`, region `asia-southeast1` �
 
 A CI deploy takes **~30 minutes** — most of it baking the 455 MB model into the image on a small regional worker. It is not hung; watch it with `gcloud builds list --region asia-southeast1` (CI's builds are regional, so a plain `gcloud builds list` shows nothing and looks like a failure).
 
-Service shape: `--allow-unauthenticated` (public URL; access control is the Lark OAuth allowlist, not IAM), **2 vCPU / 2 GiB**, request timeout 600s. The memory and CPU are sized for the resident cutout model, not the web app — don't trim them without reading Background Removal below. Note that CPU inference is real work on the instance, so several concurrent batches contend for those 2 vCPUs.
+Service shape: `--allow-unauthenticated` (public URL; access control is Lark tenant sign-in, not IAM), **2 vCPU / 2 GiB**, request timeout 600s. The memory and CPU are sized for the resident cutout model, not the web app — don't trim them without reading Background Removal below. Note that CPU inference is real work on the instance, so several concurrent batches contend for those 2 vCPUs.
 
 **This app was migrated off Vercel (2026-08-16); nothing runs there any more.** No `vercel.json`, no `vercel dev` — [server.js](server.js) is the only runtime. If you find yourself reaching for a platform-specific config file, you want the Dockerfile or the workflow instead.
 

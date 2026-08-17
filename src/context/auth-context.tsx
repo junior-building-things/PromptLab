@@ -28,8 +28,6 @@ function mapAuthError(code: string) {
       return 'The Lark sign-in flow expired or was interrupted. Try again.';
     case 'access_denied':
       return 'The Lark sign-in request was cancelled or denied.';
-    case 'access_limited':
-      return 'Your Lark account isn’t on the access list yet. Ask a maintainer to add you.';
     case 'oauth_failed':
       return 'Lark sign-in failed during the token exchange. Check the serverless logs.';
     default:
