@@ -4,6 +4,8 @@
   --output-code: oklch(0.82 0.08 195);
   --output-code-bg: rgba(0, 0, 0, 0.25);
   --scroll-thumb: rgba(255, 255, 255, 0.18);
+  --lk-btn-bg: #fff;
+  --lk-btn-fg: #000;
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
@@ -46,6 +48,8 @@
   --output-code: oklch(0.22 0.01 260);
   --output-code-bg: rgba(0, 0, 0, 0.04);
   --scroll-thumb: rgba(0, 0, 0, 0.22);
+  --lk-btn-bg: #000;
+  --lk-btn-fg: #fff;
   --bg: #f6f7f8;
   --bg-elev-1: #ffffff;
   --bg-elev-2: #fafbfc;
@@ -1688,7 +1692,7 @@ button { cursor: pointer; }
   max-width: 400px;
   height: 48px;
   padding: 0 24px;
-  background: #fff; color: #000;
+  background: var(--lk-btn-bg); color: var(--lk-btn-fg);
   border: 0; border-radius: 10px;
   font-family: var(--font-sans);
   font-size: 14px; font-weight: 500;
