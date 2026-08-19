@@ -1346,10 +1346,8 @@ export function BatchTestPage() {
       <div className="body">
         <div className="batch-list">
           {history.length === 0 ? (
-            <div className="hero" style={{ padding: 32, textAlign: 'center' }}>
-              <div className="page-sub">
-                No batch tests yet — hit "New Batch Test" to compare prompts and models.
-              </div>
+            <div style={{ padding: '32px 20px', textAlign: 'center' }} className="page-sub">
+              No batch tests yet — hit "New Batch Test" to compare prompts and models.
             </div>
           ) : (
             history.map((run) => {
