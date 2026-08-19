@@ -1695,9 +1695,14 @@ export function BatchComposer({
   // Model dropdown options — grouped by inferred type (text / image /
   // video). Type is inferred from the API model id since the catalog
   // doesn't carry an explicit `type` field.
+  const selectableModels = useMemo(
+    () => models.filter((model) => model.status === 'ready'),
+    [models],
+  );
+
   const modelDropdownOptions = useMemo<DropdownOption[]>(
     () =>
-      readyModels.map((model) => {
+      selectableModels.map((model) => {
         const id = model.apiModel.toLowerCase();
         const type = id.includes('image')
           ? 'image'
@@ -1714,9 +1719,11 @@ export function BatchComposer({
           // getProviderIconSrc returned a single static asset that read
           // as a dark blob on the dark dropdown background.
           icon: <ProviderMarkInline model={model} />,
+          disabled: !providerKeys[model.provider]?.hasKey,
+          hint: providerKeys[model.provider]?.hasKey ? undefined : 'needs API key',
         };
       }),
-    [readyModels],
+    [selectableModels, providerKeys],
   );
 
   useEffect(() => {

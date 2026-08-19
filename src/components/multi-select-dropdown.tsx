@@ -41,6 +41,12 @@ export type DropdownOption = {
    * with no `group` are rendered in a single anonymous bucket above
    * any grouped sections. */
   group?: string;
+  /** Renders the option greyed out and unselectable. Use for things the
+   * user can see but can't pick yet — e.g. a model whose provider has
+   * no API key saved. */
+  disabled?: boolean;
+  /** Short reason shown on the right of a disabled option. */
+  hint?: string;
 };
 
 export type DropdownGroup = {
@@ -244,8 +250,11 @@ export function MultiSelectDropdown({
                         key={option.id}
                         className={`dropdown-option dropdown-option-model ${
                           isSelected ? 'multi-selected' : ''
-                        }`}
-                        onClick={() => handleToggle(option.id)}
+                        } ${option.disabled ? 'is-disabled' : ''}`}
+                        aria-disabled={option.disabled || undefined}
+                        onClick={() => {
+                          if (!option.disabled) handleToggle(option.id);
+                        }}
                       >
                         {option.icon ? (
                           <span
@@ -265,6 +274,9 @@ export function MultiSelectDropdown({
                         >
                           {option.label}
                         </span>
+                        {option.disabled && option.hint ? (
+                          <span className="dropdown-option-hint">{option.hint}</span>
+                        ) : null}
                       </div>
                     );
                   })}

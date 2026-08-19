@@ -1117,6 +1117,18 @@ button { cursor: pointer; }
   width: 14px; height: 14px; display: block;
 }
 .batch-cell-th .batch-provider-img { width: 12px; height: 12px; margin-right: 4px; }
+/* Options the user can see but not pick yet — a model whose provider
+ * has no API key saved. Visible so the catalog is discoverable before
+ * committing a key. */
+.dropdown-option.is-disabled { opacity: 0.45; cursor: default; }
+.dropdown-option.is-disabled:hover { background: transparent; }
+.dropdown-option-hint {
+  flex-shrink: 0;
+  font-family: var(--font-mono); font-size: 9.5px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
 /* Output scrollers. Same treatment as the downloadable report: the
  * track is invisible and the thumb only materialises while the user is
  * actually scrolling (JS adds .is-scrolling) or hovering the box, so a
